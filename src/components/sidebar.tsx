@@ -9,7 +9,7 @@ const menu = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Classes", href: "/classes", icon: BookOpen },
   { name: "Students", href: "/students", icon: Users },
-  { name: "Teachers", href: "/teachers", icon: Users },
+  { name: "Employees", href: "/employees", icon: Users },
 ];
 
 export default function Sidebar() {

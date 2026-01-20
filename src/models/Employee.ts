@@ -1,15 +1,18 @@
 import mongoose, { Schema, model, models } from "mongoose";
 
-export interface ITeacher {
+export interface IEmployee {
   _id?: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   dateOfBirth: Date;
+  gender: "male" | "female" | "other";
+  nicNumber: string;
+  staffCategory: "teacher" | "other";
   qualification: string;
-  experience: number; // years
-  subject: string;
+  experience: number;
+  subject?: string; // Optional, only for teachers
   address: string;
   salary: number;
   joiningDate: Date;
@@ -23,7 +26,7 @@ export interface ITeacher {
   updatedAt?: Date;
 }
 
-const TeacherSchema = new Schema<ITeacher>(
+const EmployeeSchema = new Schema<IEmployee>(
   {
     firstName: {
       type: String,
@@ -51,6 +54,21 @@ const TeacherSchema = new Schema<ITeacher>(
       type: Date,
       required: [true, "Date of birth is required"],
     },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      required: [true, "Gender is required"],
+    },
+    nicNumber: {
+      type: String,
+      required: [true, "NIC number is required"],
+      trim: true,
+    },
+    staffCategory: {
+      type: String,
+      enum: ["teacher", "other"],
+      required: [true, "Staff category is required"],
+    },
     qualification: {
       type: String,
       required: [true, "Qualification is required"],
@@ -63,7 +81,6 @@ const TeacherSchema = new Schema<ITeacher>(
     },
     subject: {
       type: String,
-      required: [true, "Subject is required"],
       trim: true,
     },
     address: {
@@ -105,6 +122,7 @@ const TeacherSchema = new Schema<ITeacher>(
   },
 );
 
-const Teacher = models.Teacher || model<ITeacher>("Teacher", TeacherSchema);
+const Employee =
+  models.Employee || model<IEmployee>("Employee", EmployeeSchema);
 
-export default Teacher;
+export default Employee;

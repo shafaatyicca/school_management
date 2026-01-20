@@ -30,24 +30,27 @@ import {
   Wallet,
   Save,
   ShieldAlert,
+  Briefcase,
+  CreditCard,
+  UserCircle,
 } from "lucide-react";
-import type { ITeacher } from "@/models/Teacher";
+import type { IEmployee } from "@/models/Employee";
 
-interface TeacherFormModalProps {
+interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  teacher?: ITeacher | null;
+  employee?: IEmployee | null;
   isLoading: boolean;
 }
 
-export default function TeacherFormModal({
+export default function EmployeeFormModal({
   isOpen,
   onClose,
   onSubmit,
-  teacher,
+  employee,
   isLoading,
-}: TeacherFormModalProps) {
+}: EmployeeFormModalProps) {
   const {
     register,
     handleSubmit,
@@ -58,25 +61,30 @@ export default function TeacherFormModal({
   } = useForm();
 
   const selectedStatus = watch("status");
+  const selectedGender = watch("gender");
+  const selectedStaffCategory = watch("staffCategory");
 
   useEffect(() => {
-    if (teacher) {
+    if (employee) {
       reset({
-        firstName: teacher.firstName,
-        lastName: teacher.lastName,
-        email: teacher.email,
-        phone: teacher.phone,
-        dateOfBirth: new Date(teacher.dateOfBirth).toISOString().split("T")[0],
-        qualification: teacher.qualification,
-        experience: teacher.experience,
-        subject: teacher.subject,
-        address: teacher.address,
-        salary: teacher.salary,
-        joiningDate: new Date(teacher.joiningDate).toISOString().split("T")[0],
-        status: teacher.status,
-        emergencyContactName: teacher.emergencyContact.name,
-        emergencyContactPhone: teacher.emergencyContact.phone,
-        emergencyContactRelation: teacher.emergencyContact.relation,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        phone: employee.phone,
+        dateOfBirth: new Date(employee.dateOfBirth).toISOString().split("T")[0],
+        gender: employee.gender,
+        nicNumber: employee.nicNumber,
+        staffCategory: employee.staffCategory,
+        qualification: employee.qualification,
+        experience: employee.experience,
+        subject: employee.subject || "",
+        address: employee.address,
+        salary: employee.salary,
+        joiningDate: new Date(employee.joiningDate).toISOString().split("T")[0],
+        status: employee.status,
+        emergencyContactName: employee.emergencyContact.name,
+        emergencyContactPhone: employee.emergencyContact.phone,
+        emergencyContactRelation: employee.emergencyContact.relation,
       });
     } else {
       reset({
@@ -85,6 +93,9 @@ export default function TeacherFormModal({
         email: "",
         phone: "",
         dateOfBirth: "",
+        gender: "",
+        nicNumber: "",
+        staffCategory: "",
         qualification: "",
         experience: 0,
         subject: "",
@@ -97,7 +108,7 @@ export default function TeacherFormModal({
         emergencyContactRelation: "",
       });
     }
-  }, [teacher, reset]);
+  }, [employee, reset]);
 
   const onFormSubmit = (data: any) => {
     const formattedData = {
@@ -121,7 +132,7 @@ export default function TeacherFormModal({
         <DialogHeader className="p-2 bg-slate-900 text-white shrink-0">
           <DialogTitle className="text-lg font-bold flex items-center gap-2">
             <User className="size-5 text-blue-400" />
-            {teacher ? "Edit Teacher Profile" : "Add Teacher"}
+            {employee ? "Edit Employee Profile" : "Add Employee"}
           </DialogTitle>
         </DialogHeader>
 
@@ -202,6 +213,38 @@ export default function TeacherFormModal({
                 </div>
 
                 <div className="space-y-1">
+                  <Label className="text-xs font-medium">Gender *</Label>
+                  <div className="relative">
+                    <UserCircle className="absolute left-2.5 top-2.5 size-4 text-slate-400 z-10" />
+                    <Select
+                      value={selectedGender}
+                      onValueChange={(v) => setValue("gender", v)}
+                    >
+                      <SelectTrigger className="h-9 text-sm pl-9">
+                        <SelectValue placeholder="Select gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">NIC Number *</Label>
+                  <div className="relative">
+                    <CreditCard className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
+                    <Input
+                      {...register("nicNumber", { required: "Required" })}
+                      className="pl-9 h-9 text-sm"
+                      placeholder="12345-1234567-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
                   <Label className="text-xs font-medium">Address *</Label>
                   <div className="relative">
                     <MapPin className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
@@ -225,36 +268,59 @@ export default function TeacherFormModal({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Row 1: Qualification & Subject */}
+                {/* Staff Category */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">
+                    Staff Category *
+                  </Label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-2.5 top-2.5 size-4 text-slate-400 z-10" />
+                    <Select
+                      value={selectedStaffCategory}
+                      onValueChange={(v) => setValue("staffCategory", v)}
+                    >
+                      <SelectTrigger className="h-9 text-sm pl-9">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="teacher">Teacher</SelectItem>
+                        <SelectItem value="other">Other Staff</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Qualification *</Label>
                   <Input
                     {...register("qualification", { required: "Required" })}
-                    className="h-10 text-sm"
+                    className="h-9 text-sm"
                     placeholder="e.g. M.Sc Math"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Subject *</Label>
-                  <Input
-                    {...register("subject", { required: "Required" })}
-                    className="h-10 text-sm"
-                    placeholder="Mathematics"
-                  />
-                </div>
+                {/* Subject - Only show if teacher */}
+                {selectedStaffCategory === "teacher" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Subject</Label>
+                    <Input
+                      {...register("subject")}
+                      className="h-9 text-sm"
+                      placeholder="Mathematics"
+                    />
+                  </div>
+                )}
 
-                {/* Row 2: Experience & Salary (Now in 2 columns instead of 4) */}
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">
                     Experience (Years) *
                   </Label>
                   <div className="relative">
-                    <Clock className="absolute left-2.5 top-3 size-4 text-slate-400" />
+                    <Clock className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
                     <Input
                       type="number"
                       {...register("experience", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
+                      className="pl-9 h-9 text-sm"
                       placeholder="0"
                     />
                   </div>
@@ -263,23 +329,22 @@ export default function TeacherFormModal({
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Salary (PKR) *</Label>
                   <div className="relative">
-                    <Wallet className="absolute left-2.5 top-3 size-4 text-slate-400" />
+                    <Wallet className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
                     <Input
                       type="number"
                       {...register("salary", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
+                      className="pl-9 h-9 text-sm"
                       placeholder="50000"
                     />
                   </div>
                 </div>
 
-                {/* Row 3: Joining Date & Status (Now in 2 columns instead of 4) */}
                 <div className="space-y-1">
                   <Label className="text-xs font-medium">Joining Date *</Label>
                   <Input
                     type="date"
                     {...register("joiningDate", { required: "Required" })}
-                    className="h-10 text-sm"
+                    className="h-9 text-sm"
                   />
                 </div>
 
@@ -289,7 +354,7 @@ export default function TeacherFormModal({
                     value={selectedStatus}
                     onValueChange={(v) => setValue("status", v)}
                   >
-                    <SelectTrigger className="h-10 text-sm">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -354,21 +419,21 @@ export default function TeacherFormModal({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="h-9 px-4 text-xs font-semibold"
+              className="h-9 px-4 text-xs font-semibold cursor-pointer"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="h-9 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm"
+              className="h-9 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm cursor-pointer"
             >
               {isLoading ? (
                 "Saving..."
               ) : (
                 <span className="flex items-center gap-2">
                   <Save className="size-3.5" />
-                  {teacher ? "Update Teacher" : "Save Teacher"}
+                  {employee ? "Update Employee" : "Save Employee"}
                 </span>
               )}
             </Button>
