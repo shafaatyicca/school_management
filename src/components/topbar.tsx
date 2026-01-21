@@ -133,7 +133,7 @@ export default function Topbar() {
               </div>
               <div className="text-right hidden sm:block">
                 <p className="text-[12px] font-bold text-slate-800 leading-none">
-                  Admin Panel
+                  Hassan Jani
                 </p>
                 <p className="text-[10px] text-indigo-500 font-semibold mt-0.5 uppercase tracking-tighter">
                   Super Admin

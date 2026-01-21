@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader"; // ✅ PageHeader Import
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* ✅ Page header added.
        */}
       <PageHeader
