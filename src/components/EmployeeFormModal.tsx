@@ -433,7 +433,7 @@ export default function EmployeeFormModal({
               ) : (
                 <span className="flex items-center gap-2">
                   <Save className="size-3.5" />
-                  {employee ? "Update Employee" : "Save Employee"}
+                  {employee ? "Update" : "Save"}
                 </span>
               )}
             </Button>

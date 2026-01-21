@@ -10,8 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Users } from "lucide-react"; // Users icon add kiya
 import EmployeeFormModal from "@/components/EmployeeFormModal";
+import PageHeader from "@/components/PageHeader"; // ✅ PageHeader Import
 import type { IEmployee } from "@/models/Employee";
 import {
   AlertDialog,
@@ -49,20 +50,11 @@ export default function EmployeesPage() {
     setFetchLoading(true);
     setError(null);
     try {
-      console.log("Fetching employees...");
       const response = await fetch("/api/employees");
-      console.log("Response status:", response.status);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch");
-      }
-
+      if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
-      console.log("Employees data:", data);
-
       setEmployees(data);
     } catch (error) {
-      console.error("Error fetching employees:", error);
       setError("Failed to fetch employees");
     } finally {
       setFetchLoading(false);
@@ -92,7 +84,6 @@ export default function EmployeesPage() {
       setIsModalOpen(false);
       setSelectedEmployee(null);
     } catch (error: any) {
-      console.error("Error saving employee:", error);
       alert(error.message || "Failed to save employee");
     } finally {
       setIsLoading(false);
@@ -111,14 +102,9 @@ export default function EmployeesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete");
-      }
-
+      if (!response.ok) throw new Error("Failed to delete");
       await fetchEmployees();
     } catch (error) {
-      console.error("Error deleting employee:", error);
       alert("Failed to delete employee");
     } finally {
       setDeleteDialog({ open: false, id: null });
@@ -130,130 +116,117 @@ export default function EmployeesPage() {
     setIsModalOpen(true);
   };
 
-  if (fetchLoading) {
-    return (
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex justify-center items-center h-64">
-          <p className="text-lg">Loading employees...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto py-10 px-4">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <p className="text-lg text-red-500 mb-4">{error}</p>
-            <Button onClick={fetchEmployees}>Retry</Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto">
-      <div className="flex justify-between items-center mb-2">
-        <h1 className="text-1xl font-bold">Employees Management</h1>
-        <Button onClick={openAddModal} className="cursor-pointer">
-          <Plus />
-          Add Employee
-        </Button>
-      </div>
+    <div className="container mx-auto space-y-4">
+      {/* ✅ New Animated Dynamic Page Header */}
+      <PageHeader
+        title="Employees Management"
+        buttonLabel="Add Employee"
+        onButtonClick={openAddModal}
+        icon={<Users className="w-3.5 h-3.5" />}
+      />
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>S.No</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>NIC</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Salary</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {employees.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="text-center py-8 text-gray-500"
-                >
-                  No employees found. Click "Add Employee" to create one.
-                </TableCell>
-              </TableRow>
-            ) : (
-              employees.map((employee, index) => (
-                <TableRow key={employee._id}>
-                  <TableCell>{index + 1}</TableCell>
-                  <TableCell className="font-medium">
-                    {employee.firstName} {employee.lastName}
-                  </TableCell>
-                  <TableCell>{employee.email}</TableCell>
-                  <TableCell>{employee.phone}</TableCell>
-                  <TableCell>{employee.nicNumber}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        employee.staffCategory === "teacher"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-purple-100 text-purple-800"
-                      }`}
-                    >
-                      {employee.staffCategory === "teacher"
-                        ? "Teacher"
-                        : "Other Staff"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {employee.gender}
-                  </TableCell>
-                  <TableCell>PKR {employee.salary.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        employee.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {employee.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        className="cursor-pointer"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(employee)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        className="cursor-pointer"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() =>
-                          setDeleteDialog({ open: true, id: employee._id! })
-                        }
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
+      <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
+        {fetchLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>S.No</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>NIC</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Gender</TableHead>
+                  <TableHead>Salary</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {employees.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={10}
+                      className="text-center py-8 text-gray-500"
+                    >
+                      No employees found. Click "Add Employee" to create one.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  employees.map((employee, index) => (
+                    <TableRow key={employee._id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        {employee.firstName} {employee.lastName}
+                      </TableCell>
+                      <TableCell>{employee.email}</TableCell>
+                      <TableCell>{employee.phone}</TableCell>
+                      <TableCell>{employee.nicNumber}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            employee.staffCategory === "teacher"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          {employee.staffCategory === "teacher"
+                            ? "Teacher"
+                            : "Other Staff"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="capitalize">
+                        {employee.gender}
+                      </TableCell>
+                      <TableCell>
+                        PKR {employee.salary.toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${
+                            employee.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {employee.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(employee)}
+                            className="cursor-pointer"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setDeleteDialog({ open: true, id: employee._id! })
+                            }
+                            className="cursor-pointer"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       <EmployeeFormModal

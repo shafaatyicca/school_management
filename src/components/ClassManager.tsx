@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PageHeader from "@/components/PageHeader";
 import {
   Dialog,
   DialogContent,
@@ -25,19 +26,19 @@ export default function ClassManager() {
   const [name, setName] = useState("");
   const [sections, setSections] = useState("");
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true); // ✅ Loading state for fetching
+  const [fetchLoading, setFetchLoading] = useState(true);
 
   const isEdit = Boolean(editClass);
 
   const fetchClasses = async () => {
-    setFetchLoading(true); // ✅ Start loading
+    setFetchLoading(true);
     try {
       const res = await fetch("/api/classes");
       setClasses(await res.json());
     } catch (error) {
       console.error("Error fetching classes:", error);
     } finally {
-      setFetchLoading(false); // ✅ Stop loading
+      setFetchLoading(false);
     }
   };
 
@@ -104,82 +105,81 @@ export default function ClassManager() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800">Classes</h2>
-        <Button onClick={handleAddNew} className="cursor-pointer">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Class
-        </Button>
-      </div>
+      {/* ✅ Naya Animated Page Header yahan add kiya */}
+      <PageHeader
+        title="Classes Management"
+        buttonLabel="Add Class"
+        onButtonClick={handleAddNew}
+        icon={<BookOpen className="w-3.5 h-3.5" />}
+      />
 
       <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
         {fetchLoading ? (
-          // ✅ Loading state
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : classes.length === 0 ? (
-          // ✅ Empty state
           <div className="text-center py-12 text-gray-500">
             No classes found. Add your first class!
           </div>
         ) : (
-          // ✅ Table with data
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="p-3 text-left text-sm font-medium text-gray-600">
-                  S#
-                </th>
-                <th className="p-3 text-left text-sm font-medium text-gray-600">
-                  Class
-                </th>
-                <th className="p-3 text-left text-sm font-medium text-gray-600">
-                  Sections
-                </th>
-                <th className="p-3 text-right text-sm font-medium text-gray-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {classes.map((cls, index) => (
-                <tr
-                  key={cls._id}
-                  className="border-b last:border-b-0 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="p-3 text-sm text-gray-700">{index + 1}</td>
-                  <td className="p-3 text-sm font-medium text-gray-800">
-                    {cls.name}
-                  </td>
-                  <td className="p-3 text-sm text-gray-700">
-                    {cls.sections.join(", ")}
-                  </td>
-
-                  <td className="p-3 text-right flex justify-end gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="border-gray-300 hover:bg-gray-100 cursor-pointer"
-                      onClick={() => handleEdit(cls)}
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="border-red-300 hover:bg-red-50 cursor-pointer"
-                      onClick={() => handleDelete(cls._id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                    </Button>
-                  </td>
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="p-3 text-left text-sm font-medium text-gray-600">
+                    S#
+                  </th>
+                  <th className="p-3 text-left text-sm font-medium text-gray-600">
+                    Class
+                  </th>
+                  <th className="p-3 text-left text-sm font-medium text-gray-600">
+                    Sections
+                  </th>
+                  <th className="p-3 text-right text-sm font-medium text-gray-600">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {classes.map((cls, index) => (
+                  <tr
+                    key={cls._id}
+                    className="border-b last:border-b-0 hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="p-3 text-sm text-gray-700">{index + 1}</td>
+                    <td className="p-3 text-sm font-medium text-gray-800">
+                      {cls.name}
+                    </td>
+                    <td className="p-3 text-sm text-gray-700">
+                      {cls.sections.join(", ")}
+                    </td>
+
+                    <td className="p-3 text-right flex justify-end gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="border-gray-300 hover:bg-gray-100 cursor-pointer"
+                        onClick={() => handleEdit(cls)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="border-red-300 hover:bg-red-50 cursor-pointer"
+                        onClick={() => handleDelete(cls._id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
