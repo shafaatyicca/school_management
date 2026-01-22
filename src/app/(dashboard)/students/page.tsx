@@ -1,282 +1,280 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useMemo } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Pencil, Trash2, Plus } from "lucide-react";
+  MaterialReactTable,
+  type MRT_ColumnDef,
+  useMaterialReactTable,
+} from "material-react-table";
+import { Box, IconButton, Chip } from "@mui/material";
+import { Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
-import type { IStudent } from "@/models/Student";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import StudentProfileModal from "@/components/StudentProfileModal";
 
 export default function StudentsPage() {
-  const [students, setStudents] = useState<IStudent[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<IStudent | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true); // ✅ Loading state
-  const [error, setError] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    id: string | null;
-  }>({
-    open: false,
-    id: null,
-  });
+  const [fetchLoading, setFetchLoading] = useState(true);
+
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingStudent, setViewingStudent] = useState<any>(null);
 
   useEffect(() => {
-    fetchStudents();
-    fetchClasses();
+    fetchData();
   }, []);
 
-  const fetchStudents = async () => {
-    setFetchLoading(true); // ✅ Start loading
-    setError(null);
+  const fetchData = async () => {
+    setFetchLoading(true);
     try {
-      const response = await fetch("/api/students");
-      if (!response.ok) throw new Error("Failed to fetch");
-      const data = await response.json();
-      setStudents(data);
+      const [stdRes, clsRes] = await Promise.all([
+        fetch("/api/students"),
+        fetch("/api/classes"),
+      ]);
+      const stdData = await stdRes.json();
+      const clsData = await clsRes.json();
+      setStudents(stdData);
+      setClasses(clsData);
     } catch (error) {
-      setError("Failed to fetch students");
+      console.error("Fetch error:", error);
     } finally {
-      setFetchLoading(false); // ✅ Stop loading
+      setFetchLoading(false);
     }
-  };
-
-  const fetchClasses = async () => {
-    try {
-      const response = await fetch("/api/classes");
-      const data = await response.json();
-      setClasses(data);
-    } catch (error) {
-      console.error("Error fetching classes:", error);
-    }
-  };
-
-  const handleSubmit = async (formData: any) => {
-    setIsLoading(true);
-    try {
-      const method = selectedStudent ? "PUT" : "POST";
-      const body = selectedStudent
-        ? { id: selectedStudent._id, ...formData }
-        : formData;
-
-      const response = await fetch("/api/students", {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Something went wrong");
-      }
-
-      await fetchStudents();
-      setIsModalOpen(false);
-      setSelectedStudent(null);
-    } catch (error: any) {
-      alert(error.message || "Failed to save student");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEdit = (student: IStudent) => {
-    setSelectedStudent(student);
-    setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    try {
-      const response = await fetch("/api/students", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!response.ok) throw new Error("Failed to delete");
-      await fetchStudents();
-    } catch (error) {
-      alert("Failed to delete student");
-    } finally {
-      setDeleteDialog({ open: false, id: null });
+    if (confirm("Are you sure you want to delete this student?")) {
+      try {
+        await fetch("/api/students", {
+          method: "DELETE",
+          body: JSON.stringify({ id }),
+          headers: { "Content-Type": "application/json" },
+        });
+        fetchData();
+      } catch (error) {
+        console.error("Delete failed");
+      }
     }
   };
 
-  const openAddModal = () => {
-    setSelectedStudent(null);
-    setIsModalOpen(true);
-  };
+  const columns = useMemo<MRT_ColumnDef<any>[]>(
+    () => [
+      {
+        id: "sno",
+        header: "S.No",
+        size: 50,
+        enableResizing: false,
+        Cell: ({ row }) => (
+          <span className="text-gray-500 font-mono text-[11px]">
+            {row.index + 1}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "grNumber",
+        header: "GR#",
+        size: 50,
+        Cell: ({ cell }) => (
+          <b className="text-blue-700">{cell.getValue<number>()}</b>
+        ),
+      },
+      {
+        accessorKey: "fullName",
+        header: "Student Name",
+        size: 130,
+        Cell: ({ row }) => (
+          <div
+            className="font-semibold text-blue-600 hover:underline cursor-pointer leading-none"
+            onClick={() => {
+              setViewingStudent(row.original);
+              setIsViewModalOpen(true);
+            }}
+          >
+            {row.original.fullName}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "parentId.fullName",
+        header: "Father Name",
+        size: 130,
+        Cell: ({ row }) => (
+          <span className="text-slate-600">
+            {row.original.parentId?.fullName || "---"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "parentId.phone",
+        header: "Father Phone",
+        size: 120,
+        Cell: ({ row }) => (
+          <span className="text-slate-600">
+            {row.original.parentId?.phone || "---"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "dateOfBirth",
+        header: "D.O.B",
+        size: 80,
+        Cell: ({ cell }) => {
+          const d = cell.getValue<string>();
+          return d
+            ? new Intl.DateTimeFormat("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }).format(new Date(d))
+            : "---";
+        },
+      },
+      {
+        accessorKey: "enrollmentDate",
+        header: "Enrolled",
+        size: 100,
+        Cell: ({ cell }) => {
+          const d = cell.getValue<string>();
+          return d
+            ? new Intl.DateTimeFormat("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }).format(new Date(d))
+            : "---";
+        },
+      },
+      {
+        accessorFn: (row) => (row.classId as any)?.name || "N/A",
+        id: "class",
+        header: "Class",
+        size: 90,
+        Cell: ({ row }) => (
+          <Chip
+            label={`${(row.original.classId as any)?.name}-${row.original.section}`}
+            size="small"
+            variant="outlined"
+            color="primary"
+            sx={{ height: "20px", fontSize: "10px" }}
+          />
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        size: 80,
+        Cell: ({ cell }) => (
+          <Chip
+            label={cell.getValue<string>()}
+            color={cell.getValue<string>() === "active" ? "success" : "error"}
+            size="small"
+            sx={{
+              height: "18px",
+              fontSize: "10px",
+              textTransform: "capitalize",
+            }}
+          />
+        ),
+      },
+    ],
+    [],
+  );
+
+  const table = useMaterialReactTable({
+    columns,
+    data: students,
+    state: { isLoading: fetchLoading },
+    enableRowActions: true,
+    positionActionsColumn: "last",
+    displayColumnDefOptions: {
+      "mrt-row-actions": { size: 80, header: "Actions" },
+    },
+
+    // COMPACT DESIGN SETTINGS
+    muiTableHeadCellProps: {
+      sx: {
+        padding: "4px 8px",
+        fontSize: "12px",
+        fontWeight: "bold",
+        backgroundColor: "#f1f5f9",
+      },
+    },
+    muiTableBodyCellProps: {
+      sx: { padding: "2px 8px", fontSize: "12px" },
+    },
+    muiTableBodyRowProps: {
+      sx: { height: "30px" },
+    },
+
+    renderRowActions: ({ row }) => (
+      <Box sx={{ display: "flex", gap: "2px" }}>
+        <IconButton
+          size="small"
+          onClick={() => {
+            setSelectedStudent(row.original);
+            setIsModalOpen(true);
+          }}
+        >
+          <EditIcon fontSize="inherit" color="primary" />
+        </IconButton>
+        <IconButton size="small" onClick={() => handleDelete(row.original._id)}>
+          <DeleteIcon fontSize="inherit" sx={{ color: "#ef4444" }} />
+        </IconButton>
+      </Box>
+    ),
+  });
 
   return (
-    <div className="space-y-4">
-      {/* ✅ Dynamic Page Header Component */}
-      <PageHeader
-        title="Students Management"
-        buttonLabel="Add Student"
-        onButtonClick={openAddModal}
-        // icon={<Users className="w-6 h-6" />}
-      />
+    <>
+      <div className="space-y-1">
+        <PageHeader
+          title="Students Management"
+          buttonLabel="Add New Student"
+          onButtonClick={() => {
+            setSelectedStudent(null);
+            setIsModalOpen(true);
+          }}
+        />
 
-      {/* Main Content Card */}
-      <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
-        {fetchLoading ? (
-          // ✅ loading style
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <p className="text-red-500 mb-4">{error}</p>
-            <Button onClick={fetchStudents} variant="outline">
-              Retry
-            </Button>
-          </div>
-        ) : (
-          // ✅ Keeping your Original Table Structure
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader className="bg-gray-50">
-                <TableRow>
-                  <TableHead>S.No</TableHead>
-                  <TableHead>Roll No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Section</TableHead>
-                  <TableHead>Guardian</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-8 text-gray-500"
-                    >
-                      No students found. Click "Add Student" to create one.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  students.map((student, index) => (
-                    <TableRow
-                      key={student._id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {student.rollNumber}
-                      </TableCell>
-                      <TableCell>
-                        {student.firstName} {student.lastName}
-                      </TableCell>
-                      <TableCell className="text-sm">{student.email}</TableCell>
-                      <TableCell>
-                        {(student.classId as any)?.name || "N/A"}
-                      </TableCell>
-                      <TableCell>{student.section}</TableCell>
-                      <TableCell>{student.guardianName}</TableCell>
-                      <TableCell className="text-sm">{student.phone}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            student.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {student.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(student)}
-                            className="cursor-pointer"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setDeleteDialog({ open: true, id: student._id! })
-                            }
-                            className="cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <div className="border rounded-lg overflow-hidden shadow-sm">
+          <MaterialReactTable table={table} />
+        </div>
+
+        <StudentFormModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={async (data: any) => {
+            setIsLoading(true);
+            const method = selectedStudent ? "PUT" : "POST";
+            const res = await fetch("/api/students", {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(
+                selectedStudent ? { id: selectedStudent._id, ...data } : data,
+              ),
+            });
+            if (res.ok) {
+              await fetchData();
+              setIsModalOpen(false);
+            } else {
+              const err = await res.json();
+              alert("Error: " + err.message);
+            }
+            setIsLoading(false);
+          }}
+          student={selectedStudent}
+          classes={classes}
+          isLoading={isLoading}
+        />
       </div>
-
-      <StudentFormModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedStudent(null);
-        }}
-        onSubmit={handleSubmit}
-        student={selectedStudent}
-        classes={classes}
-        isLoading={isLoading}
+      <StudentProfileModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        student={viewingStudent}
       />
-
-      <AlertDialog
-        open={deleteDialog.open}
-        onOpenChange={(open) => setDeleteDialog({ open, id: null })}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              student record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteDialog.id && handleDelete(deleteDialog.id)}
-              className="bg-red-500 hover:bg-red-600 cursor-pointer"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    </>
   );
 }

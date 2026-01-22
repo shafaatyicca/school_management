@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
@@ -18,30 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  User,
-  Mail,
-  Phone,
-  Calendar,
-  MapPin,
-  School,
-  Hash,
-  Droplets,
-  Baby,
-  Users,
-  Save,
-  HeartPulse,
-} from "lucide-react";
-import type { IStudent } from "@/models/Student";
-
-interface StudentFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  student?: IStudent | null;
-  classes: any[];
-  isLoading: boolean;
-}
+import { Textarea } from "@/components/ui/textarea";
+import { Save } from "lucide-react";
 
 export default function StudentFormModal({
   isOpen,
@@ -50,279 +27,309 @@ export default function StudentFormModal({
   student,
   classes,
   isLoading,
-}: StudentFormModalProps) {
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm();
-
-  const selectedClass = watch("classId");
-  const selectedSection = watch("section");
-  const selectedStatus = watch("status");
-
+}: any) {
+  const { register, handleSubmit, reset, watch, setValue } = useForm();
+  const [parents, setParents] = useState([]);
+  const [isNewParent, setIsNewParent] = useState(false);
   const [availableSections, setAvailableSections] = useState<string[]>([]);
 
-  // Update available sections when class changes
+  const selectedClass = watch("classId");
+  const selectedStatus = watch("status");
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/parents")
+        .then((res) => res.json())
+        .then((data) => setParents(data));
+
+      if (student) {
+        reset({
+          ...student,
+          dateOfBirth: student.dateOfBirth
+            ? new Date(student.dateOfBirth).toISOString().split("T")[0]
+            : "",
+          enrollmentDate: student.enrollmentDate
+            ? new Date(student.enrollmentDate).toISOString().split("T")[0]
+            : "",
+          inactiveDate: student.inactiveDate
+            ? new Date(student.inactiveDate).toISOString().split("T")[0]
+            : "",
+          classId: student.classId?._id || student.classId,
+          parentId: student.parentId?._id || student.parentId,
+        });
+      } else {
+        reset({
+          fullName: "",
+          gender: "",
+          cast: "",
+          religion: "Islam",
+          nationality: "Pakistani",
+          placeOfBirth: "",
+          bFormNumber: "",
+          classId: "",
+          section: "",
+          previousSchool: "",
+          status: "active",
+          enrollmentDate: new Date().toISOString().split("T")[0],
+          parentData: { gender: "Male" },
+        });
+      }
+      setIsNewParent(false);
+    }
+  }, [isOpen, student, reset]);
+
   useEffect(() => {
     if (selectedClass) {
-      const classData = classes.find((c) => c._id === selectedClass);
-      setAvailableSections(classData?.sections || []);
-    } else {
-      setAvailableSections([]);
+      const cls = classes.find((c: any) => c._id === selectedClass);
+      setAvailableSections(cls?.sections || []);
     }
   }, [selectedClass, classes]);
 
-  useEffect(() => {
-    if (student) {
-      const classId =
-        typeof student.classId === "object" && student.classId !== null
-          ? (student.classId as any)._id
-          : student.classId;
-
-      reset({
-        firstName: student.firstName,
-        lastName: student.lastName,
-        email: student.email,
-        phone: student.phone,
-        dateOfBirth: new Date(student.dateOfBirth).toISOString().split("T")[0],
-        classId: classId,
-        section: student.section,
-        rollNumber: student.rollNumber,
-        address: student.address,
-        guardianName: student.guardianName,
-        guardianPhone: student.guardianPhone,
-        guardianRelation: student.guardianRelation,
-        enrollmentDate: new Date(student.enrollmentDate)
-          .toISOString()
-          .split("T")[0],
-        status: student.status,
-        bloodGroup: student.bloodGroup || "",
-        previousSchool: student.previousSchool || "",
-      });
-    } else {
-      reset({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        dateOfBirth: "",
-        classId: "",
-        section: "",
-        rollNumber: "",
-        address: "",
-        guardianName: "",
-        guardianPhone: "",
-        guardianRelation: "",
-        enrollmentDate: new Date().toISOString().split("T")[0],
-        status: "active",
-        bloodGroup: "",
-        previousSchool: "",
-      });
-    }
-  }, [student, reset, classes]);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col bg-white dark:bg-zinc-950">
-        {/* Compact Header */}
-        <DialogHeader className="p-2 bg-slate-900 text-white shrink-0">
-          <DialogTitle className="text-lg font-bold flex items-center gap-2">
-            <Baby className="size-5 text-blue-400" />
-            {student ? "Edit Student Profile" : "Register New Student"}
+      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0 flex flex-col bg-white border-none shadow-2xl">
+        {/* SMALL HEADER */}
+        <DialogHeader className="px-6 py-3 border-b bg-slate-50 shrink-0">
+          <DialogTitle className="text-lg font-bold text-slate-800">
+            {student
+              ? `Edit Student: GR# ${student.grNumber}`
+              : "Student Admission Form"}
           </DialogTitle>
         </DialogHeader>
 
-        {/* Scrollable Form Body */}
         <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="flex flex-col overflow-hidden"
+          onSubmit={handleSubmit((data) => onSubmit({ ...data, isNewParent }))}
+          className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="p-3 space-y-6 overflow-y-auto custom-scrollbar">
-            {/* Section 1: Personal Information */}
+          {/* SCROLLABLE BODY */}
+          <div className="flex-1 overflow-y-auto p-8 space-y-10">
+            {/* STUDENT SECTION */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <User className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Personal Information
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <h3 className="text-sm font-black uppercase tracking-widest text-blue-600 border-b pb-2">
+                1. Student Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2 space-y-1">
+                  <Label>Full Name*</Label>
+                  <Input {...register("fullName", { required: true })} />
+                </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">First Name *</Label>
+                  <Label>Gender*</Label>
+                  <Select
+                    onValueChange={(v) => setValue("gender", v)}
+                    value={watch("gender")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Date of Birth*</Label>
                   <Input
-                    {...register("firstName", { required: "Required" })}
-                    className="h-10 text-sm"
-                    placeholder="Ahmed"
-                  />
-                  {errors.firstName && (
-                    <p className="text-[10px] text-red-500">
-                      {errors.firstName.message as string}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Last Name *</Label>
-                  <Input
-                    {...register("lastName", { required: "Required" })}
-                    className="h-10 text-sm"
-                    placeholder="Khan"
+                    type="date"
+                    {...register("dateOfBirth", { required: true })}
                   />
                 </div>
-
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Email Address *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-2.5 top-3 size-4 text-slate-400" />
-                    <Input
-                      type="email"
-                      {...register("email", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
-                      placeholder="ahmed@example.com"
-                    />
-                  </div>
+                  <Label>Cast</Label>
+                  <Input {...register("cast")} />
                 </div>
-
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Phone Number *</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-2.5 top-3 size-4 text-slate-400" />
-                    <Input
-                      {...register("phone", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
-                      placeholder="+92..."
-                    />
-                  </div>
+                  <Label>Religion</Label>
+                  <Input {...register("religion")} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">
-                      Date of Birth *
-                    </Label>
-                    <Input
-                      type="date"
-                      {...register("dateOfBirth", { required: "Required" })}
-                      className="h-10 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Blood Group</Label>
-                    <div className="relative">
-                      <Droplets className="absolute left-2.5 top-3 size-4 text-red-400" />
-                      <Input
-                        {...register("bloodGroup")}
-                        className="pl-9 h-10 text-sm"
-                        placeholder="O+"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Home Address *</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-2.5 top-3 size-4 text-slate-400" />
-                    <Input
-                      {...register("address", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
-                      placeholder="Street, City"
-                    />
-                  </div>
+                  <Label>Nationality</Label>
+                  <Input {...register("nationality")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Place of Birth</Label>
+                  <Input {...register("placeOfBirth")} />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <Label>B-Form / CNIC Number</Label>
+                  <Input {...register("bFormNumber")} />
                 </div>
               </div>
             </div>
 
-            {/* Section 2: Academic Information */}
+            {/* ACADEMIC SECTION */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <School className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Academic Details
+              <h3 className="text-sm font-black uppercase tracking-widest text-blue-600 border-b pb-2">
+                2. Academic Info
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <Label>Class*</Label>
+                  <Select
+                    onValueChange={(v) => setValue("classId", v)}
+                    value={watch("classId")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((c: any) => (
+                        <SelectItem key={c._id} value={c._id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Section*</Label>
+                  <Select
+                    onValueChange={(v) => setValue("section", v)}
+                    value={watch("section")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSections.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Enrollment Date</Label>
+                  <Input type="date" {...register("enrollmentDate")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Previous School</Label>
+                  <Input {...register("previousSchool")} />
+                </div>
+              </div>
+            </div>
+
+            {/* PARENT SECTION */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className="text-sm font-black uppercase tracking-widest text-blue-600">
+                  3. Parent/Guardian
                 </h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsNewParent(!isNewParent)}
+                >
+                  {isNewParent ? "Select Existing" : "Add New Parent"}
+                </Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="p-6 bg-slate-50 rounded-lg border">
+                {!isNewParent ? (
                   <div className="space-y-1">
-                    <Label className="text-xs font-medium">Class *</Label>
+                    <Label>Registered Father</Label>
                     <Select
-                      value={selectedClass}
-                      onValueChange={(v) => {
-                        setValue("classId", v);
-                        setValue("section", "");
-                      }}
+                      onValueChange={(v) => setValue("parentId", v)}
+                      value={watch("parentId")}
                     >
-                      <SelectTrigger className="h-10 text-sm">
-                        <SelectValue placeholder="Class" />
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Search Father" />
                       </SelectTrigger>
                       <SelectContent>
-                        {classes.map((cls) => (
-                          <SelectItem key={cls._id} value={cls._id}>
-                            {cls.name}
+                        {parents.map((p: any) => (
+                          <SelectItem key={p._id} value={p._id}>
+                            {p.fullName} - {p.cnic}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Section *</Label>
-                    <Select
-                      value={selectedSection}
-                      onValueChange={(v) => setValue("section", v)}
-                      disabled={
-                        !selectedClass || availableSections.length === 0
-                      }
-                    >
-                      <SelectTrigger className="h-10 text-sm">
-                        <SelectValue placeholder="Section" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableSections.map((sec) => (
-                          <SelectItem key={sec} value={sec}>
-                            {sec}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <Label>Father Name*</Label>
+                      <Input
+                        {...register("parentData.fullName")}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Father Gender*</Label>
+                      <Select
+                        onValueChange={(v) => setValue("parentData.gender", v)}
+                        defaultValue="Male"
+                      >
+                        <SelectTrigger className="bg-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Male">Male</SelectItem>
+                          <SelectItem value="Female">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Father CNIC*</Label>
+                      <Input
+                        {...register("parentData.cnic")}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Father Phone</Label>
+                      <Input
+                        {...register("parentData.phone")}
+                        className="bg-white"
+                      />
+                    </div>
+                    <div className="md:col-span-2 space-y-1">
+                      <Label>Address</Label>
+                      <Input
+                        {...register("parentData.address")}
+                        className="bg-white"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Roll Number *</Label>
-                  <div className="relative">
-                    <Hash className="absolute left-2.5 top-3 size-4 text-slate-400" />
-                    <Input
-                      {...register("rollNumber", { required: "Required" })}
-                      className="pl-9 h-10 text-sm"
-                      placeholder="001"
-                    />
-                  </div>
+                  <Label>Mother Name</Label>
+                  <Input {...register("motherName")} />
                 </div>
-
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">
-                    Enrollment Date *
-                  </Label>
-                  <Input
-                    type="date"
-                    {...register("enrollmentDate", { required: "Required" })}
-                    className="h-10 text-sm"
-                  />
+                  <Label>Mother Phone</Label>
+                  <Input {...register("motherPhone")} />
                 </div>
-
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Status *</Label>
+                  <Label>Mother Profession</Label>
+                  <Input {...register("motherProfession")} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Guardian Name</Label>
+                  <Input {...register("guardianName")} />
+                </div>
+                <div className="md:col-span-2 space-y-1">
+                  <Label>Guardian Phone</Label>
+                  <Input {...register("guardianPhone")} />
+                </div>
+              </div>
+            </div>
+
+            {/* STATUS & NOTES */}
+            <div className="space-y-4 border-t pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <Label>Status</Label>
                   <Select
-                    value={selectedStatus}
                     onValueChange={(v) => setValue("status", v)}
+                    value={watch("status")}
                   >
-                    <SelectTrigger className="h-10 text-sm">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -331,80 +338,41 @@ export default function StudentFormModal({
                     </SelectContent>
                   </Select>
                 </div>
-
+                {selectedStatus === "inactive" && (
+                  <div className="space-y-1">
+                    <Label>Inactive Date</Label>
+                    <Input type="date" {...register("inactiveDate")} />
+                  </div>
+                )}
+                {selectedStatus === "inactive" && (
+                  <div className="md:col-span-2 space-y-1">
+                    <Label>Reason</Label>
+                    <Input {...register("inactiveReason")} />
+                  </div>
+                )}
                 <div className="md:col-span-2 space-y-1">
-                  <Label className="text-xs font-medium">Previous School</Label>
-                  <Input
-                    {...register("previousSchool")}
-                    className="h-10 text-sm"
-                    placeholder="Name of last school attended"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3: Guardian Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <Users className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Guardian Details
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Guardian Name *
-                  </Label>
-                  <Input
-                    {...register("guardianName", { required: "Required" })}
-                    className="h-10 text-sm bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Guardian Phone *
-                  </Label>
-                  <Input
-                    {...register("guardianPhone", { required: "Required" })}
-                    className="h-10 text-sm bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Relation *
-                  </Label>
-                  <Input
-                    {...register("guardianRelation", { required: "Required" })}
-                    className="h-10 text-sm bg-slate-50"
-                  />
+                  <Label>Detailed Note</Label>
+                  <Textarea {...register("detailedNote")} rows={3} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-2 bg-slate-50 dark:bg-zinc-900 border-t flex justify-end gap-3 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-              className="h-8 px-3 text-xs font-semibold cursor-pointer"
-            >
+          {/* SMALL FOOTER */}
+          <div className="px-6 py-3 border-t bg-slate-50 flex justify-end gap-3 shrink-0">
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="h-8 px-3 text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 px-8 font-bold"
             >
               {isLoading ? (
                 "Saving..."
               ) : (
                 <span className="flex items-center gap-2">
-                  <Save className="size-4" />
-                  {student ? "Update Student" : "Save Student"}
+                  <Save size={16} /> Save Record
                 </span>
               )}
             </Button>
