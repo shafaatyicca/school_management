@@ -3,13 +3,29 @@ import { connectDB } from "@/lib/db";
 import Student from "@/models/Student";
 import { ParentModel } from "@/models/Parent";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await connectDB();
+
+    // Query parameters se parentId nikaalein
+    const { searchParams } = new URL(req.url);
+    const parentId = searchParams.get("parentId");
+
+    // Case 1: Agar parentId diya gaya hai (Siblings fetch karne ke liye)
+    if (parentId) {
+      const siblings = await Student.find({ parentId })
+        .populate("classId")
+        .populate("parentId")
+        .sort({ fullName: 1 });
+      return NextResponse.json(siblings);
+    }
+
+    // Case 2: Agar koi parentId nahi hai to saaray students return karein
     const students = await Student.find()
       .populate("classId")
       .populate("parentId")
       .sort({ grNumber: -1 });
+
     return NextResponse.json(students);
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });

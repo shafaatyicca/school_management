@@ -11,6 +11,7 @@ import { Edit as EditIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
+import ParentProfileModal from "@/components/ParentProfileModal";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -22,6 +23,9 @@ export default function StudentsPage() {
 
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingStudent, setViewingStudent] = useState<any>(null);
+
+  const [isParentModalOpen, setIsParentModalOpen] = useState(false);
+  const [viewingParent, setViewingParent] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -43,6 +47,16 @@ export default function StudentsPage() {
     } finally {
       setFetchLoading(false);
     }
+  };
+
+  // Naya function: Parent modal se student profile par jane ke liye
+  const handleOpenStudentFromParent = (studentData: any) => {
+    setIsParentModalOpen(false); // Parent modal band
+    setViewingStudent(studentData); // Student ka data set
+    // Thora delay taake transition smooth ho
+    setTimeout(() => {
+      setIsViewModalOpen(true); // Student profile modal open
+    }, 200);
   };
 
   const handleDelete = async (id: string) => {
@@ -78,7 +92,7 @@ export default function StudentsPage() {
         header: "GR#",
         size: 50,
         Cell: ({ cell }) => (
-          <b className="text-blue-700">{cell.getValue<number>()}</b>
+          <b className=" text-slate-600">{cell.getValue<number>()}</b>
         ),
       },
       {
@@ -87,7 +101,7 @@ export default function StudentsPage() {
         size: 130,
         Cell: ({ row }) => (
           <div
-            className="font-semibold text-blue-600 hover:underline cursor-pointer leading-none"
+            className="text-blue-600 hover:underline cursor-pointer leading-none"
             onClick={() => {
               setViewingStudent(row.original);
               setIsViewModalOpen(true);
@@ -101,11 +115,22 @@ export default function StudentsPage() {
         accessorKey: "parentId.fullName",
         header: "Father Name",
         size: 130,
-        Cell: ({ row }) => (
-          <span className="text-slate-600">
-            {row.original.parentId?.fullName || "---"}
-          </span>
-        ),
+        Cell: ({ row }) => {
+          const parentData = row.original.parentId;
+          return (
+            <div
+              className={`font-medium ${parentData ? "text-blue-600 hover:underline cursor-pointer leading-none" : "text-slate-400"}`}
+              onClick={() => {
+                if (parentData) {
+                  setViewingParent(parentData);
+                  setIsParentModalOpen(true);
+                }
+              }}
+            >
+              {parentData?.fullName || "---"}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "parentId.phone",
@@ -193,7 +218,6 @@ export default function StudentsPage() {
       "mrt-row-actions": { size: 80, header: "Actions" },
     },
 
-    // COMPACT DESIGN SETTINGS
     muiTableHeadCellProps: {
       sx: {
         padding: "4px 8px",
@@ -203,7 +227,7 @@ export default function StudentsPage() {
       },
     },
     muiTableBodyCellProps: {
-      sx: { padding: "2px 8px", fontSize: "12px" },
+      sx: { padding: "6px 8px", fontSize: "12px" },
     },
     muiTableBodyRowProps: {
       sx: { height: "30px" },
@@ -270,10 +294,18 @@ export default function StudentsPage() {
           isLoading={isLoading}
         />
       </div>
+      {/* Students Profile View Modal */}
       <StudentProfileModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
+      />
+      {/* Parent Profile View Modal */}
+      <ParentProfileModal
+        isOpen={isParentModalOpen}
+        onClose={() => setIsParentModalOpen(false)}
+        parent={viewingParent}
+        onStudentClick={handleOpenStudentFromParent} // Function yahan pass kar di
       />
     </>
   );

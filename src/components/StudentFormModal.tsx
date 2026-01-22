@@ -85,6 +85,17 @@ export default function StudentFormModal({
     }
   }, [selectedClass, classes]);
 
+  const relationOptions = [
+    { label: "Father", value: "Father" },
+    { label: "Mother", value: "Mother" },
+    { label: "Brother", value: "Brother" },
+    { label: "Sister", value: "Sister" },
+    { label: "Uncle", value: "Uncle" },
+    { label: "Aunt", value: "Aunt" },
+    { label: "Grandfather", value: "Grandfather" },
+    { label: "Grandmother", value: "Grandmother" },
+    { label: "Other", value: "Other" },
+  ];
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0 flex flex-col bg-white border-none shadow-2xl">
@@ -312,6 +323,25 @@ export default function StudentFormModal({
                 <div className="space-y-1">
                   <Label>Guardian Name</Label>
                   <Input {...register("guardianName")} />
+                </div>
+                {/* Guardian Relation Dropdown */}
+                <div className="space-y-1">
+                  <Label>Guardian Relation</Label>
+                  <select
+                    {...register("guardianRelation")}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">Select Relation</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Uncle">Uncle</option>
+                    <option value="Aunt">Aunt</option>
+                    <option value="Grandfather">Grandfather</option>
+                    <option value="Grandmother">Grandmother</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div className="md:col-span-2 space-y-1">
                   <Label>Guardian Phone</Label>

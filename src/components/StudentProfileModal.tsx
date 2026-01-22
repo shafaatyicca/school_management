@@ -4,12 +4,13 @@ import {
   DialogTitle,
   DialogContent,
   IconButton,
-  Typography,
-  Box,
-  Divider,
   Chip,
 } from "@mui/material";
-import { Close as CloseIcon, Person as PersonIcon } from "@mui/icons-material";
+import {
+  Close as CloseIcon,
+  Person as PersonIcon,
+  VpnKey as KeyIcon,
+} from "@mui/icons-material";
 
 interface Props {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export default function StudentProfileModal({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      scroll="body"
+      scroll="paper"
     >
       <DialogTitle className="flex justify-between items-center bg-slate-50 border-b p-4">
         <div className="flex items-center gap-2">
@@ -60,7 +61,8 @@ export default function StudentProfileModal({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent className="p-0">
+      {/* Box height and overflow added here */}
+      <DialogContent className="p-0" sx={{ maxHeight: "80vh" }}>
         {/* Tailwind Grid Wrapper */}
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           {/* Section 1: Personal Info */}
@@ -103,7 +105,12 @@ export default function StudentProfileModal({
                 label={student.status}
                 size="small"
                 color={student.status === "active" ? "success" : "error"}
-                className="h-5 text-[10px] uppercase font-bold"
+                sx={{
+                  height: 20,
+                  fontSize: "10px",
+                  textTransform: "capitalize",
+                  fontWeight: "bold",
+                }}
               />
             </div>
             <DetailRow label="Previous School" value={student.previousSchool} />
@@ -120,6 +127,15 @@ export default function StudentProfileModal({
               </>
             )}
             <DetailRow label="Detailed Note" value={student.detailedNote} />
+
+            {/* NEW LOGIN CREDENTIALS SUB-SECTION */}
+            <div className="mt-6 pt-4 border-t border-slate-200">
+              <h3 className="text-purple-600 font-bold text-xs flex items-center gap-1 mb-4">
+                <KeyIcon sx={{ fontSize: 14 }} /> LOGIN CREDENTIALS
+              </h3>
+              <DetailRow label="System Email" value={student.email} />
+              <DetailRow label="Password" value={student.password} />
+            </div>
           </div>
 
           {/* Section 3: Family Info */}
@@ -127,8 +143,22 @@ export default function StudentProfileModal({
             <h3 className="text-amber-600 font-bold text-xs flex items-center gap-1 mb-4">
               FAMILY INFO
             </h3>
-            <DetailRow label="Father Name" value={student.parentId?.fullName} />
-            <DetailRow label="Father Phone" value={student.parentId?.phone} />
+            <DetailRow
+              label="Father Name"
+              value={
+                typeof student.parentId === "object"
+                  ? student.parentId?.fullName
+                  : "---"
+              }
+            />
+            <DetailRow
+              label="Father Phone"
+              value={
+                typeof student.parentId === "object"
+                  ? student.parentId?.phone
+                  : "---"
+              }
+            />
             <hr className="my-3 border-slate-100" />
             <DetailRow label="Mother Name" value={student.motherName} />
             <DetailRow
@@ -138,6 +168,10 @@ export default function StudentProfileModal({
             <DetailRow label="Mother Phone" value={student.motherPhone} />
             <hr className="my-3 border-slate-100" />
             <DetailRow label="Guardian Name" value={student.guardianName} />
+            <DetailRow
+              label="Guardian Relation"
+              value={student.guardianRelation}
+            />
             <DetailRow label="Guardian Phone" value={student.guardianPhone} />
           </div>
         </div>
