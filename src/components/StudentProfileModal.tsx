@@ -61,9 +61,7 @@ export default function StudentProfileModal({
         </IconButton>
       </DialogTitle>
 
-      {/* Box height and overflow added here */}
       <DialogContent className="p-0" sx={{ maxHeight: "80vh" }}>
-        {/* Tailwind Grid Wrapper */}
         <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
           {/* Section 1: Personal Info */}
           <div className="p-5 bg-white">
@@ -128,7 +126,6 @@ export default function StudentProfileModal({
             )}
             <DetailRow label="Detailed Note" value={student.detailedNote} />
 
-            {/* NEW LOGIN CREDENTIALS SUB-SECTION */}
             <div className="mt-6 pt-4 border-t border-slate-200">
               <h3 className="text-purple-600 font-bold text-xs flex items-center gap-1 mb-4">
                 <KeyIcon sx={{ fontSize: 14 }} /> LOGIN CREDENTIALS

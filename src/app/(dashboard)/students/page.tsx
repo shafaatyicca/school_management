@@ -49,14 +49,10 @@ export default function StudentsPage() {
     }
   };
 
-  // Naya function: Parent modal se student profile par jane ke liye
+  // FIXED: Jab parent profile ke andar bache par click ho to student modal parent ke uper khule
   const handleOpenStudentFromParent = (studentData: any) => {
-    setIsParentModalOpen(false); // Parent modal band
-    setViewingStudent(studentData); // Student ka data set
-    // Thora delay taake transition smooth ho
-    setTimeout(() => {
-      setIsViewModalOpen(true); // Student profile modal open
-    }, 200);
+    setViewingStudent(studentData);
+    setIsViewModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -92,7 +88,7 @@ export default function StudentsPage() {
         header: "GR#",
         size: 50,
         Cell: ({ cell }) => (
-          <b className=" text-slate-600">{cell.getValue<number>()}</b>
+          <span className=" text-slate-600">{cell.getValue<number>()}</span>
         ),
       },
       {
@@ -294,18 +290,20 @@ export default function StudentsPage() {
           isLoading={isLoading}
         />
       </div>
-      {/* Students Profile View Modal */}
+
+      {/* Student Profile Modal (onParentClick prop hata diya gaya) */}
       <StudentProfileModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
       />
-      {/* Parent Profile View Modal */}
+
+      {/* Parent Profile Modal */}
       <ParentProfileModal
         isOpen={isParentModalOpen}
         onClose={() => setIsParentModalOpen(false)}
         parent={viewingParent}
-        onStudentClick={handleOpenStudentFromParent} // Function yahan pass kar di
+        onStudentClick={handleOpenStudentFromParent}
       />
     </>
   );

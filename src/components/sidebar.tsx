@@ -12,14 +12,18 @@ import {
   ChevronRight,
   Menu,
   X,
+  GraduationCap,
+  UsersRound,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const menu = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Classes", href: "/classes", icon: BookOpen },
-  { name: "Students", href: "/students", icon: Users },
-  { name: "Employees", href: "/employees", icon: Users },
+  { name: "Students", href: "/students", icon: GraduationCap },
+  { name: "Employees", href: "/employees", icon: BriefcaseBusiness },
+  { name: "Parents", href: "/parents", icon: UsersRound },
 ];
 
 export default function Sidebar() {
@@ -135,9 +139,6 @@ export default function Sidebar() {
         </nav>
       </aside>
 
-      {/* 4. ✅ INVISIBLE SPACER DIV (The Magic Fix) */}
-      {/* Ye div page ke flow mein jagah leti hai taake content sidebar ke niche na jaye.
-          Jab sidebar collapse hoga, ye div bhi choti ho jayegi aur content khul jayega. */}
       <div
         className={cn(
           "hidden lg:block shrink-0 transition-[width] duration-300 ease-in-out",

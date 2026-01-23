@@ -1,24 +1,28 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, forwardRef } from "react";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  MenuItem,
+  IconButton,
+  Typography,
+  Divider,
+  Slide,
+} from "@mui/material";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Save } from "lucide-react";
+  Close as CloseIcon,
+  Save as SaveIcon,
+  Search as SearchIcon,
+} from "@mui/icons-material";
+
+const Transition = forwardRef(function Transition(props: any, ref: any) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
 
 export default function StudentFormModal({
   isOpen,
@@ -32,9 +36,9 @@ export default function StudentFormModal({
   const [parents, setParents] = useState([]);
   const [isNewParent, setIsNewParent] = useState(false);
   const [availableSections, setAvailableSections] = useState<string[]>([]);
+  const [parentSearch, setParentSearch] = useState("");
 
-  const selectedClass = watch("classId");
-  const selectedStatus = watch("status");
+  const formValues = watch();
 
   useEffect(() => {
     if (isOpen) {
@@ -60,355 +64,463 @@ export default function StudentFormModal({
       } else {
         reset({
           fullName: "",
-          gender: "",
+          gender: "Male",
           cast: "",
           religion: "Islam",
           nationality: "Pakistani",
-          placeOfBirth: "",
-          bFormNumber: "",
-          classId: "",
-          section: "",
-          previousSchool: "",
           status: "active",
           enrollmentDate: new Date().toISOString().split("T")[0],
-          parentData: { gender: "Male" },
+          parentData: {
+            fullName: "",
+            cnic: "",
+            phone: "",
+            address: "",
+            gender: "Male",
+          },
+          parentId: "",
         });
+        setIsNewParent(false);
       }
-      setIsNewParent(false);
     }
   }, [isOpen, student, reset]);
 
   useEffect(() => {
-    if (selectedClass) {
-      const cls = classes.find((c: any) => c._id === selectedClass);
+    if (formValues.classId) {
+      const cls = classes.find((c: any) => c._id === formValues.classId);
       setAvailableSections(cls?.sections || []);
     }
-  }, [selectedClass, classes]);
+  }, [formValues.classId, classes]);
 
-  const relationOptions = [
-    { label: "Father", value: "Father" },
-    { label: "Mother", value: "Mother" },
-    { label: "Brother", value: "Brother" },
-    { label: "Sister", value: "Sister" },
-    { label: "Uncle", value: "Uncle" },
-    { label: "Aunt", value: "Aunt" },
-    { label: "Grandfather", value: "Grandfather" },
-    { label: "Grandmother", value: "Grandmother" },
-    { label: "Other", value: "Other" },
-  ];
+  const filteredParents = useMemo(() => {
+    const search = parentSearch || "";
+    return parents.filter(
+      (p: any) =>
+        p.fullName?.toLowerCase().includes(search.toLowerCase()) ||
+        p.cnic?.includes(search),
+    );
+  }, [parents, parentSearch]);
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0 flex flex-col bg-white border-none shadow-2xl">
-        {/* SMALL HEADER */}
-        <DialogHeader className="px-6 py-3 border-b bg-slate-50 shrink-0">
-          <DialogTitle className="text-lg font-bold text-slate-800">
-            {student
-              ? `Edit Student: GR# ${student.grNumber}`
-              : "Student Admission Form"}
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      TransitionComponent={Transition}
+      disableEnforceFocus={true}
+      disableRestoreFocus={true}
+      aria-hidden={!isOpen}
+    >
+      <DialogTitle className="flex justify-between items-center bg-white py-2">
+        <span className="font-bold text-[#2d3748] text-sm uppercase tracking-tight">
+          {student
+            ? `Edit Student: ${student.fullName}`
+            : "Student Admission Form"}
+        </span>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
 
-        <form
-          onSubmit={handleSubmit((data) => onSubmit({ ...data, isNewParent }))}
-          className="flex flex-col flex-1 overflow-hidden"
-        >
-          {/* SCROLLABLE BODY */}
-          <div className="flex-1 overflow-y-auto p-8 space-y-10">
-            {/* STUDENT SECTION */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-black uppercase tracking-widest text-blue-600 border-b pb-2">
-                1. Student Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Full Name*</Label>
-                  <Input {...register("fullName", { required: true })} />
+      <Divider />
+
+      <form
+        onSubmit={handleSubmit((data) =>
+          onSubmit({ ...data, isNewParent: student ? false : isNewParent }),
+        )}
+      >
+        <DialogContent className="space-y-6">
+          {/* 1. PERSONAL DETAILS */}
+          <div className="space-y-6">
+            <Typography className="font-bold text-blue-600 text-sm uppercase tracking-wider pb-2">
+              1. Personal Details
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              <div className="md:col-span-6">
+                <TextField
+                  fullWidth
+                  label="Full Name *"
+                  {...register("fullName")}
+                  value={formValues.fullName || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-3">
+                <TextField
+                  select
+                  fullWidth
+                  label="Gender *"
+                  value={formValues.gender || "Male"}
+                  onChange={(e) => setValue("gender", e.target.value)}
+                  size="small"
+                >
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                </TextField>
+              </div>
+              <div className="md:col-span-3">
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Date of Birth *"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  {...register("dateOfBirth")}
+                  value={formValues.dateOfBirth || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-4">
+                <TextField
+                  fullWidth
+                  label="Cast"
+                  {...register("cast")}
+                  value={formValues.cast || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-4">
+                <TextField
+                  fullWidth
+                  label="Religion"
+                  {...register("religion")}
+                  value={formValues.religion || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-4">
+                <TextField
+                  fullWidth
+                  label="Nationality"
+                  {...register("nationality")}
+                  value={formValues.nationality || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-6">
+                <TextField
+                  fullWidth
+                  label="Place of Birth"
+                  {...register("placeOfBirth")}
+                  value={formValues.placeOfBirth || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-6">
+                <TextField
+                  fullWidth
+                  label="B-Form / CNIC Number"
+                  {...register("bFormNumber")}
+                  value={formValues.bFormNumber || ""}
+                  size="small"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 2. ACADEMIC DETAILS */}
+          <div className="space-y-6">
+            <Typography className="font-bold text-emerald-600 text-sm uppercase tracking-wider pb-2">
+              2. Academic Details
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              <div className="md:col-span-4">
+                <TextField
+                  select
+                  fullWidth
+                  label="Class *"
+                  value={formValues.classId || ""}
+                  onChange={(e) => setValue("classId", e.target.value)}
+                  size="small"
+                >
+                  {classes.map((c: any) => (
+                    <MenuItem key={c._id} value={c._id}>
+                      {c.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </div>
+              <div className="md:col-span-4">
+                <TextField
+                  select
+                  fullWidth
+                  label="Section *"
+                  value={
+                    availableSections.includes(formValues.section)
+                      ? formValues.section
+                      : ""
+                  }
+                  onChange={(e) => setValue("section", e.target.value)}
+                  size="small"
+                >
+                  {/* Agar list khali hai (starting mein), to temporary purana section dikha do */}
+                  {availableSections.length > 0
+                    ? availableSections.map((s) => (
+                        <MenuItem key={s} value={s}>
+                          {s}
+                        </MenuItem>
+                      ))
+                    : // Yeh line error ko khatam kar degi jab tak list load ho rahi ho
+                      formValues.section && (
+                        <MenuItem value={formValues.section}>
+                          {formValues.section}
+                        </MenuItem>
+                      )}
+                </TextField>
+              </div>
+              <div className="md:col-span-4">
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Enrollment Date"
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  {...register("enrollmentDate")}
+                  value={formValues.enrollmentDate || ""}
+                  size="small"
+                />
+              </div>
+              <div className="md:col-span-12">
+                <TextField
+                  fullWidth
+                  label="Previous School Name"
+                  {...register("previousSchool")}
+                  value={formValues.previousSchool || ""}
+                  size="small"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. PARENT & GUARDIAN DETAILS */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center pb-2">
+              <Typography className="font-bold text-amber-600 text-sm uppercase tracking-wider">
+                3. Parent & Guardian Details
+              </Typography>
+              {/* Button sirf Add mode mein nazar ayega */}
+              {!student && (
+                <Button
+                  size="small"
+                  onClick={() => setIsNewParent(!isNewParent)}
+                  className="text-[11px] capitalize font-bold underline"
+                >
+                  {isNewParent ? "Back to Search" : "+ Add New Parent Profile"}
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {!student ? (
+                <>
+                  {!isNewParent ? (
+                    <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextField
+                        fullWidth
+                        placeholder="Search Father by Name or CNIC..."
+                        size="small"
+                        value={parentSearch || ""}
+                        onChange={(e) => setParentSearch(e.target.value)}
+                        className="bg-white"
+                        InputProps={{
+                          startAdornment: (
+                            <SearchIcon
+                              className="mr-2 text-slate-400"
+                              fontSize="small"
+                            />
+                          ),
+                        }}
+                      />
+                      <TextField
+                        select
+                        fullWidth
+                        label="Select Registered Father"
+                        value={formValues.parentId || ""}
+                        onChange={(e) => setValue("parentId", e.target.value)}
+                        size="small"
+                        className="bg-white"
+                      >
+                        {filteredParents.map((p: any) => (
+                          <MenuItem key={p._id} value={p._id}>
+                            {p.fullName} - {p.cnic}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 p-5 bg-orange-50/30 rounded-xl border border-orange-100">
+                      <TextField
+                        fullWidth
+                        label="Father Name *"
+                        {...register("parentData.fullName")}
+                        value={formValues.parentData?.fullName || ""}
+                        size="small"
+                      />
+                      <TextField
+                        select
+                        fullWidth
+                        label="Father Gender *"
+                        value={formValues.parentData?.gender || "Male"}
+                        onChange={(e) =>
+                          setValue("parentData.gender", e.target.value)
+                        }
+                        size="small"
+                      >
+                        <MenuItem value="Male">Male</MenuItem>
+                        <MenuItem value="Female">Female</MenuItem>
+                      </TextField>
+                      <TextField
+                        fullWidth
+                        label="Father CNIC *"
+                        {...register("parentData.cnic")}
+                        value={formValues.parentData?.cnic || ""}
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Father Phone *"
+                        {...register("parentData.phone")}
+                        value={formValues.parentData?.phone || ""}
+                        size="small"
+                      />
+                      <TextField
+                        fullWidth
+                        label="Complete Address"
+                        {...register("parentData.address")}
+                        value={formValues.parentData?.address || ""}
+                        size="small"
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Edit Mode mein sirf aik hint dikhayen */
+                <div className="p-2 bg-blue-50/30 border border-blue-100 rounded-lg">
+                  <Typography className="text-sm text-blue-500">
+                    Parent (Father) profile is linked. To update parent info,
+                    please visit the <strong>Parent Management</strong>.
+                  </Typography>
                 </div>
-                <div className="space-y-1">
-                  <Label>Gender*</Label>
-                  <Select
-                    onValueChange={(v) => setValue("gender", v)}
-                    value={watch("gender")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Date of Birth*</Label>
-                  <Input
+              )}
+
+              {/* Mother & Guardian fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <TextField
+                  fullWidth
+                  label="Mother Name"
+                  {...register("motherName")}
+                  value={formValues.motherName || ""}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Mother Phone"
+                  {...register("motherPhone")}
+                  value={formValues.motherPhone || ""}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Mother Profession"
+                  {...register("motherProfession")}
+                  value={formValues.motherProfession || ""}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Guardian Name"
+                  {...register("guardianName")}
+                  value={formValues.guardianName || ""}
+                  size="small"
+                />
+                <TextField
+                  select
+                  fullWidth
+                  label="Relation"
+                  value={formValues.guardianRelation || ""}
+                  onChange={(e) => setValue("guardianRelation", e.target.value)}
+                  size="small"
+                >
+                  <MenuItem value="Father">Father</MenuItem>
+                  <MenuItem value="Mother">Mother</MenuItem>
+                  <MenuItem value="Uncle">Uncle</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </TextField>
+                <TextField
+                  fullWidth
+                  label="Guardian Phone"
+                  {...register("guardianPhone")}
+                  value={formValues.guardianPhone || ""}
+                  size="small"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. STATUS & NOTES */}
+          <div className="space-y-6">
+            <Typography className="font-bold text-slate-600 text-sm uppercase tracking-wider pb-2">
+              4. Status & Notes
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
+              <div className="md:col-span-4">
+                <TextField
+                  select
+                  fullWidth
+                  label="Current Status"
+                  value={formValues.status || "active"}
+                  onChange={(e) => setValue("status", e.target.value)}
+                  size="small"
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </TextField>
+              </div>
+              {formValues.status === "inactive" && (
+                <div className="md:col-span-4">
+                  <TextField
+                    fullWidth
                     type="date"
-                    {...register("dateOfBirth", { required: true })}
+                    label="Inactive Date"
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    {...register("inactiveDate")}
+                    value={formValues.inactiveDate || ""}
+                    size="small"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>Cast</Label>
-                  <Input {...register("cast")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Religion</Label>
-                  <Input {...register("religion")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Nationality</Label>
-                  <Input {...register("nationality")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Place of Birth</Label>
-                  <Input {...register("placeOfBirth")} />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <Label>B-Form / CNIC Number</Label>
-                  <Input {...register("bFormNumber")} />
-                </div>
-              </div>
-            </div>
-
-            {/* ACADEMIC SECTION */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-black uppercase tracking-widest text-blue-600 border-b pb-2">
-                2. Academic Info
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <Label>Class*</Label>
-                  <Select
-                    onValueChange={(v) => setValue("classId", v)}
-                    value={watch("classId")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {classes.map((c: any) => (
-                        <SelectItem key={c._id} value={c._id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Section*</Label>
-                  <Select
-                    onValueChange={(v) => setValue("section", v)}
-                    value={watch("section")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSections.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Enrollment Date</Label>
-                  <Input type="date" {...register("enrollmentDate")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Previous School</Label>
-                  <Input {...register("previousSchool")} />
-                </div>
-              </div>
-            </div>
-
-            {/* PARENT SECTION */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center border-b pb-2">
-                <h3 className="text-sm font-black uppercase tracking-widest text-blue-600">
-                  3. Parent/Guardian
-                </h3>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsNewParent(!isNewParent)}
-                >
-                  {isNewParent ? "Select Existing" : "Add New Parent"}
-                </Button>
-              </div>
-
-              <div className="p-6 bg-slate-50 rounded-lg border">
-                {!isNewParent ? (
-                  <div className="space-y-1">
-                    <Label>Registered Father</Label>
-                    <Select
-                      onValueChange={(v) => setValue("parentId", v)}
-                      value={watch("parentId")}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Search Father" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {parents.map((p: any) => (
-                          <SelectItem key={p._id} value={p._id}>
-                            {p.fullName} - {p.cnic}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <Label>Father Name*</Label>
-                      <Input
-                        {...register("parentData.fullName")}
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Father Gender*</Label>
-                      <Select
-                        onValueChange={(v) => setValue("parentData.gender", v)}
-                        defaultValue="Male"
-                      >
-                        <SelectTrigger className="bg-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Male">Male</SelectItem>
-                          <SelectItem value="Female">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Father CNIC*</Label>
-                      <Input
-                        {...register("parentData.cnic")}
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Father Phone</Label>
-                      <Input
-                        {...register("parentData.phone")}
-                        className="bg-white"
-                      />
-                    </div>
-                    <div className="md:col-span-2 space-y-1">
-                      <Label>Address</Label>
-                      <Input
-                        {...register("parentData.address")}
-                        className="bg-white"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                <div className="space-y-1">
-                  <Label>Mother Name</Label>
-                  <Input {...register("motherName")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Mother Phone</Label>
-                  <Input {...register("motherPhone")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Mother Profession</Label>
-                  <Input {...register("motherProfession")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Guardian Name</Label>
-                  <Input {...register("guardianName")} />
-                </div>
-                {/* Guardian Relation Dropdown */}
-                <div className="space-y-1">
-                  <Label>Guardian Relation</Label>
-                  <select
-                    {...register("guardianRelation")}
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Select Relation</option>
-                    <option value="Father">Father</option>
-                    <option value="Mother">Mother</option>
-                    <option value="Brother">Brother</option>
-                    <option value="Sister">Sister</option>
-                    <option value="Uncle">Uncle</option>
-                    <option value="Aunt">Aunt</option>
-                    <option value="Grandfather">Grandfather</option>
-                    <option value="Grandmother">Grandmother</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Guardian Phone</Label>
-                  <Input {...register("guardianPhone")} />
-                </div>
-              </div>
-            </div>
-
-            {/* STATUS & NOTES */}
-            <div className="space-y-4 border-t pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <Label>Status</Label>
-                  <Select
-                    onValueChange={(v) => setValue("status", v)}
-                    value={watch("status")}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {selectedStatus === "inactive" && (
-                  <div className="space-y-1">
-                    <Label>Inactive Date</Label>
-                    <Input type="date" {...register("inactiveDate")} />
-                  </div>
-                )}
-                {selectedStatus === "inactive" && (
-                  <div className="md:col-span-2 space-y-1">
-                    <Label>Reason</Label>
-                    <Input {...register("inactiveReason")} />
-                  </div>
-                )}
-                <div className="md:col-span-2 space-y-1">
-                  <Label>Detailed Note</Label>
-                  <Textarea {...register("detailedNote")} rows={3} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SMALL FOOTER */}
-          <div className="px-6 py-3 border-t bg-slate-50 flex justify-end gap-3 shrink-0">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-blue-600 hover:bg-blue-700 px-8 font-bold"
-            >
-              {isLoading ? (
-                "Saving..."
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Save size={16} /> Save Record
-                </span>
               )}
-            </Button>
+              <div className="md:col-span-12">
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="Additional Remarks / Notes"
+                  {...register("detailedNote")}
+                  value={formValues.detailedNote || ""}
+                  size="small"
+                />
+              </div>
+            </div>
           </div>
-        </form>
-      </DialogContent>
+        </DialogContent>
+
+        <Divider />
+        <DialogActions className="p-6 bg-slate-50 gap-4">
+          <Button onClick={onClose} className="text-slate-500 font-bold px-6">
+            CANCEL
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={isLoading}
+            className="bg-[#2563eb] px-10 py-2 font-bold hover:bg-blue-700 shadow-lg"
+          >
+            {isLoading
+              ? "PROCESSING..."
+              : student
+                ? "UPDATE STUDENT"
+                : "CONFIRM ADMISSION"}
+          </Button>
+        </DialogActions>
+      </form>
     </Dialog>
   );
 }
