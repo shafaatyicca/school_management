@@ -50,13 +50,26 @@ export default function StudentProfileModal({
       maxWidth="md"
       fullWidth
       scroll="paper"
+      disableEnforceFocus={true}
+      disableRestoreFocus={true}
+      autoFocus={false}
+      slotProps={{
+        backdrop: {
+          sx: { backgroundColor: "transparent" },
+        },
+      }}
     >
       <DialogTitle className="flex justify-between items-center bg-slate-50 border-b p-4">
         <div className="flex items-center gap-2">
           <PersonIcon className="text-blue-600" />
           <span className="font-bold text-lg">Student Profile Card</span>
         </div>
-        <IconButton onClick={onClose} size="small">
+        <IconButton
+          onClick={onClose}
+          size="small"
+          tabIndex={-1}
+          autoFocus={false}
+        >
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>

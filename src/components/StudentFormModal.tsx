@@ -117,7 +117,7 @@ export default function StudentFormModal({
             ? `Edit Student: ${student.fullName}`
             : "Student Admission Form"}
         </span>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={onClose} size="small" tabIndex={-1}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -251,20 +251,19 @@ export default function StudentFormModal({
                   }
                   onChange={(e) => setValue("section", e.target.value)}
                   size="small"
+                  // Error fix: Agar availableSections khali hain, to kam az kam aik empty MenuItem dikhao
                 >
-                  {/* Agar list khali hai (starting mein), to temporary purana section dikha do */}
-                  {availableSections.length > 0
-                    ? availableSections.map((s) => (
-                        <MenuItem key={s} value={s}>
-                          {s}
-                        </MenuItem>
-                      ))
-                    : // Yeh line error ko khatam kar degi jab tak list load ho rahi ho
-                      formValues.section && (
-                        <MenuItem value={formValues.section}>
-                          {formValues.section}
-                        </MenuItem>
-                      )}
+                  {availableSections.length > 0 ? (
+                    availableSections.map((s) => (
+                      <MenuItem key={s} value={s}>
+                        {s}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="" disabled>
+                      No Sections Available
+                    </MenuItem>
+                  )}
                 </TextField>
               </div>
               <div className="md:col-span-4">

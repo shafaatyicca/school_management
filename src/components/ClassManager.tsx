@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog";
 
@@ -315,6 +316,9 @@ export default function ClassManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{isEdit ? "Edit Class" : "Add Class"}</DialogTitle>
+            <DialogDescription className="sr-only">
+              Class creation form.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitHandler} className="space-y-4">
             <Input

@@ -17,7 +17,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
-  parent?: any; // Agar edit mode ho to parent data aayega
+  parent?: any;
   isLoading?: boolean;
 }
 
@@ -47,12 +47,20 @@ export default function ParentFormModal({
   }, [parent, isOpen, reset]);
 
   return (
-    <Dialog open={isOpen} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      disableEnforceFocus={true}
+      disableRestoreFocus={true}
+      aria-hidden={!isOpen}
+    >
       <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
         <span className="font-bold text-slate-700">
           {parent ? "Edit Parent Details" : "Register New Parent"}
         </span>
-        <IconButton onClick={onClose} size="small">
+        <IconButton onClick={onClose} size="small" tabIndex={-1}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
