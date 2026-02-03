@@ -6,17 +6,12 @@ import {
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
-import { Box, IconButton, Tooltip } from "@mui/material";
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-} from "@mui/icons-material";
 import PageHeader from "@/components/PageHeader";
 import ParentFormModal from "@/components/ParentFormModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
-import StudentProfileModal from "@/components/StudentProfileModal"; // 1. Student Modal Import kiya
-
+import StudentProfileModal from "@/components/StudentProfileModal";
+import { Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 export default function ParentsPage() {
   const [parents, setParents] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +22,7 @@ export default function ParentsPage() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState<any>(null);
 
-  // 2. Student Modal ke liye nayi states
+  // Student Modal states
   const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
 
@@ -37,6 +32,7 @@ export default function ParentsPage() {
 
   const fetchParents = async () => {
     setFetchLoading(true);
+
     try {
       const res = await fetch("/api/parents");
       const data = await res.json();
@@ -60,6 +56,7 @@ export default function ParentsPage() {
           body: JSON.stringify({ id }),
           headers: { "Content-Type": "application/json" },
         });
+
         fetchParents();
       } catch (error) {
         console.error("Delete failed");
@@ -75,58 +72,58 @@ export default function ParentsPage() {
         size: 50,
         enableResizing: false,
         Cell: ({ row }) => (
-          <span className="text-gray-500 font-mono text-[11px]">
+          <span className="text-muted-foreground font-mono dark:text-slate-300">
             {row.index + 1}
           </span>
         ),
       },
+
       {
         accessorKey: "fullName",
         header: "Parent Name",
-        size: 200,
+        size: 180,
         Cell: ({ row }) => (
           <div
-            className="flex items-center gap-2 cursor-pointer hover:underline group"
+            className="flex items-center gap-1.5 cursor-pointer group"
             onClick={() => {
               setSelectedParent(row.original);
               setIsViewOpen(true);
             }}
           >
-            <span className="text-gray-400 font-mono text-[11px] group-hover:text-blue-500">
+            <span className="font-mono text-slate-500 dark:text-slate-200 group-hover:underline">
               ({row.original.p_id})
             </span>
-            <span className="text-blue-600 group-hover:text-blue-600">
+            <span className="text-sky-600 dark:text-sky-400 group-hover:underline transition-all">
               {row.original.fullName}
             </span>
           </div>
         ),
       },
+
+      { accessorKey: "cnic", header: "CNIC", size: 130 },
+
+      { accessorKey: "phone", header: "Phone", size: 120 },
+
       {
-        accessorKey: "cnic",
-        header: "CNIC",
-        size: 130,
-      },
-      {
-        accessorKey: "phone",
-        header: "Phone",
-        size: 120,
-      },
-      {
-        accessorKey: "email",
-        header: "System Email",
+        accessorKey: "address",
+
+        header: "Address",
+
         size: 200,
-        Cell: ({ cell }) => (
-          <span className="text-xs text-gray-500">
-            {cell.getValue<string>()}
-          </span>
+
+        Cell: ({ row }) => (
+          <div
+            className="capitalize truncate max-w-[180px] print:whitespace-normal print:max-w-none"
+            title={row.original.address}
+          >
+            {row.original.address || "---"}
+          </div>
         ),
       },
-      {
-        accessorKey: "occupation",
-        header: "Occupation",
-        size: 120,
-      },
+      { accessorKey: "gender", header: "Gender", size: 100 },
+      { accessorKey: "occupation", header: "Occupation", size: 120 },
     ],
+
     [],
   );
 
@@ -134,76 +131,85 @@ export default function ParentsPage() {
     columns,
     data: parents,
     state: { isLoading: fetchLoading },
+    enableColumnOrdering: true,
+    enableGlobalFilter: true,
+    enablePagination: true,
+    initialState: {
+      density: "compact",
+      columnVisibility: { address: false, gender: false },
+    },
+
     enableRowActions: true,
+
     positionActionsColumn: "last",
+
     displayColumnDefOptions: {
-      "mrt-row-actions": { size: 120, header: "Actions" },
-    },
-    muiTableHeadCellProps: {
-      sx: {
-        padding: "4px 8px",
-        fontSize: "12px",
-        fontWeight: "bold",
-        backgroundColor: "#f8fafc",
-      },
-    },
-    muiTableBodyCellProps: {
-      sx: { padding: "6px 8px", fontSize: "12px" },
+      "mrt-row-actions": { size: 80, header: "Actions" },
     },
 
     renderRowActions: ({ row }) => (
-      <Box sx={{ display: "flex", gap: "4px" }}>
-        <Tooltip title="View Profile">
-          <IconButton
-            size="small"
-            onClick={() => {
-              setSelectedParent(row.original);
-              setIsViewOpen(true);
-            }}
-          >
-            <ViewIcon fontSize="inherit" className="text-slate-500" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Edit">
-          <IconButton
-            size="small"
-            color="primary"
-            onClick={() => {
-              setSelectedParent(row.original);
-              setIsFormOpen(true);
-            }}
-          >
-            <EditIcon fontSize="inherit" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton
-            size="small"
-            onClick={() => handleDelete(row.original._id)}
-          >
-            <DeleteIcon fontSize="inherit" sx={{ color: "#ef4444" }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
+      <div className="flex gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setSelectedParent(row.original);
+
+            setIsFormOpen(true);
+          }}
+          className="h-8 w-8 cursor-pointer hover:bg-accent"
+        >
+          <Pencil className="h-4 w-4 text-sky-500" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleDelete(row.original._id)}
+          className="h-8 w-8 cursor-pointer hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
     ),
+
+    muiTablePaperProps: {
+      elevation: 0,
+
+      sx: {
+        borderRadius: "16px",
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--background)",
+        padding: "0px 10px",
+      },
+    },
+
+    muiTableHeadCellProps: {
+      sx: { fontWeight: "700", fontSize: "12px", padding: "12px 8px" },
+    },
+    muiTableBodyCellProps: {
+      sx: {
+        fontSize: "12px",
+      },
+    },
   });
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <PageHeader
         title="Parents Management"
         buttonLabel="Add Parent"
         onButtonClick={() => {
           setSelectedParent(null);
+
           setIsFormOpen(true);
         }}
       />
 
-      <div className="border rounded-xl shadow-sm bg-white overflow-hidden">
+      <div className="border border-border rounded-xl shadow-sm bg-background overflow-hidden">
         <MaterialReactTable table={table} />
       </div>
 
-      {/* Add/Edit Modal */}
       <ParentFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -211,6 +217,7 @@ export default function ParentsPage() {
         isLoading={isLoading}
         onSubmit={async (data: any) => {
           setIsLoading(true);
+
           const method = selectedParent ? "PUT" : "POST";
           const res = await fetch("/api/parents", {
             method,
@@ -227,23 +234,22 @@ export default function ParentsPage() {
             const err = await res.json();
             alert("Error: " + err.message);
           }
+
           setIsLoading(false);
         }}
       />
 
-      {/* Profile View Modal */}
       <ParentProfileModal
         isOpen={isViewOpen}
         onClose={() => setIsViewOpen(false)}
         parent={selectedParent}
         onStudentClick={(student) => {
-          // 3. Yahan Student data set hoga aur modal khulega
           setSelectedStudent(student);
+
           setIsStudentViewOpen(true);
         }}
       />
 
-      {/* 4. Student Profile Modal Render kiya */}
       <StudentProfileModal
         isOpen={isStudentViewOpen}
         onClose={() => setIsStudentViewOpen(false)}

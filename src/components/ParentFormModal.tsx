@@ -28,21 +28,26 @@ export default function ParentFormModal({
   parent,
   isLoading,
 }: Props) {
-  const { register, handleSubmit, reset } = useForm();
+  // 1. watch aur setValue zaroori hain MUI Select ki coordination ke liye
+  const { register, handleSubmit, reset, watch, setValue } = useForm();
 
-  // Reset or Set values when modal opens or parent changes
+  // 2. Gender ki current value ko track karna
+  const genderValue = watch("gender");
+
   useEffect(() => {
-    if (parent) {
-      reset(parent);
-    } else {
-      reset({
-        fullName: "",
-        cnic: "",
-        phone: "",
-        occupation: "",
-        gender: "Male",
-        address: "",
-      });
+    if (isOpen) {
+      if (parent) {
+        reset(parent);
+      } else {
+        reset({
+          fullName: "",
+          cnic: "",
+          phone: "",
+          occupation: "",
+          gender: "Male",
+          address: "",
+        });
+      }
     }
   }, [parent, isOpen, reset]);
 
@@ -52,23 +57,22 @@ export default function ParentFormModal({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      disableEnforceFocus={true}
-      disableRestoreFocus={true}
-      aria-hidden={!isOpen}
+      // Accessibility aur focus management
+      disableEnforceFocus={false}
     >
       <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
         <span className="font-bold text-slate-700">
           {parent ? "Edit Parent Details" : "Register New Parent"}
         </span>
-        <IconButton onClick={onClose} size="small" tabIndex={-1}>
+        <IconButton onClick={onClose} size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogContent dividers>
-          {/* Tailwind v4 compatible Grid layout */}
           <div className="flex flex-col gap-4">
+            {/* Full Name */}
             <div className="w-full">
               <TextField
                 {...register("fullName", { required: true })}
@@ -79,6 +83,7 @@ export default function ParentFormModal({
               />
             </div>
 
+            {/* CNIC and Phone */}
             <div className="flex flex-col sm:flex-row gap-4">
               <TextField
                 {...register("cnic", { required: true })}
@@ -97,20 +102,22 @@ export default function ParentFormModal({
               />
             </div>
 
+            {/* Gender and Occupation */}
             <div className="flex flex-col sm:flex-row gap-4">
               <TextField
-                {...register("gender", { required: true })}
                 select
                 label="Gender"
                 className="w-full sm:w-1/2"
                 size="small"
-                defaultValue="Male"
                 required
+                value={genderValue || ""} // Manual value link ki
+                onChange={(e) => setValue("gender", e.target.value)} // Manual update link kiya
               >
                 <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem>
                 <MenuItem value="Other">Other</MenuItem>
               </TextField>
+
               <TextField
                 {...register("occupation")}
                 label="Occupation"
@@ -119,6 +126,7 @@ export default function ParentFormModal({
               />
             </div>
 
+            {/* Address */}
             <div className="w-full">
               <TextField
                 {...register("address", { required: true })}
@@ -142,8 +150,10 @@ export default function ParentFormModal({
             variant="contained"
             disabled={isLoading}
             sx={{
-              backgroundColor: "#2563eb", // blue-600
-              "&:hover": { backgroundColor: "#1d4ed8" }, // blue-700
+              backgroundColor: "#2563eb",
+              textTransform: "none",
+              fontWeight: "600",
+              "&:hover": { backgroundColor: "#1d4ed8" },
             }}
           >
             {isLoading ? "Saving..." : parent ? "Update Parent" : "Save Parent"}

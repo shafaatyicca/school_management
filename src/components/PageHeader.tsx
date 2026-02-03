@@ -17,8 +17,6 @@ export default function PageHeader({
   icon,
 }: PageHeaderProps) {
   return (
-    /* top-0 ensures it sticks exactly below Topbar. 
-       pt-4 provides the gap from top that doesn't disappear on scroll. */
     <div className="sticky top-0 z-30 w-full bg-[#F8FAFC]">
       <div className="group relative p-[2px] overflow-hidden rounded-xl bg-transparent shadow-2xl">
         {/* 1. Slow Rotating 4-Sided Border Beam */}

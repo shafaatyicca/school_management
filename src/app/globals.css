@@ -82,34 +82,40 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* Exact #1d1d1d using OKLCH */
+  --background: oklch(0.23 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+
+  /* Slightly lighter cards for depth (#262626) */
+  --card: oklch(0.28 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+
+  --popover: oklch(0.23 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+
+  --primary: oklch(0.707 0.165 254.624);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.28 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+
+  --muted: oklch(0.28 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+
+  --accent: oklch(0.28 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+
+  --destructive: oklch(0.6 0.2 27);
+  --border: oklch(1 0 0 / 60%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
+
+  /* Sidebar color (#18181b approx) */
+  --sidebar: oklch(0.21 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.28 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
@@ -122,4 +128,46 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* --- MATERIAL REACT TABLE (MRT) DARK MODE FIXES --- */
+
+/* Pure #1d1d1d for Table Background */
+.dark .MuiTablePaper-root,
+.dark .MuiPaper-root {
+  background-color: #1d1d1d !important;
+  background-image: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+/* Table Header - Darker shade */
+.dark [data-mrt-table-head-cell] {
+  background-color: #151515 !important;
+  color: #f1f5f9 !important;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Icons, Buttons, & Text inside MRT */
+.dark .MuiButtonBase-root,
+.dark .MuiIconButton-root,
+.dark .MuiSvgIcon-root,
+.dark .MuiTypography-root {
+  color: #94a3b8 !important;
+}
+
+/* Sorting & Label Text */
+.dark .MuiTableCell-head div,
+.dark .MuiTableCell-head span {
+  color: #f1f5f9 !important;
+}
+
+/* Hover Effect for Rows */
+.dark .MuiTableRow-root:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Table ke andar ki lines (Horizontal lines) */
+.dark .MuiTableCell-body {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
 }

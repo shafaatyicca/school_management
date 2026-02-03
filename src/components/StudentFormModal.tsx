@@ -14,11 +14,10 @@ import {
   Divider,
   Slide,
 } from "@mui/material";
-import {
-  Close as CloseIcon,
-  Save as SaveIcon,
-  Search as SearchIcon,
-} from "@mui/icons-material";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { Autocomplete, Box, createFilterOptions } from "@mui/material";
+
+const filter = createFilterOptions();
 
 const Transition = forwardRef(function Transition(props: any, ref: any) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -36,9 +35,13 @@ export default function StudentFormModal({
   const [parents, setParents] = useState([]);
   const [isNewParent, setIsNewParent] = useState(false);
   const [availableSections, setAvailableSections] = useState<string[]>([]);
-  const [parentSearch, setParentSearch] = useState("");
 
-  const formValues = watch();
+  const currentStatus = watch("status");
+  const studentGender = watch("gender");
+  const selectedClassId = watch("classId");
+  const selectedSection = watch("section");
+  const parentIdValue = watch("parentId") || "";
+  const fatherGender = watch("parentData.gender") || "Male";
 
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +61,13 @@ export default function StudentFormModal({
           inactiveDate: student.inactiveDate
             ? new Date(student.inactiveDate).toISOString().split("T")[0]
             : "",
+          inactiveReason: student.inactiveReason || "",
+          motherName: student.motherName || "",
+          motherProfession: student.motherProfession || "",
+          motherPhone: student.motherPhone || "",
+          guardianName: student.guardianName || "",
+          guardianRelation: student.guardianRelation || "",
+          guardianPhone: student.guardianPhone || "",
           classId: student.classId?._id || student.classId,
           parentId: student.parentId?._id || student.parentId,
         });
@@ -85,20 +95,18 @@ export default function StudentFormModal({
   }, [isOpen, student, reset]);
 
   useEffect(() => {
-    if (formValues.classId) {
-      const cls = classes.find((c: any) => c._id === formValues.classId);
+    if (selectedClassId) {
+      const cls = classes.find((c: any) => c._id === selectedClassId);
       setAvailableSections(cls?.sections || []);
     }
-  }, [formValues.classId, classes]);
+  }, [selectedClassId, classes]);
 
-  const filteredParents = useMemo(() => {
-    const search = parentSearch || "";
-    return parents.filter(
-      (p: any) =>
-        p.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-        p.cnic?.includes(search),
-    );
-  }, [parents, parentSearch]);
+  useEffect(() => {
+    if (currentStatus === "active") {
+      setValue("inactiveDate", "");
+      setValue("inactiveReason", "");
+    }
+  }, [currentStatus, setValue]);
 
   return (
     <Dialog
@@ -107,21 +115,15 @@ export default function StudentFormModal({
       fullWidth
       maxWidth="md"
       TransitionComponent={Transition}
-      disableEnforceFocus={true}
-      disableRestoreFocus={true}
-      aria-hidden={!isOpen}
     >
-      <DialogTitle className="flex justify-between items-center bg-white py-2">
-        <span className="font-bold text-[#2d3748] text-sm uppercase tracking-tight">
-          {student
-            ? `Edit Student: ${student.fullName}`
-            : "Student Admission Form"}
+      <DialogTitle className="flex justify-between items-center border-b bg-background px-6">
+        <span className="font-bold text-[11px] uppercase tracking-[0.15em]">
+          {student ? `Edit: ${student.fullName}` : "Student Admission Form"}
         </span>
-        <IconButton onClick={onClose} size="small" tabIndex={-1}>
-          <CloseIcon />
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon style={{ fontSize: "16px" }} />
         </IconButton>
       </DialogTitle>
-
       <Divider />
 
       <form
@@ -130,9 +132,8 @@ export default function StudentFormModal({
         )}
       >
         <DialogContent className="space-y-6">
-          {/* 1. PERSONAL DETAILS */}
           <div className="space-y-6">
-            <Typography className="font-bold text-blue-600 text-sm uppercase tracking-wider pb-2">
+            <Typography className="font-bold text-blue-600 text-sm uppercase pb-4">
               1. Personal Details
             </Typography>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
@@ -141,16 +142,16 @@ export default function StudentFormModal({
                   fullWidth
                   label="Full Name *"
                   {...register("fullName")}
-                  value={formValues.fullName || ""}
                   size="small"
                 />
               </div>
+
               <div className="md:col-span-3">
                 <TextField
                   select
                   fullWidth
                   label="Gender *"
-                  value={formValues.gender || "Male"}
+                  value={studentGender || "Male"} // Upar wala variable yahan use hoga
                   onChange={(e) => setValue("gender", e.target.value)}
                   size="small"
                 >
@@ -165,7 +166,6 @@ export default function StudentFormModal({
                   label="Date of Birth *"
                   slotProps={{ inputLabel: { shrink: true } }}
                   {...register("dateOfBirth")}
-                  value={formValues.dateOfBirth || ""}
                   size="small"
                 />
               </div>
@@ -174,7 +174,6 @@ export default function StudentFormModal({
                   fullWidth
                   label="Cast"
                   {...register("cast")}
-                  value={formValues.cast || ""}
                   size="small"
                 />
               </div>
@@ -183,7 +182,6 @@ export default function StudentFormModal({
                   fullWidth
                   label="Religion"
                   {...register("religion")}
-                  value={formValues.religion || ""}
                   size="small"
                 />
               </div>
@@ -192,7 +190,6 @@ export default function StudentFormModal({
                   fullWidth
                   label="Nationality"
                   {...register("nationality")}
-                  value={formValues.nationality || ""}
                   size="small"
                 />
               </div>
@@ -201,25 +198,22 @@ export default function StudentFormModal({
                   fullWidth
                   label="Place of Birth"
                   {...register("placeOfBirth")}
-                  value={formValues.placeOfBirth || ""}
                   size="small"
                 />
               </div>
               <div className="md:col-span-6">
                 <TextField
                   fullWidth
-                  label="B-Form / CNIC Number"
+                  label="B-Form / CNIC"
                   {...register("bFormNumber")}
-                  value={formValues.bFormNumber || ""}
                   size="small"
                 />
               </div>
             </div>
           </div>
 
-          {/* 2. ACADEMIC DETAILS */}
           <div className="space-y-6">
-            <Typography className="font-bold text-emerald-600 text-sm uppercase tracking-wider pb-2">
+            <Typography className="font-bold text-emerald-600 text-sm uppercase pb-4">
               2. Academic Details
             </Typography>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
@@ -228,7 +222,7 @@ export default function StudentFormModal({
                   select
                   fullWidth
                   label="Class *"
-                  value={formValues.classId || ""}
+                  value={selectedClassId || ""}
                   onChange={(e) => setValue("classId", e.target.value)}
                   size="small"
                 >
@@ -245,25 +239,18 @@ export default function StudentFormModal({
                   fullWidth
                   label="Section *"
                   value={
-                    availableSections.includes(formValues.section)
-                      ? formValues.section
+                    availableSections.includes(selectedSection)
+                      ? selectedSection
                       : ""
                   }
                   onChange={(e) => setValue("section", e.target.value)}
                   size="small"
-                  // Error fix: Agar availableSections khali hain, to kam az kam aik empty MenuItem dikhao
                 >
-                  {availableSections.length > 0 ? (
-                    availableSections.map((s) => (
-                      <MenuItem key={s} value={s}>
-                        {s}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem value="" disabled>
-                      No Sections Available
+                  {availableSections.map((s) => (
+                    <MenuItem key={s} value={s}>
+                      {s}
                     </MenuItem>
-                  )}
+                  ))}
                 </TextField>
               </div>
               <div className="md:col-span-4">
@@ -273,191 +260,238 @@ export default function StudentFormModal({
                   label="Enrollment Date"
                   slotProps={{ inputLabel: { shrink: true } }}
                   {...register("enrollmentDate")}
-                  value={formValues.enrollmentDate || ""}
                   size="small"
                 />
               </div>
               <div className="md:col-span-12">
                 <TextField
                   fullWidth
-                  label="Previous School Name"
+                  label="Previous School"
                   {...register("previousSchool")}
-                  value={formValues.previousSchool || ""}
                   size="small"
                 />
               </div>
             </div>
           </div>
 
-          {/* 3. PARENT & GUARDIAN DETAILS */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-center pb-2">
-              <Typography className="font-bold text-amber-600 text-sm uppercase tracking-wider">
-                3. Parent & Guardian Details
-              </Typography>
-              {/* Button sirf Add mode mein nazar ayega */}
-              {!student && (
-                <Button
-                  size="small"
-                  onClick={() => setIsNewParent(!isNewParent)}
-                  className="text-[11px] capitalize font-bold underline"
-                >
-                  {isNewParent ? "Back to Search" : "+ Add New Parent Profile"}
-                </Button>
-              )}
-            </div>
+          <div className="space-y-4">
+            <Typography className="font-bold text-amber-600 text-sm uppercase pb-4">
+              3. Parent Details
+            </Typography>
+            <Autocomplete
+              value={parents.find((p: any) => p._id === parentIdValue) || null}
+              onChange={(event, newValue: any) => {
+                if (newValue && newValue.inputValue) {
+                  // "+ Add New Parent" logic
+                  setIsNewParent(true);
+                  setValue("parentId", "");
+                  setValue("parentData.fullName", newValue.inputValue);
+                } else if (newValue) {
+                  // Existing Parent logic
+                  setIsNewParent(false);
+                  setValue("parentId", newValue._id);
+                  setValue("parentData", {
+                    fullName: "",
+                    cnic: "",
+                    phone: "",
+                    address: "",
+                    gender: "Male",
+                    occupation: "",
+                  });
+                } else {
+                  setIsNewParent(false);
+                  setValue("parentId", "");
+                }
+              }}
+              filterOptions={(options, params) => {
+                const filtered = filter(options, params);
+                const { inputValue } = params;
 
-            <div className="space-y-6">
-              {!student ? (
-                <>
-                  {!isNewParent ? (
-                    <div className="p-3 bg-slate-50 rounded-xl border border-dashed border-slate-300 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <TextField
-                        fullWidth
-                        placeholder="Search Father by Name or CNIC..."
-                        size="small"
-                        value={parentSearch || ""}
-                        onChange={(e) => setParentSearch(e.target.value)}
-                        className="bg-white"
-                        InputProps={{
-                          startAdornment: (
-                            <SearchIcon
-                              className="mr-2 text-slate-400"
-                              fontSize="small"
-                            />
-                          ),
-                        }}
-                      />
-                      <TextField
-                        select
-                        fullWidth
-                        label="Select Registered Father"
-                        value={formValues.parentId || ""}
-                        onChange={(e) => setValue("parentId", e.target.value)}
-                        size="small"
-                        className="bg-white"
-                      >
-                        {filteredParents.map((p: any) => (
-                          <MenuItem key={p._id} value={p._id}>
-                            {p.fullName} - {p.cnic}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 p-5 bg-orange-50/30 rounded-xl border border-orange-100">
-                      <TextField
-                        fullWidth
-                        label="Father Name *"
-                        {...register("parentData.fullName")}
-                        value={formValues.parentData?.fullName || ""}
-                        size="small"
-                      />
-                      <TextField
-                        select
-                        fullWidth
-                        label="Father Gender *"
-                        value={formValues.parentData?.gender || "Male"}
-                        onChange={(e) =>
-                          setValue("parentData.gender", e.target.value)
-                        }
-                        size="small"
-                      >
-                        <MenuItem value="Male">Male</MenuItem>
-                        <MenuItem value="Female">Female</MenuItem>
-                      </TextField>
-                      <TextField
-                        fullWidth
-                        label="Father CNIC *"
-                        {...register("parentData.cnic")}
-                        value={formValues.parentData?.cnic || ""}
-                        size="small"
-                      />
-                      <TextField
-                        fullWidth
-                        label="Father Phone *"
-                        {...register("parentData.phone")}
-                        value={formValues.parentData?.phone || ""}
-                        size="small"
-                      />
-                      <TextField
-                        fullWidth
-                        label="Complete Address"
-                        {...register("parentData.address")}
-                        value={formValues.parentData?.address || ""}
-                        size="small"
-                      />
-                    </div>
-                  )}
-                </>
-              ) : (
-                /* Edit Mode mein sirf aik hint dikhayen */
-                <div className="p-2 bg-blue-50/30 border border-blue-100 rounded-lg">
-                  <Typography className="text-sm text-blue-500">
-                    Parent (Father) profile is linked. To update parent info,
-                    please visit the <strong>Parent Management</strong>.
-                  </Typography>
-                </div>
-              )}
+                if (inputValue !== "") {
+                  filtered.push({
+                    inputValue,
+                    fullName: `+ Add "${inputValue}" as New Parent`,
+                  });
+                }
+                return filtered;
+              }}
+              options={parents}
+              getOptionLabel={(option: any) => {
+                if (typeof option === "string") return option;
+                if (option.inputValue) return option.inputValue;
+                return `${option.fullName} (${option.cnic || "No CNIC"})`;
+              }}
+              renderOption={(props, option: any, { index }) => {
+                const { key, ...optionProps } = props as any;
+                const isAddNew = !!option.inputValue;
 
-              {/* Mother & Guardian fields */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                return (
+                  <li
+                    key={key}
+                    {...optionProps}
+                    className={`${optionProps.className} border-b last:border-0 py-2`}
+                  >
+                    <Box className="flex items-center gap-3 w-full">
+                      {!isAddNew && (
+                        <Typography
+                          variant="caption"
+                          className="bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-bold min-w-[25px] text-center"
+                        >
+                          {index + 1}
+                        </Typography>
+                      )}
+
+                      <Box className="flex flex-col md:flex-row md:items-center justify-between w-full gap-2">
+                        {/* Name Section */}
+                        <Typography
+                          variant="body2"
+                          className={
+                            isAddNew
+                              ? "text-blue-600 font-bold"
+                              : "font-semibold min-w-[150px]"
+                          }
+                        >
+                          {option.fullName}
+                        </Typography>
+
+                        {/* CNIC & Phone Section (Sirf purane parents ke liye) */}
+                        {!isAddNew && (
+                          <Box className="flex gap-4 items-center">
+                            <Typography
+                              variant="caption"
+                              className="bg-blue-50 text-blue-700 px-2 rounded border border-blue-100"
+                            >
+                              <strong>CNIC:</strong> {option.cnic || "N/A"}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              className="bg-green-50 text-green-700 px-2 rounded border border-green-100"
+                            >
+                              <strong>Phone:</strong> {option.phone || "N/A"}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </Box>
+                  </li>
+                );
+              }}
+              renderInput={(params) => (
                 <TextField
-                  fullWidth
-                  label="Mother Name"
-                  {...register("motherName")}
-                  value={formValues.motherName || ""}
+                  {...params}
+                  label="Search Father or Type New Name"
                   size="small"
+                  fullWidth
+                  helperText="Type to search, or type a new name to add a new record"
                 />
+              )}
+            />
+
+            {/* Agar New Parent select ho to niche fields khul jayen */}
+            {isNewParent && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 bg-orange-50/30 rounded-xl border animate-in fade-in duration-500">
                 <TextField
                   fullWidth
-                  label="Mother Phone"
-                  {...register("motherPhone")}
-                  value={formValues.motherPhone || ""}
-                  size="small"
-                />
-                <TextField
-                  fullWidth
-                  label="Mother Profession"
-                  {...register("motherProfession")}
-                  value={formValues.motherProfession || ""}
-                  size="small"
-                />
-                <TextField
-                  fullWidth
-                  label="Guardian Name"
-                  {...register("guardianName")}
-                  value={formValues.guardianName || ""}
+                  label="Father Name"
+                  {...register("parentData.fullName")}
                   size="small"
                 />
                 <TextField
                   select
                   fullWidth
-                  label="Relation"
-                  value={formValues.guardianRelation || ""}
-                  onChange={(e) => setValue("guardianRelation", e.target.value)}
+                  label="Gender"
+                  value={fatherGender}
+                  onChange={(e) =>
+                    setValue("parentData.gender", e.target.value)
+                  }
                   size="small"
                 >
-                  <MenuItem value="Father">Father</MenuItem>
-                  <MenuItem value="Mother">Mother</MenuItem>
-                  <MenuItem value="Uncle">Uncle</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
                 </TextField>
                 <TextField
                   fullWidth
-                  label="Guardian Phone"
-                  {...register("guardianPhone")}
-                  value={formValues.guardianPhone || ""}
+                  label="CNIC"
+                  {...register("parentData.cnic")}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  {...register("parentData.phone")}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Occupation (Peshah)"
+                  {...register("parentData.occupation")}
+                  size="small"
+                />
+                <TextField
+                  fullWidth
+                  label="Address"
+                  {...register("parentData.address")}
                   size="small"
                 />
               </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <Typography className="font-bold text-pink-600 text-sm uppercase pb-2">
+              4. Mother's Information
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <TextField
+                fullWidth
+                label="Mother Name"
+                {...register("motherName")}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="Mother Profession"
+                {...register("motherProfession")}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="Mother Phone"
+                {...register("motherPhone")}
+                size="small"
+              />
             </div>
           </div>
 
-          {/* 4. STATUS & NOTES */}
           <div className="space-y-6">
-            <Typography className="font-bold text-slate-600 text-sm uppercase tracking-wider pb-2">
-              4. Status & Notes
+            <Typography className="font-bold text-purple-600 text-sm uppercase pb-2">
+              5. Guardian's Information
+            </Typography>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <TextField
+                fullWidth
+                label="Guardian Name"
+                {...register("guardianName")}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="Relation with Student"
+                {...register("guardianRelation")}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="Guardian Phone"
+                {...register("guardianPhone")}
+                size="small"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <Typography className="font-bold text-slate-600 text-sm uppercase pb-4">
+              6. Status & Notes
             </Typography>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
               <div className="md:col-span-4">
@@ -465,7 +499,7 @@ export default function StudentFormModal({
                   select
                   fullWidth
                   label="Current Status"
-                  value={formValues.status || "active"}
+                  value={currentStatus || "active"}
                   onChange={(e) => setValue("status", e.target.value)}
                   size="small"
                 >
@@ -473,44 +507,54 @@ export default function StudentFormModal({
                   <MenuItem value="inactive">Inactive</MenuItem>
                 </TextField>
               </div>
-              {formValues.status === "inactive" && (
-                <div className="md:col-span-4">
-                  <TextField
-                    fullWidth
-                    type="date"
-                    label="Inactive Date"
-                    slotProps={{ inputLabel: { shrink: true } }}
-                    {...register("inactiveDate")}
-                    value={formValues.inactiveDate || ""}
-                    size="small"
-                  />
-                </div>
+              {currentStatus === "inactive" && (
+                <>
+                  <div className="md:col-span-4">
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label="Inactive Date"
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      {...register("inactiveDate")}
+                      size="small"
+                      required
+                    />
+                  </div>
+                  <div className="md:col-span-4">
+                    <TextField
+                      fullWidth
+                      label="Reason for Inactive"
+                      {...register("inactiveReason")}
+                      size="small"
+                      required
+                      placeholder="e.g. SLC Issued"
+                    />
+                  </div>
+                </>
               )}
               <div className="md:col-span-12">
                 <TextField
                   fullWidth
                   multiline
                   rows={2}
-                  label="Additional Remarks / Notes"
+                  label="Remarks"
                   {...register("detailedNote")}
-                  value={formValues.detailedNote || ""}
                   size="small"
                 />
               </div>
             </div>
           </div>
         </DialogContent>
-
         <Divider />
-        <DialogActions className="p-6 bg-slate-50 gap-4">
-          <Button onClick={onClose} className="text-slate-500 font-bold px-6">
+        <DialogActions className="px-6 py-2 gap-3">
+          <Button onClick={onClose} className="text-[10px] tracking-widest">
             CANCEL
           </Button>
           <Button
             type="submit"
             variant="contained"
             disabled={isLoading}
-            className="bg-[#2563eb] px-10 py-2 font-bold hover:bg-blue-700 shadow-lg"
+            className="bg-primary text-primary-foreground px-6 text-[10px] tracking-widest"
           >
             {isLoading
               ? "PROCESSING..."

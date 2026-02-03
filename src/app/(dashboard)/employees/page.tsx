@@ -1,19 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Pencil, Trash2, Users } from "lucide-react"; // Users icon add kiya
+import { Pencil, Trash2, Users } from "lucide-react";
 import EmployeeFormModal from "@/components/EmployeeFormModal";
-import PageHeader from "@/components/PageHeader"; // ✅ PageHeader Import
+import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
+import {
+  MaterialReactTable,
+  useMaterialReactTable,
+  type MRT_ColumnDef,
+} from "material-react-table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<IEmployee[]>([]);
@@ -41,6 +39,10 @@ export default function EmployeesPage() {
     open: false,
     id: null,
   });
+
+  // For Staff Profile Modal
+  const [viewingStaff, setViewingStaff] = useState<any>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
     fetchEmployees();
@@ -79,7 +81,6 @@ export default function EmployeesPage() {
         const errorData = await response.json();
         throw new Error(errorData.message || "Something went wrong");
       }
-
       await fetchEmployees();
       setIsModalOpen(false);
       setSelectedEmployee(null);
@@ -116,119 +117,263 @@ export default function EmployeesPage() {
     setIsModalOpen(true);
   };
 
+  // --- MRT COLUMNS DEFINITION ---
+  const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
+    () => [
+      {
+        header: "S.No",
+        size: 50,
+        Cell: ({ row }) => (
+          <span className="text-foreground">{row.index + 1}</span>
+        ),
+      },
+      {
+        id: "employee_info",
+        header: "Employee Details",
+        size: 150,
+        Cell: ({ row }) => (
+          <div
+            className="flex items-center gap-1.5 cursor-pointer group"
+            onClick={() => {
+              setViewingStaff(row.original);
+              setIsViewModalOpen(true);
+            }}
+          >
+            <span className="font-mono text-slate-500 dark:text-slate-400 group-hover:underline">
+              ({row.original.emp_id || "---"})
+            </span>
+            <span className="text-sky-600 dark:text-sky-400 group-hover:underline transition-all">
+              {row.original.fullName}
+            </span>
+          </div>
+        ),
+      },
+      // {
+      //   accessorKey: "email",
+      //   header: "Email",
+      //   size: 200,
+      // },
+      // {
+      //   accessorKey: "password",
+      //   header: "Password",
+      //   size: 100,
+      // },
+      // {
+      //   accessorKey: "role",
+      //   header: "Role",
+      //   size: 100,
+      //   Cell: ({ cell }) => (
+      //     <span className="capitalize">{cell.getValue<string>()}</span>
+      //   ),
+      // },
+      {
+        accessorKey: "phone",
+        header: "Phone",
+        size: 90,
+      },
+      {
+        accessorKey: "nicNumber",
+        header: "NIC",
+        size: 90,
+      },
+      {
+        accessorKey: "dateOfBirth",
+        header: "DOB",
+        size: 90,
+        Cell: ({ cell }) => {
+          const date = cell.getValue<any>();
+          if (!date) return "---";
+
+          return (
+            <span className="text-slate-700 dark:text-slate-300">
+              {new Intl.DateTimeFormat("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }).format(new Date(date))}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "staffCategory",
+        header: "Category",
+        size: 90,
+        Cell: ({ cell }) => {
+          const cat = cell.getValue<string>();
+          return (
+            <span className=" font-medium text-slate-700 dark:text-slate-300 capitalize">
+              {cat || "---"}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "gender",
+        header: "Gender",
+        size: 90,
+        Cell: ({ cell }) => (
+          <span className="capitalize">{cell.getValue<string>()}</span>
+        ),
+      },
+      {
+        accessorKey: "salary",
+        header: "Salary",
+        size: 90,
+        Cell: ({ cell }) => (
+          <span className="font-mono font-bold text-green-600 dark:text-green-400">
+            PKR {cell.getValue<number>()?.toLocaleString()}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "qualification",
+        header: "Qualification",
+        size: 90,
+      },
+      {
+        accessorKey: "designation",
+        header: "Designation",
+        size: 90,
+      },
+      {
+        accessorKey: "address",
+        header: "Address",
+        size: 200,
+        Cell: ({ cell }) => (
+          <div
+            className="capitalize truncate max-w-[180px] print:whitespace-normal print:max-w-none"
+            title={cell.getValue<string>()}
+          >
+            {cell.getValue<string>() || "---"}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "experience",
+        header: "Experience",
+        size: 100,
+        Cell: ({ cell }) => {
+          const exp = cell.getValue<number>();
+          return <span className="font-medium">{exp || 0} Years</span>;
+        },
+      },
+
+      {
+        accessorKey: "status",
+        header: "Status",
+        size: 100,
+        Cell: ({ cell }) => {
+          const status = cell.getValue<string>();
+          const isActive = status === "active";
+
+          return (
+            <span
+              className={`
+          inline-flex items-center justify-center
+          px-2.5 py-0.5 
+          rounded-full text-[10px] font-bold 
+          tracking-wide shadow-sm
+          ${isActive ? "bg-green-600 text-white" : "bg-red-600 text-white"}
+        `}
+              style={{
+                height: "20px",
+                fontSize: "10px",
+                textTransform: "capitalize",
+              }}
+            >
+              {status}
+            </span>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
+  const table = useMaterialReactTable({
+    columns,
+    data: employees,
+    state: { isLoading: fetchLoading },
+    enableColumnOrdering: true,
+    enableGlobalFilter: true,
+    enablePagination: true,
+    initialState: {
+      density: "compact",
+      columnVisibility: {
+        nicNumber: true,
+        status: true,
+        phone: true,
+        dateOfBirth: true,
+        gender: false,
+        salary: false,
+        // email: false,
+        // password: false,
+        // role: false,
+        qualification: false,
+        designation: false,
+        experience: false,
+        address: false,
+      },
+    },
+    enableRowActions: true,
+    positionActionsColumn: "last",
+    renderRowActions: ({ row }) => (
+      <div className="flex gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleEdit(row.original)}
+          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+        >
+          <Pencil className="h-4 w-4 text-sky-500" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setDeleteDialog({ open: true, id: row.original._id! })}
+          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+        >
+          <Trash2 className="h-4 w-4 text-red-500" />
+        </Button>
+      </div>
+    ),
+    muiTablePaperProps: {
+      elevation: 0,
+      sx: {
+        borderRadius: "16px",
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--background)",
+        padding: " 0px 10px",
+      },
+    },
+    muiTableHeadCellProps: {
+      sx: {
+        fontWeight: "700",
+        fontSize: "12px",
+      },
+    },
+    muiTableBodyCellProps: {
+      sx: {
+        fontSize: "12px",
+        fontWeight: "500",
+
+        color: "var(--foreground)",
+      },
+    },
+  });
+
   return (
-    <div className="container mx-auto space-y-4">
-      {/* ✅ New Animated Dynamic Page Header */}
+    <div className="container mx-auto space-y-2">
       <PageHeader
         title="Employees Management"
         buttonLabel="Add Employee"
         onButtonClick={openAddModal}
         icon={<Users className="w-3.5 h-3.5" />}
       />
-
-      <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-200">
-        {fetchLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>S.No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>NIC</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Gender</TableHead>
-                  <TableHead>Salary</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employees.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-8 text-gray-500"
-                    >
-                      No employees found. Click "Add Employee" to create one.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  employees.map((employee, index) => (
-                    <TableRow key={employee._id}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        {employee.firstName} {employee.lastName}
-                      </TableCell>
-                      <TableCell>{employee.email}</TableCell>
-                      <TableCell>{employee.phone}</TableCell>
-                      <TableCell>{employee.nicNumber}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            employee.staffCategory === "teacher"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-purple-100 text-purple-800"
-                          }`}
-                        >
-                          {employee.staffCategory === "teacher"
-                            ? "Teacher"
-                            : "Other Staff"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="capitalize">
-                        {employee.gender}
-                      </TableCell>
-                      <TableCell>
-                        PKR {employee.salary.toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            employee.status === "active"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {employee.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(employee)}
-                            className="cursor-pointer"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setDeleteDialog({ open: true, id: employee._id! })
-                            }
-                            className="cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+      <div className="w-full border border-border rounded-xl shadow-sm bg-background overflow-hidden">
+        <MaterialReactTable table={table} />
       </div>
-
       <EmployeeFormModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -239,7 +384,6 @@ export default function EmployeesPage() {
         employee={selectedEmployee}
         isLoading={isLoading}
       />
-
       <AlertDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
@@ -265,6 +409,11 @@ export default function EmployeesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <EmployeeProfileModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        staff={viewingStaff}
+      />
     </div>
   );
 }

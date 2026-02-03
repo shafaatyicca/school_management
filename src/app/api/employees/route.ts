@@ -7,11 +7,8 @@ export async function GET() {
   try {
     await connectDB();
     const employees = await Employee.find().sort({ createdAt: -1 }).lean();
-
-    console.log("Found employees:", employees.length);
     return NextResponse.json(employees);
   } catch (error: any) {
-    console.error("API Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
@@ -22,23 +19,27 @@ export async function POST(req: Request) {
     await connectDB();
     const body = await req.json();
 
-    if (!body.firstName || !body.lastName || !body.email) {
+    // 1. Validation: Sirf wo cheez check karein jo user ne lazmi deni hay
+    if (!body.fullName) {
       return NextResponse.json(
-        { message: "Required fields are missing" },
+        { message: "Full Name is required" },
         { status: 400 },
       );
     }
 
-    const newEmployee = await Employee.create(body);
-    console.log("Employee created:", newEmployee);
+    // 2. Create instance (Don't use .create())
+    // Hum password/email nahi bhej rahe, Schema hook handle karega
+    const employee = new Employee(body);
 
-    return NextResponse.json(newEmployee, { status: 201 });
+    // 3. Save (Yehi wo point hay jahan pre-save hook trigger hota hay)
+    await employee.save();
+
+    return NextResponse.json(employee, { status: 201 });
   } catch (error: any) {
-    console.error("Create Error:", error);
+    console.error("Employee POST Error:", error);
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }
-
 // PUT → update employee
 export async function PUT(req: Request) {
   try {
@@ -52,12 +53,23 @@ export async function PUT(req: Request) {
       );
     }
 
-    const updated = await Employee.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-      lean: true,
-      includeResultMetadata: true,
-    });
+    // Logic for active status
+    if (updateData.status === "active") {
+      updateData.inactiveDate = null;
+      updateData.inactiveReason = "";
+    }
+
+    // IS LINE KO DEKHEIN: Main ne { $set: updateData } add kiya hay
+    const updated = await Employee.findByIdAndUpdate(
+      id,
+      { $set: updateData }, // Yeh ensure karega ke har field update ho
+      {
+        new: true,
+        runValidators: true,
+        lean: true,
+        includeResultMetadata: true,
+      },
+    );
 
     if (!updated) {
       return NextResponse.json(
@@ -66,10 +78,9 @@ export async function PUT(req: Request) {
       );
     }
 
-    console.log("Employee updated:", updated);
     return NextResponse.json(updated);
   } catch (error: any) {
-    console.error("Update Error:", error);
+    console.error("Update Error:", error.message);
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }
@@ -96,10 +107,8 @@ export async function DELETE(req: Request) {
       );
     }
 
-    console.log("Employee deleted:", id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Delete Error:", error);
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }

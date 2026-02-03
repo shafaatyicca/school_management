@@ -4,44 +4,23 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  User,
-  Mail,
-  Phone,
-  Calendar,
-  MapPin,
-  GraduationCap,
-  BookOpen,
-  Clock,
-  Wallet,
-  Save,
-  ShieldAlert,
-  Briefcase,
-  CreditCard,
-  UserCircle,
-} from "lucide-react";
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  MenuItem,
+  IconButton,
+} from "@mui/material";
+import { Close as CloseIcon } from "@mui/icons-material";
 import type { IEmployee } from "@/models/Employee";
 
-interface EmployeeFormModalProps {
+interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: any) => void;
   employee?: IEmployee | null;
-  isLoading: boolean;
+  isLoading?: boolean;
 }
 
 export default function EmployeeFormModal({
@@ -50,52 +29,43 @@ export default function EmployeeFormModal({
   onSubmit,
   employee,
   isLoading,
-}: EmployeeFormModalProps) {
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm();
+}: Props) {
+  const { register, handleSubmit, reset, watch, setValue } = useForm();
 
-  const selectedStatus = watch("status");
-  const selectedGender = watch("gender");
-  const selectedStaffCategory = watch("staffCategory");
+  // Watch all required fields for controlled components
+  const staffCategory = watch("staffCategory");
+  const currentStatus = watch("status");
+  const currentRole = watch("role");
+  const currentGender = watch("gender");
 
   useEffect(() => {
     if (employee) {
       reset({
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        email: employee.email,
-        phone: employee.phone,
-        dateOfBirth: new Date(employee.dateOfBirth).toISOString().split("T")[0],
-        gender: employee.gender,
-        nicNumber: employee.nicNumber,
-        staffCategory: employee.staffCategory,
-        qualification: employee.qualification,
-        experience: employee.experience,
-        subject: employee.subject || "",
-        address: employee.address,
-        salary: employee.salary,
-        joiningDate: new Date(employee.joiningDate).toISOString().split("T")[0],
-        status: employee.status,
-        emergencyContactName: employee.emergencyContact.name,
-        emergencyContactPhone: employee.emergencyContact.phone,
-        emergencyContactRelation: employee.emergencyContact.relation,
+        ...employee,
+        dateOfBirth: employee.dateOfBirth
+          ? new Date(employee.dateOfBirth).toISOString().split("T")[0]
+          : "",
+        joiningDate: employee.joiningDate
+          ? new Date(employee.joiningDate).toISOString().split("T")[0]
+          : "",
+        inactiveDate: employee.inactiveDate
+          ? new Date(employee.inactiveDate).toISOString().split("T")[0]
+          : "",
+        inactiveReason: employee.inactiveReason || "",
+        emergencyContactName: employee.emergencyContact?.name || "",
+        emergencyContactPhone: employee.emergencyContact?.phone || "",
+        emergencyContactRelation: employee.emergencyContact?.relation || "",
       });
     } else {
       reset({
-        firstName: "",
-        lastName: "",
-        email: "",
+        fullName: "",
         phone: "",
+        role: "employee",
         dateOfBirth: "",
-        gender: "",
+        gender: "male",
         nicNumber: "",
-        staffCategory: "",
+        staffCategory: "teacher",
+        designation: "",
         qualification: "",
         experience: 0,
         subject: "",
@@ -103,343 +73,303 @@ export default function EmployeeFormModal({
         salary: 0,
         joiningDate: new Date().toISOString().split("T")[0],
         status: "active",
+        inactiveDate: "",
+        inactiveReason: "",
         emergencyContactName: "",
         emergencyContactPhone: "",
         emergencyContactRelation: "",
       });
     }
-  }, [employee, reset]);
+  }, [employee, isOpen, reset]);
 
   const onFormSubmit = (data: any) => {
     const formattedData = {
       ...data,
+      // Numbers conversion to ensure DB storage
+      salary: Number(data.salary),
+      experience: Number(data.experience),
+      // Emergency contact object mapping
       emergencyContact: {
         name: data.emergencyContactName,
         phone: data.emergencyContactPhone,
         relation: data.emergencyContactRelation,
       },
     };
+
     delete formattedData.emergencyContactName;
     delete formattedData.emergencyContactPhone;
     delete formattedData.emergencyContactRelation;
+
     onSubmit(formattedData);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col bg-white dark:bg-zinc-950">
-        {/* Compact Header */}
-        <DialogHeader className="p-2 bg-slate-900 text-white shrink-0">
-          <DialogTitle className="text-lg font-bold flex items-center gap-2">
-            <User className="size-5 text-blue-400" />
-            {employee ? "Edit Employee Profile" : "Add Employee"}
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={isOpen} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
+        <span className="font-bold text-slate-700">
+          {employee ? "Edit Employee Details" : "Register New Employee"}
+        </span>
+        <IconButton onClick={onClose} size="small" tabIndex={-1}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
 
-        {/* Scrollable Form Body */}
-        <form
-          onSubmit={handleSubmit(onFormSubmit)}
-          className="flex flex-col overflow-hidden"
-        >
-          <div className="p-3 space-y-6 overflow-y-auto custom-scrollbar">
-            {/* Section 1: Personal Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <User className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Personal Details
-                </h3>
-              </div>
+      <form onSubmit={handleSubmit(onFormSubmit)}>
+        <DialogContent dividers>
+          <div className="flex flex-col gap-5">
+            {/* 1. Basic Information */}
+            <TextField
+              {...register("fullName", { required: true })}
+              label="Full Name"
+              fullWidth
+              size="small"
+              required
+            />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">First Name *</Label>
-                  <Input
-                    {...register("firstName", { required: "Required" })}
-                    className="h-9 text-sm"
-                    placeholder="John"
-                  />
-                  {errors.firstName && (
-                    <p className="text-[10px] text-red-500">
-                      {errors.firstName.message as string}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Last Name *</Label>
-                  <Input
-                    {...register("lastName", { required: "Required" })}
-                    className="h-9 text-sm"
-                    placeholder="Doe"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Email Address *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      type="email"
-                      {...register("email", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="john@school.com"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Phone Number *</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      {...register("phone", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="+92..."
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Date of Birth *</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      type="date"
-                      {...register("dateOfBirth", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Gender *</Label>
-                  <div className="relative">
-                    <UserCircle className="absolute left-2.5 top-2.5 size-4 text-slate-400 z-10" />
-                    <Select
-                      value={selectedGender}
-                      onValueChange={(v) => setValue("gender", v)}
-                    >
-                      <SelectTrigger className="h-9 text-sm pl-9">
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="male">Male</SelectItem>
-                        <SelectItem value="female">Female</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">NIC Number *</Label>
-                  <div className="relative">
-                    <CreditCard className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      {...register("nicNumber", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="12345-1234567-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Address *</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      {...register("address", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="City, Country"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <TextField
+                {...register("phone", { required: true })}
+                label="Phone Number"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+              <TextField
+                {...register("role", { required: true })}
+                select
+                label="System Role"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+                value={currentRole || "employee"}
+                onChange={(e) => setValue("role", e.target.value)}
+              >
+                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="employee">Employee</MenuItem>
+                <MenuItem value="accountant">Accountant</MenuItem>
+              </TextField>
             </div>
 
-            {/* Section 2: Professional Information */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <GraduationCap className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Professional Details
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Staff Category */}
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">
-                    Staff Category *
-                  </Label>
-                  <div className="relative">
-                    <Briefcase className="absolute left-2.5 top-2.5 size-4 text-slate-400 z-10" />
-                    <Select
-                      value={selectedStaffCategory}
-                      onValueChange={(v) => setValue("staffCategory", v)}
-                    >
-                      <SelectTrigger className="h-9 text-sm pl-9">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="teacher">Teacher</SelectItem>
-                        <SelectItem value="other">Other Staff</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Qualification *</Label>
-                  <Input
-                    {...register("qualification", { required: "Required" })}
-                    className="h-9 text-sm"
-                    placeholder="e.g. M.Sc Math"
-                  />
-                </div>
-
-                {/* Subject - Only show if teacher */}
-                {selectedStaffCategory === "teacher" && (
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Subject</Label>
-                    <Input
-                      {...register("subject")}
-                      className="h-9 text-sm"
-                      placeholder="Mathematics"
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">
-                    Experience (Years) *
-                  </Label>
-                  <div className="relative">
-                    <Clock className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      type="number"
-                      {...register("experience", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Salary (PKR) *</Label>
-                  <div className="relative">
-                    <Wallet className="absolute left-2.5 top-2.5 size-4 text-slate-400" />
-                    <Input
-                      type="number"
-                      {...register("salary", { required: "Required" })}
-                      className="pl-9 h-9 text-sm"
-                      placeholder="50000"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Joining Date *</Label>
-                  <Input
-                    type="date"
-                    {...register("joiningDate", { required: "Required" })}
-                    className="h-9 text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-medium">Status *</Label>
-                  <Select
-                    value={selectedStatus}
-                    onValueChange={(v) => setValue("status", v)}
-                  >
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <TextField
+                {...register("nicNumber", { required: true })}
+                label="NIC Number"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+              <TextField
+                {...register("gender", { required: true })}
+                select
+                label="Gender"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+                value={currentGender || "male"}
+                onChange={(e) => setValue("gender", e.target.value)}
+              >
+                <MenuItem value="male">Male</MenuItem>
+                <MenuItem value="female">Female</MenuItem>
+              </TextField>
             </div>
 
-            {/* Section 3: Emergency Contact */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 border-b pb-1">
-                <ShieldAlert className="size-4 text-slate-400" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Emergency Contact
-                </h3>
+            {/* 2. Professional Details */}
+            <div className="flex flex-col sm:flex-row gap-4 border-t pt-4">
+              <TextField
+                {...register("staffCategory", { required: true })}
+                select
+                label="Staff Category"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+                value={staffCategory || "teacher"}
+                onChange={(e) => setValue("staffCategory", e.target.value)}
+              >
+                <MenuItem value="teacher">Teacher</MenuItem>
+                <MenuItem value="other">Other Staff</MenuItem>
+              </TextField>
+              <TextField
+                {...register("designation", { required: true })}
+                label="Designation"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <TextField
+                {...register("salary", { required: true })}
+                label="Monthly Salary"
+                type="number"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+              <TextField
+                {...register("experience", { required: true })}
+                label="Experience (Years)"
+                type="number"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4">
+              <TextField
+                {...register("subject")}
+                label="Subject"
+                disabled={staffCategory !== "teacher"}
+                className="w-full sm:w-1/2"
+                size="small"
+                placeholder={
+                  staffCategory === "teacher" ? "Maths, Urdu..." : "N/A"
+                }
+              />
+              <TextField
+                {...register("qualification", { required: true })}
+                label="Qualification"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+            </div>
+
+            {/* 3. Dates & Status */}
+            <div className="flex flex-col sm:flex-row gap-4 border-t pt-4">
+              <TextField
+                {...register("dateOfBirth", { required: true })}
+                label="Date of Birth"
+                type="date"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                {...register("joiningDate", { required: true })}
+                label="Joining Date"
+                type="date"
+                className="w-full sm:w-1/2"
+                size="small"
+                required
+              />
+            </div>
+
+            <div className="w-full">
+              <TextField
+                {...register("status", { required: true })}
+                select
+                label="Employment Status"
+                fullWidth
+                size="small"
+                required
+                value={currentStatus || "active"}
+                onChange={(e) => setValue("status", e.target.value)}
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+              </TextField>
+            </div>
+
+            {/* Conditional Inactive Fields */}
+            {currentStatus === "inactive" && (
+              <div className="flex flex-col sm:flex-row gap-4 p-4 bg-red-50 border border-red-200 rounded-md animate-in fade-in duration-300">
+                <TextField
+                  {...register("inactiveDate", {
+                    required: currentStatus === "inactive",
+                  })}
+                  label="Leaving Date"
+                  type="date"
+                  className="w-full sm:w-1/2"
+                  size="small"
+                  required
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  {...register("inactiveReason", {
+                    required: currentStatus === "inactive",
+                  })}
+                  label="Reason of Leaving"
+                  placeholder="e.g. Resigned / Personal"
+                  className="w-full sm:w-1/2"
+                  size="small"
+                  required
+                />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Contact Name *
-                  </Label>
-                  <Input
-                    {...register("emergencyContactName", {
-                      required: "Required",
-                    })}
-                    className="h-9 text-sm bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Contact Phone *
-                  </Label>
-                  <Input
-                    {...register("emergencyContactPhone", {
-                      required: "Required",
-                    })}
-                    className="h-9 text-sm bg-slate-50"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-bold text-slate-400 uppercase">
-                    Relation *
-                  </Label>
-                  <Input
-                    {...register("emergencyContactRelation", {
-                      required: "Required",
-                    })}
-                    className="h-9 text-sm bg-slate-50"
-                  />
-                </div>
+            )}
+
+            <TextField
+              {...register("address", { required: true })}
+              label="Complete Address"
+              multiline
+              rows={2}
+              fullWidth
+              size="small"
+              required
+            />
+
+            {/* 4. Emergency Contact */}
+            <div className="mt-2 border-t pt-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Emergency Contact Information
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 bg-slate-50 p-3 rounded border border-dashed border-slate-300">
+                <TextField
+                  {...register("emergencyContactName", { required: true })}
+                  label="Name"
+                  fullWidth
+                  size="small"
+                  required
+                />
+                <TextField
+                  {...register("emergencyContactPhone", { required: true })}
+                  label="Phone"
+                  fullWidth
+                  size="small"
+                  required
+                />
+                <TextField
+                  {...register("emergencyContactRelation", { required: true })}
+                  label="Relation"
+                  fullWidth
+                  size="small"
+                  required
+                />
               </div>
             </div>
           </div>
+        </DialogContent>
 
-          {/* Footer Actions */}
-          <div className="p-2 bg-slate-50 dark:bg-zinc-900 border-t flex justify-end gap-3 shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-              className="h-9 px-4 text-xs font-semibold cursor-pointer"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="h-9 px-4 text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm cursor-pointer"
-            >
-              {isLoading ? (
-                "Saving..."
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Save className="size-3.5" />
-                  {employee ? "Update" : "Save"}
-                </span>
-              )}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
+        <DialogActions className="p-4 bg-slate-50 border-t">
+          <Button
+            onClick={onClose}
+            color="inherit"
+            disabled={isLoading}
+            size="small"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={isLoading}
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 4,
+            }}
+          >
+            {isLoading
+              ? "Processing..."
+              : employee
+                ? "Update Details"
+                : "Register Employee"}
+          </Button>
+        </DialogActions>
+      </form>
     </Dialog>
   );
 }

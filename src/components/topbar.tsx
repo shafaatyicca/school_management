@@ -7,12 +7,11 @@ import {
   GraduationCap,
   Bell,
   Calendar as CalendarIcon,
-  Clock,
-  User,
   Search,
   Settings,
   KeyRound,
   UserCircle,
+  User,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,22 +22,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/siteTheme/ThemeToggle";
 
 export default function Topbar() {
   const [dateTime, setDateTime] = useState(new Date());
-  const [mounted, setMounted] = useState(false); // Hydration error fix karne ke liye
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true); // Component mount hone par true hoga
+    setMounted(true);
     const timer = setInterval(() => setDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Server par render nahi hoga, sirf client par load hone ke baad dikhega
   if (!mounted) {
+    // 1. Loading state background changed to bg-background
     return (
-      <header className="h-20 w-full border-b border-slate-200/60 bg-white sticky top-0 z-50 flex items-center px-8">
-        <div className="animate-pulse bg-slate-100 h-10 w-48 rounded-lg" />
+      <header className="h-20 w-full border-b border-border bg-background sticky top-0 z-50 flex items-center px-8">
+        <div className="animate-pulse bg-muted h-10 w-48 rounded-lg" />
       </header>
     );
   }
@@ -57,34 +57,35 @@ export default function Topbar() {
   });
 
   return (
-    <header className="h-20 w-full border-b border-slate-200/60 bg-white/80 backdrop-blur-xl flex items-center justify-between px-3 sticky top-0 z-50">
-      {/* --- LEFT SECTION: Logo & Info --- */}
-      <div className="flex items-center gap-3 md:gap-5">
-        <div className="relative group cursor-pointer">
-          <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-300"></div>
-          <div className="relative flex h-10 w-10 md:h-12 md:w-12 items-center justify-center rounded-2xl bg-white border border-slate-100 shadow-sm">
-            <GraduationCap className="h-6 w-6 md:h-7 md:w-7 text-indigo-600" />
+    // 2. Main Header: bg-background use kiya backdrop-blur ke sath
+    <header className="h-20 w-full bg-background/80 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
+      {/* --- LEFT SECTION --- */}
+      <div className="flex items-center gap-4">
+        <div className="relative group cursor-pointer hidden sm:block">
+          <div className="absolute -inset-1 bg-gradient-to-r from-sky-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border shadow-xl">
+            <GraduationCap className="h-6 w-6 text-sky-400" />
           </div>
         </div>
 
         <div className="flex flex-col">
-          <h1 className="text-base md:text-xl font-black tracking-tight text-slate-800 leading-none">
-            BRIGHT<span className="text-indigo-600 italic">FUTURE</span>
-            <span className="hidden sm:inline ml-1 text-slate-400 font-light">
-              | ACADEMY
+          <h1 className="text-sm md:text-lg font-bold tracking-wider text-foreground leading-none">
+            BRIGHT<span className="text-sky-400 italic">FUTURE</span>
+            <span className="hidden md:inline ml-2 text-muted-foreground font-light text-xs">
+              | MANAGEMENT
             </span>
           </h1>
 
-          <div className="flex items-center gap-2 mt-1.5">
-            <div className="flex items-center gap-1.5 bg-slate-100/80 px-2 py-0.5 rounded-full border border-slate-200 shadow-sm">
-              <CalendarIcon className="h-3 w-3 text-indigo-500" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tighter">
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-border">
+              <CalendarIcon className="h-3 w-3 text-sky-400" />
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight">
                 {formattedDate}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 bg-slate-900 px-2.5 py-0.5 rounded-full shadow-lg">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono font-medium text-emerald-50 tracking-widest tabular-nums">
+            <div className="flex items-center gap-1.5 bg-sky-500/10 px-2 py-0.5 rounded-md border border-sky-500/20">
+              <div className="h-1 w-1 rounded-full bg-sky-400 animate-pulse" />
+              <span className="text-[10px] font-mono font-bold text-sky-300 tracking-wider tabular-nums">
                 {formattedTime}
               </span>
             </div>
@@ -92,87 +93,92 @@ export default function Topbar() {
         </div>
       </div>
 
-      {/* Status Badge */}
-      <div className="hidden lg:flex items-center gap-2 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
-          System Active
+      {/* --- MIDDLE SECTION --- */}
+      <div className="hidden lg:flex items-center gap-2 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/10">
+        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em]">
+          Core System Online
         </span>
       </div>
 
-      {/* --- RIGHT SECTION: Actions & Profile Dropdown --- */}
-      <div className="flex items-center gap-2 md:gap-4">
-        <div className="hidden md:flex items-center gap-2 mr-2">
+      {/* --- RIGHT SECTION --- */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+
           <Button
             variant="ghost"
             size="icon"
-            className="text-slate-500 rounded-full"
+            className="text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 rounded-lg h-9 w-9"
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-4 w-4" />
           </Button>
+
           <div className="relative">
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-500 rounded-full"
+              className="text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 rounded-lg h-9 w-9"
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
             </Button>
-            <span className="absolute top-2 right-2 h-2 w-2 bg-rose-500 rounded-full border-2 border-white"></span>
+            {/* 3. Notification dot ring changed to ring-background */}
+            <span className="absolute top-2 right-2 h-1.5 w-1.5 bg-sky-500 rounded-full ring-2 ring-background"></span>
           </div>
         </div>
 
+        {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-2 md:gap-3 p-1 pr-3 cursor-pointer bg-slate-50 hover:bg-slate-100 transition-all rounded-full border border-slate-200 group">
+            <div className="flex items-center gap-3 pl-1 pr-3 py-1 cursor-pointer bg-muted/50 hover:bg-muted transition-all rounded-xl border border-border group shadow-inner">
               <div className="relative">
-                <div className="h-9 w-9 rounded-full ring-2 ring-indigo-50 border-2 border-white bg-indigo-100 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform">
-                  <User className="h-5 w-5 text-indigo-600" />
+                <div className="h-8 w-8 rounded-lg bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
+                  <User className="h-4 w-4 text-muted-foreground group-hover:text-sky-400" />
                 </div>
-                <div className="absolute bottom-0 right-0 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-white"></div>
+                {/* Status dot ring changed to border-background */}
+                <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-background"></div>
               </div>
-              <div className="text-right hidden sm:block">
-                <p className="text-[12px] font-bold text-slate-800 leading-none">
+              <div className="text-left hidden sm:block">
+                <p className="text-[11px] font-bold text-foreground leading-none tracking-wide">
                   Hassan Jani
                 </p>
-                <p className="text-[10px] text-indigo-500 font-semibold mt-0.5 uppercase tracking-tighter">
+                <p className="text-[9px] text-sky-400/80 font-bold mt-1 uppercase tracking-tighter">
                   Super Admin
                 </p>
               </div>
             </div>
           </DropdownMenuTrigger>
 
+          {/* 4. Dropdown content bg and border synced */}
           <DropdownMenuContent
-            className="w-64 mt-2 shadow-2xl border-slate-200 rounded-xl overflow-hidden"
+            className="w-64 mt-2 bg-popover border-border shadow-2xl rounded-xl text-popover-foreground"
             align="end"
           >
-            <DropdownMenuLabel className="font-normal p-4 bg-slate-50/50">
+            <DropdownMenuLabel className="font-normal p-4 bg-muted/30">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-bold leading-none text-slate-900">
-                  Ali Khan
-                </p>
-                <p className="text-xs leading-none text-slate-500">
+                <p className="text-sm font-bold text-foreground">Ali Khan</p>
+                <p className="text-xs text-muted-foreground">
                   ali.admin@school.com
                 </p>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuGroup className="p-1">
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer focus:bg-indigo-50 focus:text-indigo-600">
+              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
                 <UserCircle className="h-4 w-4" />
-                <span className="font-medium text-sm">Update Profile</span>
+                <span className="text-sm">Update Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer focus:bg-indigo-50 focus:text-indigo-600">
+              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
                 <KeyRound className="h-4 w-4" />
-                <span className="font-medium text-sm">Change Password</span>
+                <span className="text-sm">Change Password</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer focus:bg-indigo-50 focus:text-indigo-600">
+              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
                 <Settings className="h-4 w-4" />
-                <span className="font-medium text-sm">System Settings</span>
+                <span className="text-sm">Settings</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-none cursor-pointer text-rose-600 focus:bg-rose-50 focus:text-rose-700 font-bold">
+            <DropdownMenuSeparator className="bg-border" />
+            <DropdownMenuItem className="flex items-center gap-3 p-3 m-1 rounded-lg cursor-pointer text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/20 focus:text-rose-400 font-bold transition-colors">
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </DropdownMenuItem>

@@ -48,7 +48,6 @@ export default function ClassManager() {
       const data = await res.json();
       setClasses(data);
 
-      // Yahan orderMap ko refresh karna zaroori hai taake UI 0 na dikhaye
       const map: { [key: string]: number } = {};
       data.forEach((cls: ClassType) => {
         map[cls._id] = cls.order || 0;
@@ -81,7 +80,7 @@ export default function ClassManager() {
     try {
       const items = Object.entries(orderMap).map(([id, order]) => ({
         id,
-        order: Number(order), // Ensure it's a number
+        order: Number(order),
       }));
 
       const res = await fetch("/api/classes", {
@@ -92,7 +91,7 @@ export default function ClassManager() {
 
       if (res.ok) {
         setIsOrderMode(false);
-        await fetchClasses(); // Wait for fresh data
+        await fetchClasses();
       }
     } catch (error) {
       console.error("Failed to save order", error);
@@ -101,7 +100,6 @@ export default function ClassManager() {
     }
   };
 
-  // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<ClassType>[]>(
     () => [
       {
@@ -109,15 +107,16 @@ export default function ClassManager() {
         size: 50,
         enableColumnActions: false,
         enableHiding: false,
-        // Ye hamesha 1, 2, 3 hi dikhayega (Static count)
-        Cell: ({ row }) => row.index + 1,
+        Cell: ({ row }) => (
+          <span className="text-foreground">{row.index + 1}</span>
+        ),
       },
       {
         accessorKey: "name",
         header: "Class Name",
         size: 150,
         Cell: ({ cell }) => (
-          <span className="font-semibold text-slate-700">
+          <span className="font-semibold text-slate-700 dark:text-slate-200">
             {cell.getValue<string>()}
           </span>
         ),
@@ -131,7 +130,7 @@ export default function ClassManager() {
             {cell.getValue<string[]>().map((s, i) => (
               <span
                 key={i}
-                className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold"
+                className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 dark:border-blue-800"
               >
                 {s}
               </span>
@@ -143,12 +142,11 @@ export default function ClassManager() {
         accessorKey: "order",
         header: "Sort Order",
         size: 100,
-        // Ye column user control karega sorting ke liye
         Cell: ({ row }) =>
           isOrderMode ? (
             <Input
               type="number"
-              className="w-16 h-8 border-blue-400 focus-visible:ring-blue-500 font-bold text-center"
+              className="w-16 h-8 border-blue-400 dark:border-blue-600 bg-white dark:bg-slate-900 font-bold text-center text-foreground"
               value={orderMap[row.original._id] || 0}
               onChange={(e) =>
                 setOrderMap({
@@ -158,16 +156,17 @@ export default function ClassManager() {
               }
             />
           ) : (
-            <div className="flex items-center gap-2 text-blue-600 font-mono font-bold px-2">
-              <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-mono font-bold px-2">
+              <span className="bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">
                 {row.original.order || 0}
               </span>
             </div>
           ),
       },
     ],
-    [isOrderMode, orderMap], // Dependencies lazmi check karein
+    [isOrderMode, orderMap],
   );
+
   const table = useMaterialReactTable({
     columns,
     data: classes,
@@ -183,7 +182,7 @@ export default function ClassManager() {
         <Button
           size="icon"
           variant="outline"
-          className="h-8 w-8 border-gray-300 hover:bg-gray-100 cursor-pointer"
+          className="h-8 w-8 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           onClick={() => handleEdit(row.original)}
         >
           <Pencil className="w-3.5 h-3.5" />
@@ -191,14 +190,14 @@ export default function ClassManager() {
         <Button
           size="icon"
           variant="outline"
-          className="h-8 w-8 border-red-200 hover:bg-red-50 cursor-pointer"
+          className="h-8 w-8 border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20 cursor-pointer"
           onClick={() => handleDelete(row.original._id)}
         >
           <Trash2 className="w-3.5 h-3.5 text-red-600" />
         </Button>
       </div>
     ),
-    // Naya Section: Toolbar mein Buttons
+    // --- Ye raha aapka Set Ordering Button aur Toolbar logic ---
     renderTopToolbarCustomActions: () => (
       <div className="flex gap-2">
         {!isOrderMode ? (
@@ -206,7 +205,7 @@ export default function ClassManager() {
             variant="outline"
             size="sm"
             onClick={() => setIsOrderMode(true)}
-            className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer"
+            className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:border-blue-900 dark:text-blue-400 cursor-pointer"
           >
             <ArrowDown10 className="w-4 h-4 mr-2" />
             Set Ordering
@@ -226,7 +225,7 @@ export default function ClassManager() {
               size="sm"
               variant="ghost"
               onClick={() => setIsOrderMode(false)}
-              className="cursor-pointer"
+              className="cursor-pointer dark:text-slate-400"
             >
               <X className="w-4 h-4 mr-2" />
               Cancel
@@ -239,22 +238,26 @@ export default function ClassManager() {
       elevation: 0,
       sx: {
         borderRadius: "16px",
-        border: "1px solid #e2e8f0",
-        padding: "10px",
-        boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+        border: "1px solid var(--border)",
+        backgroundColor: "var(--background)",
+        padding: "0px 10px",
       },
     },
     muiTableHeadCellProps: {
       sx: {
         fontWeight: "700",
         fontSize: "13px",
-        backgroundColor: "#f8fafc",
-        color: "#64748b",
+      },
+    },
+    muiBottomToolbarProps: {
+      sx: {
+        backgroundColor: "var(--background)",
+        color: "var(--foreground)",
       },
     },
   });
 
-  // --- HANDLERS ---
+  // --- Handlers (Submit, Delete, etc.) ---
   const submitHandler = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -300,7 +303,7 @@ export default function ClassManager() {
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <PageHeader
         title="Classes Management"
         buttonLabel="Add Class"
@@ -308,7 +311,7 @@ export default function ClassManager() {
         icon={<BookOpen className="w-3.5 h-3.5" />}
       />
 
-      <div className="w-full">
+      <div className="w-full border border-border rounded-xl shadow-sm bg-background overflow-hidden">
         <MaterialReactTable table={table} />
       </div>
 
@@ -316,9 +319,6 @@ export default function ClassManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{isEdit ? "Edit Class" : "Add Class"}</DialogTitle>
-            <DialogDescription className="sr-only">
-              Class creation form.
-            </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitHandler} className="space-y-4">
             <Input
