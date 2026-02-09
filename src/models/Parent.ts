@@ -34,7 +34,7 @@ parentSchema.pre<IParent>("save", async function () {
 
     // 1. Calculate p_id (Auto-increment)
     const lastParent = await ParentModel.findOne(
-      {},
+      {} as any,
       { p_id: 1 },
       { sort: { p_id: -1 } },
     ).lean();

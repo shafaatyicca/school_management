@@ -83,12 +83,13 @@ export default function EmployeeFormModal({
   }, [employee, isOpen, reset]);
 
   const onFormSubmit = (data: any) => {
+    if (data.staffCategory !== "teacher") {
+      data.subject = "";
+    }
     const formattedData = {
       ...data,
-      // Numbers conversion to ensure DB storage
       salary: Number(data.salary),
       experience: Number(data.experience),
-      // Emergency contact object mapping
       emergencyContact: {
         name: data.emergencyContactName,
         phone: data.emergencyContactPhone,
@@ -217,25 +218,28 @@ export default function EmployeeFormModal({
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <TextField
-                {...register("subject")}
-                label="Subject"
-                disabled={staffCategory !== "teacher"}
-                className="w-full sm:w-1/2"
-                size="small"
-                placeholder={
-                  staffCategory === "teacher" ? "Maths, Urdu..." : "N/A"
-                }
-              />
+              {/* Qualification hamesha dikhegi */}
               <TextField
                 {...register("qualification", { required: true })}
                 label="Qualification"
-                className="w-full sm:w-1/2"
+                className={
+                  staffCategory === "teacher" ? "w-full sm:w-1/2" : "w-full"
+                }
                 size="small"
                 required
               />
-            </div>
 
+              {/* Subject sirf Teacher ke liye dikhega */}
+              {staffCategory === "teacher" && (
+                <TextField
+                  {...register("subject", { required: true })}
+                  label="Subject"
+                  className="w-full sm:w-1/2"
+                  size="small"
+                  required
+                />
+              )}
+            </div>
             {/* 3. Dates & Status */}
             <div className="flex flex-col sm:flex-row gap-4 border-t pt-4">
               <TextField

@@ -6,21 +6,14 @@ import { Pencil, Trash2, Users } from "lucide-react";
 import EmployeeFormModal from "@/components/EmployeeFormModal";
 import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
+import { FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 
 export default function EmployeesPage() {
@@ -96,12 +89,13 @@ export default function EmployeesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deleteDialog.id) return;
     try {
       const response = await fetch("/api/employees", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: deleteDialog.id }), // state se id lein
       });
       if (!response.ok) throw new Error("Failed to delete");
       await fetchEmployees();
@@ -121,6 +115,7 @@ export default function EmployeesPage() {
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
     () => [
       {
+        id: "S#",
         header: "S.No",
         size: 50,
         Cell: ({ row }) => (
@@ -130,6 +125,10 @@ export default function EmployeesPage() {
       {
         id: "employee_info",
         header: "Employee Details",
+        meta: {
+          exportHeaders: ["E-ID", "Full Name"],
+          getExportValue: (row) => [row.emp_id || "---", row.fullName || "---"],
+        },
         size: 150,
         Cell: ({ row }) => (
           <div
@@ -294,7 +293,7 @@ export default function EmployeesPage() {
   const table = useMaterialReactTable({
     columns,
     data: employees,
-    state: { isLoading: fetchLoading },
+    state: { showProgressBars: fetchLoading },
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
@@ -338,6 +337,38 @@ export default function EmployeesPage() {
         </Button>
       </div>
     ),
+
+    // --- Export Buttons Add Karein ---
+    renderTopToolbarCustomActions: ({ table }) => (
+      <div className="flex items-center gap-2">
+        <Button
+          onClick={() => handleExportRows(table, "excel", "Employees List")}
+          variant="outline"
+          size="sm"
+          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 h-8 cursor-pointer"
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+        </Button>
+
+        <Button
+          onClick={() => handleExportRows(table, "pdf", "Employees List")}
+          variant="outline"
+          size="sm"
+          className="text-rose-600 border-rose-200 hover:bg-rose-50 h-8 cursor-pointer"
+        >
+          <FileText className="h-4 w-4 mr-1" /> PDF
+        </Button>
+
+        <Button
+          onClick={() => handlePrintTable(table, "Employees List")}
+          variant="outline"
+          size="sm"
+          className="text-slate-600 border-slate-200 hover:bg-slate-50 h-8 cursor-pointer"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print
+        </Button>
+      </div>
+    ),
     muiTablePaperProps: {
       elevation: 0,
       sx: {
@@ -357,7 +388,6 @@ export default function EmployeesPage() {
       sx: {
         fontSize: "12px",
         fontWeight: "500",
-
         color: "var(--foreground)",
       },
     },
@@ -384,31 +414,12 @@ export default function EmployeesPage() {
         employee={selectedEmployee}
         isLoading={isLoading}
       />
-      <AlertDialog
+      <DeleteConfirmDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              employee record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteDialog.id && handleDelete(deleteDialog.id)}
-              className="bg-red-500 hover:bg-red-600 cursor-pointer"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={handleDelete}
+        itemName="Employee"
+      />
       <EmployeeProfileModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}

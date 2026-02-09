@@ -31,7 +31,7 @@ export default function PageHeader({
               <span className="absolute inset-0 rounded bg-blue-400 animate-ping opacity-100"></span>
             </div>
 
-            <h1 className="text-[11px] font-semibold text-slate-100 uppercase tracking-[0.25em] sm:text-sm group-hover:translate-x-1 transition-transform duration-300">
+            <h1 className="text-[11px] text-slate-100 uppercase tracking-[0.25em] sm:text-sm group-hover:translate-x-1 transition-transform duration-300">
               {title}
             </h1>
           </div>

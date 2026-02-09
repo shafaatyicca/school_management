@@ -1,8 +1,9 @@
 import mongoose, { Schema, model, models } from "mongoose";
 
 export interface IEmployee {
-  _id?: string;
-  emp_id: string; // New Field
+  [x: string]: any;
+  _id?: number;
+  emp_id: number; // New Field
   fullName: string;
   email: string;
   password?: string; // New Field
@@ -35,7 +36,7 @@ const EmployeeSchema = new Schema<IEmployee>(
   {
     // Auto-generated ID
     emp_id: {
-      type: String,
+      type: Number,
       unique: true,
     },
     fullName: {
@@ -122,28 +123,40 @@ const EmployeeSchema = new Schema<IEmployee>(
   { timestamps: true },
 );
 
-EmployeeSchema.pre("save", async function () {
+EmployeeSchema.pre<IEmployee>("save", async function () {
   if (this.isNew) {
     try {
-      // 1. Total employees count lein taake next ID mil sakay
-      const count = await mongoose.models.Employee.countDocuments();
-      const nextIdNumber = count + 1;
+      const EmployeeModel =
+        mongoose.models.Employee ||
+        mongoose.model<IEmployee>("Employee", EmployeeSchema);
 
-      // 2. Set simple emp_id (e.g., 1, 2, 3)
-      this.emp_id = nextIdNumber.toString();
+      // 1. Sab se bari ID dhoondne ka sahi tareeqa
+      const lastEmployee = await EmployeeModel.findOne(
+        {} as any,
+        { emp_id: 1 },
+        { sort: { emp_id: -1 } }, // Hamesha sab se bara number pehle uthayega
+      ).lean();
 
-      // 3. Set email (e.g., 1staff@ccw.com)
+      // Agar record hai to +1, warna 1 se shuru
+      const nextIdNumber =
+        lastEmployee && lastEmployee.emp_id
+          ? Number(lastEmployee.emp_id) + 1
+          : 1;
+
+      // 2. Set emp_id (Number format mein)
+      this.emp_id = nextIdNumber;
+
+      // 3. Aapka Original Email Format (e.g., 1staff@ccw.com)
       if (!this.email) {
-        this.email = `${this.emp_id}staff@ccw.com`;
+        this.email = `${nextIdNumber}staff@ccw.com`.toLowerCase();
       }
 
-      // 4. Set password (e.g., staff11122)
-      // Note: Aapne kaha staff ID + 1122 (staf11122 if ID is 1)
+      // 4. Aapka Original Password Format (e.g., staff1012)
       if (!this.password) {
-        this.password = `staff${this.emp_id}012`;
+        this.password = `staff${nextIdNumber}012`;
       }
 
-      // 5. Default Role check
+      // 5. Default Role
       if (!this.role) {
         this.role = "employee";
       }

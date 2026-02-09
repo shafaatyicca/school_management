@@ -69,7 +69,7 @@ StudentSchema.pre<IStudent>("save", async function () {
 
     // 1. Calculate GR Number
     const lastStudent = await StudentModel.findOne(
-      {},
+      {} as any,
       { grNumber: 1 },
       { sort: { grNumber: -1 } },
     ).lean();

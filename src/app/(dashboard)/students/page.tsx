@@ -11,9 +11,16 @@ import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
-
-import { Pencil, Trash2, Eye } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  FileSpreadsheet,
+  FileText,
+  Printer,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -56,25 +63,33 @@ export default function StudentsPage() {
     setIsViewModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this student?")) {
-      try {
-        await fetch("/api/students", {
-          method: "DELETE",
-          body: JSON.stringify({ id }),
-          headers: { "Content-Type": "application/json" },
-        });
-        fetchData();
-      } catch (error) {
-        console.error("Delete failed");
-      }
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    id: string | null;
+  }>({
+    open: false,
+    id: null,
+  });
+
+  const handleDelete = async () => {
+    if (!deleteDialog.id) return;
+    try {
+      await fetch("/api/students", {
+        method: "DELETE",
+        body: JSON.stringify({ id: deleteDialog.id }),
+        headers: { "Content-Type": "application/json" },
+      });
+      fetchData();
+      setDeleteDialog({ open: false, id: null }); // Modal band
+    } catch (error) {
+      console.error("Delete failed");
     }
   };
 
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
       {
-        id: "sno",
+        id: "S#",
         header: "S.No",
         size: 30,
         enableResizing: false,
@@ -88,6 +103,13 @@ export default function StudentsPage() {
       {
         accessorKey: "fullName",
         header: "Student Info",
+        meta: {
+          exportHeaders: ["GR#", "Student Name"],
+          getExportValue: (row) => [
+            row.grNumber || "---",
+            row.fullName || "---",
+          ],
+        },
         size: 150,
         Cell: ({ row }) => (
           <div
@@ -162,6 +184,10 @@ export default function StudentsPage() {
       {
         id: "class_info",
         header: "Class & Section",
+        meta: {
+          getExportValue: (row) =>
+            `${(row.classId as any)?.name || "N/A"} (${row.section || ""})`,
+        },
         size: 100,
         Cell: ({ row }) => {
           const className = (row.original.classId as any)?.name || "N/A";
@@ -236,6 +262,13 @@ export default function StudentsPage() {
         accessorKey: "parentId.phone",
         header: "Contact#",
         size: 120,
+        meta: {
+          getExportValue: (row) => {
+            const f = row.parentId?.phone || "";
+            const m = row.motherPhone || "";
+            return `F: ${f}${m ? ` | M: ${m}` : ""}`;
+          },
+        },
         Cell: ({ row }) => (
           <div className="flex flex-col text-[11px]">
             <span className="text-black-700 font-medium">
@@ -251,6 +284,12 @@ export default function StudentsPage() {
         accessorKey: "inactiveReason",
         header: "Remarks / Reason",
         size: 150,
+        meta: {
+          getExportValue: (row) =>
+            row.status === "inactive"
+              ? `Reason: ${row.inactiveReason || "Not specified"}`
+              : row.detailedNote || "---",
+        },
         Cell: ({ row }) => {
           const status = row.original.status;
           const reason = row.original.inactiveReason;
@@ -278,7 +317,7 @@ export default function StudentsPage() {
   const table = useMaterialReactTable({
     columns,
     data: students,
-    state: { isLoading: fetchLoading },
+    state: { showProgressBars: fetchLoading },
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
@@ -304,22 +343,55 @@ export default function StudentsPage() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 hover:bg-accent text-sky-500"
+          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
           onClick={() => {
             setSelectedStudent(row.original);
             setIsModalOpen(true);
           }}
         >
-          <Pencil className="h-4 w-4" />
+          <Pencil className="w-4 h-4 text-sky-500" />
         </Button>
 
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 hover:bg-destructive/10 text-destructive"
-          onClick={() => handleDelete(row.original._id)}
+          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+          onClick={() => setDeleteDialog({ open: true, id: row.original._id })}
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-4 w-4 text-red-500" />
+        </Button>
+      </div>
+    ),
+    renderTopToolbarCustomActions: ({ table }) => (
+      <div className="flex items-center gap-2 ">
+        {/* Excel Button */}
+        <Button
+          onClick={() => handleExportRows(table, "excel", "Students Report")}
+          variant="outline"
+          size="sm"
+          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 h-8 cursor-pointer"
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+        </Button>
+
+        {/* PDF Button */}
+        <Button
+          onClick={() => handleExportRows(table, "pdf", "Students Report")}
+          variant="outline"
+          size="sm"
+          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 h-8 cursor-pointer"
+        >
+          <FileText className="h-4 w-4 mr-1" /> PDF
+        </Button>
+
+        {/* Print Button */}
+        <Button
+          onClick={() => handlePrintTable(table, "Students Report")}
+          variant="outline"
+          size="sm"
+          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print
         </Button>
       </div>
     ),
@@ -395,6 +467,13 @@ export default function StudentsPage() {
         onClose={() => setIsParentModalOpen(false)}
         parent={viewingParent}
         onStudentClick={handleOpenStudentFromParent}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteDialog.open}
+        onOpenChange={(open) => setDeleteDialog({ open, id: null })}
+        onConfirm={handleDelete}
+        itemName="Student"
       />
     </div>
   );
