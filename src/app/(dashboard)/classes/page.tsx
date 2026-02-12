@@ -85,7 +85,7 @@ export default function ClassPage() {
     () => [
       {
         id: "S#",
-        header: "S#",
+        header: "S.No",
         size: 50,
         Cell: ({ row }) => row.index + 1,
       },

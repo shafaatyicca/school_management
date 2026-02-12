@@ -183,7 +183,7 @@ export default function StudentsPage() {
       },
       {
         id: "class_info",
-        header: "Class & Section",
+        header: "Class",
         meta: {
           getExportValue: (row) =>
             `${(row.classId as any)?.name || "N/A"} (${row.section || ""})`,
@@ -237,6 +237,29 @@ export default function StudentsPage() {
           </span>
         ),
       },
+
+      {
+        accessorKey: "parentId.phone",
+        header: "Contact#",
+        size: 120,
+        meta: {
+          getExportValue: (row) => {
+            const f = row.parentId?.phone || "";
+            const m = row.motherPhone || "";
+            return `F: ${f}${m ? ` \nM: ${m}` : ""}`;
+          },
+        },
+        Cell: ({ row }) => (
+          <div className="flex flex-col text-[11px]">
+            <span className="text-black-700 font-medium">
+              {row.original.parentId?.phone || "No Father Phone"}
+            </span>
+            <span className="text-pink-500 italic">
+              {row.original.motherPhone || ""}
+            </span>
+          </div>
+        ),
+      },
       {
         accessorKey: "status",
         header: "Status",
@@ -257,28 +280,6 @@ export default function StudentsPage() {
             />
           );
         },
-      },
-      {
-        accessorKey: "parentId.phone",
-        header: "Contact#",
-        size: 120,
-        meta: {
-          getExportValue: (row) => {
-            const f = row.parentId?.phone || "";
-            const m = row.motherPhone || "";
-            return `F: ${f}${m ? ` | M: ${m}` : ""}`;
-          },
-        },
-        Cell: ({ row }) => (
-          <div className="flex flex-col text-[11px]">
-            <span className="text-black-700 font-medium">
-              {row.original.parentId?.phone || "No Father Phone"}
-            </span>
-            <span className="text-pink-500 italic">
-              {row.original.motherPhone || ""}
-            </span>
-          </div>
-        ),
       },
       {
         accessorKey: "inactiveReason",

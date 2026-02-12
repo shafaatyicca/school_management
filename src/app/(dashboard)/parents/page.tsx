@@ -6,6 +6,8 @@ import {
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
+import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import ParentFormModal from "@/components/ParentFormModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
@@ -67,7 +69,7 @@ export default function ParentsPage() {
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
       {
-        id: "sno",
+        id: "S#",
         header: "S.No",
         size: 50,
         enableResizing: false,
@@ -79,8 +81,16 @@ export default function ParentsPage() {
       },
 
       {
-        accessorKey: "fullName",
-        header: "Parent Name",
+        id: "parent_info", // Custom id kyunki hum multi-columns export kar rahe hain
+        header: "Parent Details",
+        meta: {
+          // Export logic: Ye array Excel mein 2 alag columns banayega
+          exportHeaders: ["P-ID", "Full Name"],
+          getExportValue: (row: any) => [
+            row.p_id || "---",
+            row.fullName || "---",
+          ],
+        },
         size: 180,
         Cell: ({ row }) => (
           <div
@@ -106,11 +116,8 @@ export default function ParentsPage() {
 
       {
         accessorKey: "address",
-
         header: "Address",
-
         size: 200,
-
         Cell: ({ row }) => (
           <div
             className="capitalize truncate max-w-[180px] print:whitespace-normal print:max-w-none"
@@ -130,7 +137,7 @@ export default function ParentsPage() {
   const table = useMaterialReactTable({
     columns,
     data: parents,
-    state: { isLoading: fetchLoading },
+    state: { showProgressBars: fetchLoading },
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
@@ -140,12 +147,46 @@ export default function ParentsPage() {
     },
 
     enableRowActions: true,
-
     positionActionsColumn: "last",
-
     displayColumnDefOptions: {
       "mrt-row-actions": { size: 80, header: "Actions" },
     },
+    // Export Buttons
+    renderTopToolbarCustomActions: ({ table }) => (
+      <div className="flex items-center gap-2">
+        {/* Excel Button */}
+        <Button
+          onClick={() =>
+            handleExportRows(table, "excel", "Parents List Report")
+          }
+          variant="outline"
+          size="sm"
+          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+        </Button>
+
+        {/* PDF Button */}
+        <Button
+          onClick={() => handleExportRows(table, "pdf", "Parents List Report")}
+          variant="outline"
+          size="sm"
+          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
+        >
+          <FileText className="h-4 w-4 mr-1" /> PDF
+        </Button>
+
+        {/* Print Button */}
+        <Button
+          onClick={() => handlePrintTable(table, "Parents List Report")}
+          variant="outline"
+          size="sm"
+          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print
+        </Button>
+      </div>
+    ),
 
     renderRowActions: ({ row }) => (
       <div className="flex gap-1">

@@ -338,7 +338,7 @@ export default function EmployeesPage() {
       </div>
     ),
 
-    // --- Export Buttons Add Karein ---
+    // --- Export Buttons Add  ---
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
         <Button
@@ -363,7 +363,7 @@ export default function EmployeesPage() {
           onClick={() => handlePrintTable(table, "Employees List")}
           variant="outline"
           size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 h-8 cursor-pointer"
+          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"
         >
           <Printer className="h-4 w-4 mr-1" /> Print
         </Button>
