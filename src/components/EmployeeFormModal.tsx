@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import type { IEmployee } from "@/models/Employee";
+import ImageUploadWithCrop from "./ImageUploadWithCrop";
 
 interface Props {
   isOpen: boolean;
@@ -38,10 +39,24 @@ export default function EmployeeFormModal({
   const currentRole = watch("role");
   const currentGender = watch("gender");
 
+  // 2. Image aur Gender ko watch karein
+  // const currentGender = watch("gender");
+  const currentImage = watch("image"); // Image field ko track karne ke liye
+
+  // handleImageDone function jo Cropper se data lega
+  const handleImageDone = (blob: Blob) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setValue("image", base64String); // Form state mein image set karein
+    };
+  };
   useEffect(() => {
     if (employee) {
       reset({
         ...employee,
+        image: employee.image || "",
         dateOfBirth: employee.dateOfBirth
           ? new Date(employee.dateOfBirth).toISOString().split("T")[0]
           : "",
@@ -58,6 +73,7 @@ export default function EmployeeFormModal({
       });
     } else {
       reset({
+        image: "",
         fullName: "",
         phone: "",
         role: "employee",
@@ -85,6 +101,11 @@ export default function EmployeeFormModal({
   const onFormSubmit = (data: any) => {
     if (data.staffCategory !== "teacher") {
       data.subject = "";
+    }
+    // Agar image select nahi ki gayi, to gender ke mutabiq default set karein
+    if (!data.image) {
+      data.image =
+        data.gender === "female" ? "/female-avatar.jpg" : "/male-avatar.jpg";
     }
     const formattedData = {
       ...data,
@@ -118,6 +139,41 @@ export default function EmployeeFormModal({
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <DialogContent dividers>
           <div className="flex flex-col gap-5">
+            {/* --- IMAGE UPLOAD SECTION --- */}
+            <div className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                Employee Profile Picture
+              </p>
+
+              {/* Agar image state mein hai, to sirf preview aur Remove button dikhao */}
+              {currentImage ? (
+                <div className="relative group flex flex-col items-center">
+                  <img
+                    src={currentImage}
+                    className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md"
+                    alt="Profile"
+                  />
+                  <Button
+                    type="button"
+                    size="small"
+                    variant="text"
+                    className="mt-2 text-[10px] text-red-500 font-semibold hover:bg-red-50"
+                    onClick={() => setValue("image", "")}
+                  >
+                    Remove Photo
+                  </Button>
+                </div>
+              ) : (
+                /* Agar image khali hai, to sirf Cropper (Add Photo box) dikhao. 
+       Yahan humne placeholder wali logic bilkul nikal di hai. */
+                <div className="flex flex-col items-center">
+                  <ImageUploadWithCrop onImageCropped={handleImageDone} />
+                </div>
+              )}
+
+              <input type="hidden" {...register("image")} />
+            </div>
+
             {/* 1. Basic Information */}
             <TextField
               {...register("fullName", { required: true })}

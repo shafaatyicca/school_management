@@ -6,7 +6,7 @@ import { Pencil, Trash2, Users } from "lucide-react";
 import EmployeeFormModal from "@/components/EmployeeFormModal";
 import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { FileSpreadsheet, FileText, Printer, X } from "lucide-react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import {
@@ -22,12 +22,13 @@ export default function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<IEmployee | null>(
     null,
   );
+  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
-    id: string | null;
+    id: string | number | null;
   }>({
     open: false,
     id: null,
@@ -121,6 +122,36 @@ export default function EmployeesPage() {
         Cell: ({ row }) => (
           <span className="text-foreground">{row.index + 1}</span>
         ),
+      },
+      {
+        accessorKey: "image",
+        header: "Photo",
+        size: 80,
+        Cell: ({ row }) => {
+          const imgSrc =
+            row.original.image ||
+            (row.original.gender === "female"
+              ? "/female-avatar.jpg"
+              : "/male-avatar.jpg");
+          return (
+            <div className="flex justify-center items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenPhotoId(row.id); // Id set karein taake overlay khule
+                }}
+                className="w-10 h-10 rounded-full border-2 border-white shadow-sm overflow-hidden hover:scale-110 transition-transform cursor-pointer"
+              >
+                <img
+                  src={imgSrc}
+                  className="w-full h-full object-cover"
+                  alt="avatar"
+                />
+              </button>
+            </div>
+          );
+        },
       },
       {
         id: "employee_info",
@@ -425,6 +456,61 @@ export default function EmployeesPage() {
         onClose={() => setIsViewModalOpen(false)}
         staff={viewingStaff}
       />
+
+      {/* Picture Pop-up */}
+      {openPhotoId &&
+        (() => {
+          // .toString() use karein taake comparison ka masla khatam ho jaye
+          const selectedEmp = employees.find(
+            (emp) => emp._id?.toString() === openPhotoId.toString(),
+          );
+
+          if (!selectedEmp) return null;
+
+          const displayImg =
+            selectedEmp.image ||
+            (selectedEmp.gender === "female"
+              ? "/female-avatar.jpg"
+              : "/male-avatar.jpg");
+
+          return (
+            <div
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300"
+              onClick={() => setOpenPhotoId(null)}
+            >
+              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+
+              <div
+                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="relative">
+                  <img
+                    src={displayImg}
+                    className="w-full h-72 object-cover rounded-[2.2rem] shadow-inner border border-slate-100 dark:border-slate-800"
+                    alt="Preview"
+                  />
+
+                  <button
+                    onClick={() => setOpenPhotoId(null)}
+                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-500 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="py-4 px-2 text-center">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                    Staff Preview
+                  </p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                    {selectedEmp.fullName}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

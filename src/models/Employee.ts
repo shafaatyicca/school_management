@@ -5,6 +5,7 @@ export interface IEmployee {
   _id?: number;
   emp_id: number; // New Field
   fullName: string;
+  image: string;
   email: string;
   password?: string; // New Field
   role: string; // New Field
@@ -43,6 +44,10 @@ const EmployeeSchema = new Schema<IEmployee>(
       type: String,
       required: [true, "Full name is required"],
       trim: true,
+    },
+    image: {
+      type: String,
+      default: "",
     },
     email: {
       type: String,
@@ -130,33 +135,27 @@ EmployeeSchema.pre<IEmployee>("save", async function () {
         mongoose.models.Employee ||
         mongoose.model<IEmployee>("Employee", EmployeeSchema);
 
-      // 1. Sab se bari ID dhoondne ka sahi tareeqa
       const lastEmployee = await EmployeeModel.findOne(
         {} as any,
         { emp_id: 1 },
-        { sort: { emp_id: -1 } }, // Hamesha sab se bara number pehle uthayega
+        { sort: { emp_id: -1 } },
       ).lean();
 
-      // Agar record hai to +1, warna 1 se shuru
       const nextIdNumber =
         lastEmployee && lastEmployee.emp_id
           ? Number(lastEmployee.emp_id) + 1
           : 1;
 
-      // 2. Set emp_id (Number format mein)
       this.emp_id = nextIdNumber;
 
-      // 3. Aapka Original Email Format (e.g., 1staff@ccw.com)
       if (!this.email) {
         this.email = `${nextIdNumber}staff@ccw.com`.toLowerCase();
       }
 
-      // 4. Aapka Original Password Format (e.g., staff1012)
       if (!this.password) {
         this.password = `staff${nextIdNumber}012`;
       }
 
-      // 5. Default Role
       if (!this.role) {
         this.role = "employee";
       }
