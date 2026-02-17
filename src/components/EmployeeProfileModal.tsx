@@ -1,171 +1,337 @@
 "use client";
 import {
   Dialog,
-  DialogTitle,
+  DialogActions,
   DialogContent,
-  IconButton,
-  Chip,
+  Button,
+  Zoom,
 } from "@mui/material";
 import {
-  Close as CloseIcon,
-  Badge as BadgeIcon,
-  VpnKey as KeyIcon,
-  Work as WorkIcon,
-} from "@mui/icons-material";
+  Briefcase,
+  User,
+  Shield,
+  AlertCircle,
+  Clock,
+  Edit,
+  Printer,
+} from "lucide-react";
+import { calculateTenure, formatDate } from "@/lib/tenureUtils";
+import {} from "./ui/button";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   staff: any;
+  onEdit: () => void; // Ye line add karein
 }
 
-export default function StaffProfileModal({ isOpen, onClose, staff }: Props) {
+export default function EmployeeProfileModal({
+  isOpen,
+  onClose,
+  staff,
+  onEdit, // Ye line add karein
+}: Props) {
   if (!staff) return null;
 
-  const DetailRow = ({ label, value }: { label: string; value: any }) => (
-    <div className="mb-3">
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">
-        {label}
-      </p>
-      <p className="text-sm font-medium text-slate-900">{value || "---"}</p>
-    </div>
-  );
-
-  const formatDate = (date: any) =>
-    date
-      ? new Intl.DateTimeFormat("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }).format(new Date(date))
-      : "---";
+  const displayImg =
+    staff.image ||
+    (staff.gender === "female" ? "/female-avatar.jpg" : "/male-avatar.jpg");
 
   return (
     <Dialog
       open={isOpen}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
-      scroll="paper"
+      disableEnforceFocus
+      disableAutoFocus
+      TransitionComponent={Zoom} // 👈 Ye line add karein
+      transitionDuration={200} // Speed set karein
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.75)",
+          backdropFilter: "blur(4px)",
+        },
+      }}
     >
-      <DialogTitle className="flex justify-between items-center bg-slate-50 border-b p-4">
-        <div className="flex items-center gap-2">
-          <BadgeIcon className="text-blue-600" />
-          <span className="font-bold text-lg">Staff Profile Card</span>
+      <DialogContent className="bg-background" sx={{ p: 1 }}>
+        <div className="flex items-center gap-4 flex-1 mb-2  ">
+          <img
+            src={displayImg}
+            alt={staff.fullName}
+            className="w-25 h-25 rounded-lg object-cover border-2 border-border flex-shrink-0"
+          />
+
+          {/* Employee Info */}
+          <div className="flex-1">
+            <h2 className="text-xl font-bold text-foreground">
+              {staff.fullName}
+            </h2>
+            <div className="text-sm text-muted-foreground">
+              {staff.designation}
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs font-mono text-muted-foreground">
+                ID: {staff.emp_id || "---"}
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  staff.status === "active"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                }`}
+              >
+                {staff.status?.toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          {/* Tenure Card - Right side */}
+          <div className="p-2 bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 rounded-lg border-2 border-sky-200 dark:border-sky-800 shadow-sm flex-shrink-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              <span className="text-[10px] text-sky-600 dark:text-sky-400 uppercase tracking-wider whitespace-nowrap">
+                {staff.status === "active" ? "Current Tenure" : "Total Tenure"}
+              </span>
+            </div>
+            <div className="text-sm text-sky-700 dark:text-sky-300 whitespace-nowrap">
+              {calculateTenure(
+                staff.joiningDate,
+                staff.inactiveDate,
+                staff.status,
+              )}
+            </div>
+            <div className="text-[9px] text-muted-foreground mt-0.5 whitespace-nowrap">
+              Since {formatDate(staff.joiningDate)}
+            </div>
+          </div>
         </div>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
 
-      <DialogContent className="p-0" sx={{ maxHeight: "80vh" }}>
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-          {/* Section 1: Personal Info */}
-          <div className="p-5 bg-white">
-            <h3 className="text-blue-600 font-bold text-xs flex items-center gap-1 mb-4">
-              PERSONAL DETAILS
-            </h3>
-            <DetailRow label="Full Name" value={staff.fullName} />
-            <DetailRow label="Employee ID" value={staff.emp_id} />
-            <DetailRow label="NIC Number" value={staff.nicNumber} />
-            <DetailRow
-              label="Gender"
-              value={<span className="capitalize">{staff.gender}</span>}
-            />
-            <DetailRow
-              label="Date of Birth"
-              value={formatDate(staff.dateOfBirth)}
-            />
-            <DetailRow label="Phone" value={staff.phone} />
-            <DetailRow label="Address" value={staff.address} />
-
-            <div className="mt-6 pt-4 border-t border-slate-100">
-              <h3 className="text-red-500 font-bold text-xs mb-3">
-                EMERGENCY CONTACT
-              </h3>
-              <DetailRow
-                label="Contact Person"
-                value={staff.emergencyContact?.name}
+        {/* Content Sections */}
+        <div className="space-y-2">
+          {/* Main Info Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Personal */}
+            <Section
+              title="Personal Information"
+              icon={<User className="w-4 h-4" />}
+            >
+              <InfoItem
+                label="Gender"
+                value={<span className="capitalize">{staff.gender}</span>}
               />
-              <DetailRow
+              <InfoItem
+                label="Date of Birth"
+                value={formatDate(staff.dateOfBirth)}
+              />
+              <InfoItem label="Phone" value={staff.phone} />
+              <InfoItem label="NIC" value={staff.nicNumber} />
+              <InfoItem label="Address" value={staff.address} />
+            </Section>
+
+            {/* Job */}
+            <Section
+              title="Job Details"
+              icon={<Briefcase className="w-4 h-4" />}
+            >
+              <InfoItem
+                label="Category"
+                value={
+                  <span className="capitalize">{staff.staffCategory}</span>
+                }
+              />
+              <InfoItem label="Qualification" value={staff.qualification} />
+              <InfoItem
+                label="Experience"
+                value={`${staff.experience || 0} Years`}
+              />
+              <InfoItem label="Subject" value={staff.subject || "N/A"} />
+              <InfoItem
+                label="Joining Date"
+                value={formatDate(staff.joiningDate)}
+              />
+            </Section>
+          </div>
+
+          {/* Salary */}
+          <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                Monthly Salary
+              </span>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                PKR {staff.salary?.toLocaleString() || "---"}
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Emergency */}
+            <Section
+              title="Emergency Contact"
+              icon={<AlertCircle className="w-4 h-4" />}
+            >
+              <InfoItem label="Name" value={staff.emergencyContact?.name} />
+              <InfoItem
                 label="Relation"
                 value={staff.emergencyContact?.relation}
               />
-              <DetailRow label="Phone" value={staff.emergencyContact?.phone} />
-            </div>
-          </div>
+              <InfoItem label="Phone" value={staff.emergencyContact?.phone} />
+            </Section>
 
-          {/* Section 2: Job & Academic Info */}
-          <div className="p-5 bg-slate-50/50">
-            <h3 className="text-emerald-600 font-bold text-xs flex items-center gap-1 mb-4">
-              <WorkIcon sx={{ fontSize: 14 }} /> JOB INFORMATION
-            </h3>
-            <DetailRow label="Designation" value={staff.designation} />
-            <DetailRow
-              label="Category"
-              value={<span className="capitalize">{staff.staffCategory}</span>}
-            />
-            <DetailRow label="Qualification" value={staff.qualification} />
-            <DetailRow label="Experience" value={`${staff.experience} Years`} />
-            <DetailRow label="Subject Specialization" value={staff.subject} />
-            <DetailRow
-              label="Salary"
-              value={staff.salary ? `Rs. ${staff.salary}` : "---"}
-            />
-            <DetailRow
-              label="Joining Date"
-              value={formatDate(staff.joiningDate)}
-            />
-
-            <div className="mt-4">
-              <p className="text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                Job Status
-              </p>
-              <Chip
-                label={staff.status}
-                size="small"
-                color={staff.status === "active" ? "success" : "error"}
-                sx={{
-                  height: 20,
-                  fontSize: "10px",
-                  textTransform: "capitalize",
-                  fontWeight: "bold",
-                }}
+            {/* System */}
+            <Section
+              title="System Access"
+              icon={<Shield className="w-4 h-4" />}
+            >
+              <InfoItem
+                label="Role"
+                value={
+                  <span className="capitalize font-semibold text-purple-600 dark:text-purple-400">
+                    {staff.role}
+                  </span>
+                }
               />
-            </div>
+              <InfoItem label="Email" value={staff.email || "---"} />
+              <InfoItem
+                label="Password"
+                value={
+                  <span className="font-mono text-xs">
+                    {staff.password || "••••••••"}
+                  </span>
+                }
+              />
+            </Section>
+          </div>
 
-            {staff.status === "inactive" && (
-              <div className="mt-3 p-2 bg-red-50 rounded border border-red-100">
-                <DetailRow
-                  label="Leaving Date"
-                  value={formatDate(staff.inactiveDate)}
-                />
-                <DetailRow label="Reason" value={staff.inactiveReason} />
+          {/* Inactive Alert */}
+          {staff.status === "inactive" && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                  Employment Ended
+                </span>
               </div>
-            )}
-          </div>
-
-          {/* Section 3: Account & Credentials */}
-          <div className="p-5 bg-white">
-            <h3 className="text-purple-600 font-bold text-xs flex items-center gap-1 mb-4">
-              <KeyIcon sx={{ fontSize: 14 }} /> ACCOUNT CREDENTIALS
-            </h3>
-            <DetailRow
-              label="System Role"
-              value={<span className="capitalize">{staff.role}</span>}
-            />
-            <DetailRow label="Official Email" value={staff.email} />
-            <DetailRow label="Login Password" value={staff.password} />
-
-            <div className="mt-10 p-4 bg-blue-50 rounded-lg border border-blue-100">
-              <p className="text-[11px] text-blue-700 italic">
-                Note: This employee profile is part of the system's official
-                staff records. Any changes to salary or role must be authorized.
-              </p>
+              <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+                <div>
+                  <span className="text-red-500 text-xs">Date:</span>{" "}
+                  <span className="text-red-600 dark:text-red-400">
+                    {formatDate(staff.inactiveDate)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-red-500 text-xs">Total Tenure:</span>{" "}
+                  <span className="text-red-600 dark:text-red-400 font-semibold">
+                    {calculateTenure(
+                      staff.joiningDate,
+                      staff.inactiveDate,
+                      staff.status,
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-red-200 dark:border-red-800">
+                <span className="text-red-500 text-xs">Reason:</span>{" "}
+                <span className="text-red-600 dark:text-red-400">
+                  {staff.inactiveReason}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
+      <DialogActions
+        sx={{
+          borderTop: "1px solid",
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background)",
+          px: 2, // Spacing align karne ke liye
+          py: 1.5,
+          gap: 1,
+        }}
+      >
+        {/* Left side: Print Button */}
+        <Button
+          onClick={() => window.print()}
+          variant="outlined"
+          size="small"
+          sx={{
+            textTransform: "none",
+            borderColor: "var(--border)",
+            color: "var(--foreground)",
+            marginRight: "auto", // Isse ye button left pe chala jayega
+            "&:hover": {
+              backgroundColor: "var(--muted)",
+              borderColor: "var(--border)",
+            },
+          }}
+        >
+          Print Bio Data
+        </Button>
+
+        {/* Right side: Cancel & Edit Buttons */}
+        <Button
+          onClick={onClose}
+          size="small"
+          sx={{
+            textTransform: "none",
+            color: "var(--foreground)",
+            "&:hover": {
+              backgroundColor: "var(--muted)",
+            },
+          }}
+        >
+          Cancel
+        </Button>
+
+        <Button
+          onClick={onEdit}
+          variant="contained"
+          size="small"
+          sx={{
+            backgroundColor: "#1e293b", // Aapke Form Modal wala color
+            "&:hover": { backgroundColor: "#334155" },
+            textTransform: "none",
+            px: 2,
+            py: 0.5,
+          }}
+        >
+          Edit Profile
+        </Button>
+      </DialogActions>
     </Dialog>
+  );
+}
+
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="p-2 bg-card rounded-lg border border-border">
+      <div className="flex items-center gap-2 mb-3 text-sky-500">
+        {icon}
+        <h3 className="text-xs font-bold text-foreground uppercase">{title}</h3>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function InfoItem({ label, value }: { label: string; value: any }) {
+  return (
+    <div className="flex justify-between items-start text-xs">
+      <span className="text-muted-foreground font-medium">{label}:</span>
+      <span className="text-foreground font-semibold text-right">
+        {value || "---"}
+      </span>
+    </div>
   );
 }

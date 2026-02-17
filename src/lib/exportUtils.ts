@@ -15,7 +15,7 @@ export const handleExportRows = (
     .getVisibleLeafColumns()
     .filter(
       (col: any) =>
-        !["mrt-row-actions", "mrt-row-select", "S#"].includes(col.id),
+        !["mrt-row-actions", "mrt-row-select", "S#", "image"].includes(col.id),
     );
 
   // --- 1. HEADERS LOGIC ---
@@ -161,7 +161,7 @@ export const handlePrintTable = (table: any, title: string) => {
     .getVisibleLeafColumns()
     .filter(
       (col: any) =>
-        !["mrt-row-actions", "mrt-row-select", "S#"].includes(col.id),
+        !["mrt-row-actions", "mrt-row-select", "S#", "image"].includes(col.id),
     );
 
   const headerHtml = [];

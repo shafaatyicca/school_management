@@ -90,7 +90,7 @@ export default function ClassFormModal({
       disableEnforceFocus={false}
     >
       <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
-        <span className="font-medium text-slate-700">
+        <span className="font-bold text-foreground text-sm">
           {editClass ? "Edit Class Details" : "Add New Class"}
         </span>
         <IconButton onClick={onClose} size="small">

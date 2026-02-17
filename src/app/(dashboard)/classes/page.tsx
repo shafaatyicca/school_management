@@ -162,6 +162,8 @@ export default function ClassPage() {
     columns,
     data: classes,
     state: { showProgressBars: loading },
+    enableDensityToggle: false, // Density toggle disable
+    enableColumnActions: false, // 3 dots menu disable
     enableRowActions: !isOrderMode,
     positionActionsColumn: "last",
     initialState: {

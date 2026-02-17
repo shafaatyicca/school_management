@@ -1,16 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import {
-  MaterialReactTable,
-  type MRT_ColumnDef,
-  useMaterialReactTable,
-} from "material-react-table";
 import { Box, Chip } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
+import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { Button } from "@/components/ui/button";
+import {
+  MaterialReactTable,
+  type MRT_ColumnDef,
+  useMaterialReactTable,
+} from "material-react-table";
 import {
   Pencil,
   Trash2,
@@ -18,9 +21,6 @@ import {
   FileText,
   Printer,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
-import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
@@ -29,10 +29,8 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
-
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingStudent, setViewingStudent] = useState<any>(null);
-
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);
   const [viewingParent, setViewingParent] = useState<any>(null);
 
@@ -91,6 +89,8 @@ export default function StudentsPage() {
       {
         id: "S#",
         header: "S.No",
+        enableColumnDragging: false, // Move column disable
+        enableColumnOrdering: false, // Column reordering disable
         size: 30,
         enableResizing: false,
         Cell: ({ row }) => (
@@ -101,8 +101,9 @@ export default function StudentsPage() {
       },
 
       {
-        accessorKey: "fullName",
-        header: "Student Info",
+        id: "studentName",
+        header: "Student Name",
+        accessorFn: (row) => `${row.fullName} (${row.grNumber})`,
         meta: {
           exportHeaders: ["GR#", "Student Name"],
           getExportValue: (row) => [
@@ -322,7 +323,8 @@ export default function StudentsPage() {
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
-    enableDensityToggle: true,
+    enableDensityToggle: false, // Density toggle disable
+    enableColumnActions: false, // 3 dots menu disable
     initialState: {
       density: "compact",
       columnVisibility: {
@@ -419,7 +421,7 @@ export default function StudentsPage() {
     <div className="space-y-2">
       <PageHeader
         title="Students Management"
-        buttonLabel="Add New Student"
+        buttonLabel="Add Student"
         onButtonClick={() => {
           setSelectedStudent(null);
           setIsModalOpen(true);

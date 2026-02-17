@@ -132,9 +132,11 @@
 
 /* --- MATERIAL REACT TABLE (MRT) DARK MODE FIXES --- */
 
-/* Pure #1d1d1d for Table Background */
 .dark .MuiTablePaper-root,
-.dark .MuiPaper-root {
+.dark
+  .MuiPaper-root:not(.MuiDialog-paper):not(.MuiMenu-paper):not(
+    .MuiPopover-paper
+  ) {
   background-color: #1d1d1d !important;
   background-image: none !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -170,4 +172,22 @@
 /* Table ke andar ki lines (Horizontal lines) */
 .dark .MuiTableCell-body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ========== DIALOG MODAL STYLING ========== */
+.dark .MuiDialog-paper {
+  background-color: #262626 !important;
+  border: 2px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9) !important;
+  border-radius: 12px !important;
+}
+
+/* ⭐ Dialog Title Padding - Fixed */
+.MuiDialog-root .MuiDialogTitle-root {
+  padding: 2px 10px !important;
+}
+
+/* Dialog Actions (Footer) Padding */
+.MuiDialogActions-root {
+  padding: 2px 1px !important;
 }

@@ -71,8 +71,12 @@ export default function ParentsPage() {
       {
         id: "S#",
         header: "S.No",
-        size: 50,
+        size: 30,
         enableResizing: false,
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableColumnDragging: false,
+        enableColumnOrdering: false,
         Cell: ({ row }) => (
           <span className="text-muted-foreground font-mono dark:text-slate-300">
             {row.index + 1}
@@ -81,10 +85,10 @@ export default function ParentsPage() {
       },
 
       {
-        id: "parent_info", // Custom id kyunki hum multi-columns export kar rahe hain
+        id: "parent_info",
         header: "Parent Details",
+        accessorFn: (row) => `${row.fullName} (${row.p_id})`,
         meta: {
-          // Export logic: Ye array Excel mein 2 alag columns banayega
           exportHeaders: ["P-ID", "Full Name"],
           getExportValue: (row: any) => [
             row.p_id || "---",
@@ -141,9 +145,11 @@ export default function ParentsPage() {
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
+    enableDensityToggle: false, // Density toggle disable
+    enableColumnActions: false, // 3 dots menu disable
     initialState: {
       density: "compact",
-      columnVisibility: { address: false, gender: false },
+      columnVisibility: { address: true, gender: true },
     },
 
     enableRowActions: true,

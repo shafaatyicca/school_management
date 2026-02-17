@@ -17,7 +17,7 @@ export default function PageHeader({
   icon,
 }: PageHeaderProps) {
   return (
-    <div className="sticky top-0 z-30 w-full bg-[#F8FAFC]">
+    <div className=" w-full ">
       <div className="group relative p-[2px] overflow-hidden rounded-xl bg-transparent shadow-2xl">
         {/* 1. Slow Rotating 4-Sided Border Beam */}
         <div className="absolute inset-[-1000%] animate-[spin_8s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_30%,#3b82f6_50%,transparent_70%,transparent_100%)] opacity-100"></div>
@@ -40,12 +40,12 @@ export default function PageHeader({
           {buttonLabel && (
             <button
               onClick={onButtonClick}
-              className="group/btn relative flex h-8 items-center justify-center overflow-hidden rounded-lg bg-blue-600 px-3 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-90 cursor-pointer"
+              className="group/btn relative flex h-8 items-center justify-center overflow-hidden rounded-lg bg-blue-600 px-1 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-90 cursor-pointer"
             >
               {/* Button Shimmer */}
               <span className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%] animate-[shimmer_3s_infinite]"></span>
 
-              <div className="relative flex items-center gap-2">
+              <div className="relative flex items-center gap-1">
                 <Plus className="w-3.5 h-3.5 stroke-[3px]" />
                 <span className="hidden sm:inline">{buttonLabel}</span>
               </div>

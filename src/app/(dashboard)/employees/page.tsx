@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2, Users } from "lucide-react";
+import { Clock, Pencil, Trash2, Users } from "lucide-react";
 import EmployeeFormModal from "@/components/EmployeeFormModal";
 import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
@@ -15,6 +15,7 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
+import { calculateTenure } from "@/lib/tenureUtils";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<IEmployee[]>([]);
@@ -38,6 +39,11 @@ export default function EmployeesPage() {
   const [viewingStaff, setViewingStaff] = useState<any>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
+  const handleViewProfile = useCallback((staff: IEmployee) => {
+    setViewingStaff(staff);
+    setIsViewModalOpen(true);
+  }, []);
+
   useEffect(() => {
     fetchEmployees();
   }, []);
@@ -57,38 +63,49 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleSubmit = async (formData: any) => {
-    setIsLoading(true);
-    try {
-      const method = selectedEmployee ? "PUT" : "POST";
-      const body = selectedEmployee
-        ? { id: selectedEmployee._id, ...formData }
-        : formData;
+  const handleSubmit = useCallback(
+    async (formData: any) => {
+      setIsLoading(true);
+      try {
+        const method = selectedEmployee ? "PUT" : "POST";
+        const body = selectedEmployee
+          ? { id: selectedEmployee._id, ...formData }
+          : formData;
 
-      const response = await fetch("/api/employees", {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+        const response = await fetch("/api/employees", {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Something went wrong");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Something went wrong");
+        }
+
+        await fetchEmployees();
+
+        // 🔥 YE LINE ADD KARO - Profile modal update hoga
+        if (selectedEmployee && isViewModalOpen) {
+          const updatedEmployee = { ...selectedEmployee, ...formData };
+          setViewingStaff(updatedEmployee);
+        }
+
+        setIsModalOpen(false);
+        setSelectedEmployee(null);
+      } catch (error: any) {
+        alert(error.message || "Failed to save employee");
+      } finally {
+        setIsLoading(false);
       }
-      await fetchEmployees();
-      setIsModalOpen(false);
-      setSelectedEmployee(null);
-    } catch (error: any) {
-      alert(error.message || "Failed to save employee");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [selectedEmployee, isViewModalOpen], // Dependencies add karo
+  );
 
-  const handleEdit = (employee: IEmployee) => {
+  const handleEdit = useCallback((employee: IEmployee) => {
     setSelectedEmployee(employee);
     setIsModalOpen(true);
-  };
+  }, []);
 
   const handleDelete = async () => {
     if (!deleteDialog.id) return;
@@ -107,10 +124,15 @@ export default function EmployeesPage() {
     }
   };
 
-  const openAddModal = () => {
+  const openAddModal = useCallback(() => {
     setSelectedEmployee(null);
     setIsModalOpen(true);
-  };
+  }, []);
+
+  const handleEditFromProfile = useCallback((staff: IEmployee) => {
+    setSelectedEmployee(staff);
+    setIsModalOpen(true);
+  }, []);
 
   // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
@@ -118,7 +140,11 @@ export default function EmployeesPage() {
       {
         id: "S#",
         header: "S.No",
-        size: 50,
+        size: 30,
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableColumnDragging: false,
+        enableColumnOrdering: false,
         Cell: ({ row }) => (
           <span className="text-foreground">{row.index + 1}</span>
         ),
@@ -126,7 +152,11 @@ export default function EmployeesPage() {
       {
         accessorKey: "image",
         header: "Photo",
-        size: 80,
+        size: 50,
+        enableSorting: false, // Sorting disable
+        enableColumnFilter: false, // Filter disable
+        enableColumnDragging: false, // Move column disable
+        enableColumnOrdering: false, // Column reordering disable
         Cell: ({ row }) => {
           const imgSrc =
             row.original.image ||
@@ -139,9 +169,9 @@ export default function EmployeesPage() {
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpenPhotoId(row.id); // Id set karein taake overlay khule
+                  setOpenPhotoId(row.original._id?.toString() || null);
                 }}
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm overflow-hidden hover:scale-110 transition-transform cursor-pointer"
+                className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-700 shadow-sm overflow-hidden hover:scale-110 transition-transform cursor-pointer"
               >
                 <img
                   src={imgSrc}
@@ -155,7 +185,8 @@ export default function EmployeesPage() {
       },
       {
         id: "employee_info",
-        header: "Employee Details",
+        header: "Employee Name",
+        accessorFn: (row) => `${row.emp_id} ${row.fullName}`,
         meta: {
           exportHeaders: ["E-ID", "Full Name"],
           getExportValue: (row) => [row.emp_id || "---", row.fullName || "---"],
@@ -164,10 +195,7 @@ export default function EmployeesPage() {
         Cell: ({ row }) => (
           <div
             className="flex items-center gap-1.5 cursor-pointer group"
-            onClick={() => {
-              setViewingStaff(row.original);
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleViewProfile(row.original)}
           >
             <span className="font-mono text-slate-500 dark:text-slate-400 group-hover:underline">
               ({row.original.emp_id || "---"})
@@ -239,6 +267,28 @@ export default function EmployeesPage() {
         },
       },
       {
+        id: "tenure",
+        header: "Tenure",
+        accessorFn: (row) =>
+          calculateTenure(row.joiningDate, row.inactiveDate, row.status),
+        size: 100,
+        enableColumnActions: false,
+        Cell: ({ row }) => {
+          const tenure = calculateTenure(
+            row.original.joiningDate,
+            row.original.inactiveDate,
+            row.original.status,
+          );
+
+          return (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-sky-500" />
+              <span className="text-xs font-medium">{tenure}</span>
+            </div>
+          );
+        },
+      },
+      {
         accessorKey: "gender",
         header: "Gender",
         size: 90,
@@ -279,6 +329,7 @@ export default function EmployeesPage() {
           </div>
         ),
       },
+
       {
         accessorKey: "experience",
         header: "Experience",
@@ -318,7 +369,7 @@ export default function EmployeesPage() {
         },
       },
     ],
-    [],
+    [handleViewProfile],
   );
 
   const table = useMaterialReactTable({
@@ -328,6 +379,8 @@ export default function EmployeesPage() {
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
+    enableDensityToggle: false, // Density toggle disable
+    enableColumnActions: false, // 3 dots menu disable
     initialState: {
       density: "compact",
       columnVisibility: {
@@ -340,7 +393,8 @@ export default function EmployeesPage() {
         // email: false,
         // password: false,
         // role: false,
-        qualification: false,
+        qualification: true,
+        tenure: false,
         designation: false,
         experience: false,
         address: false,
@@ -413,6 +467,7 @@ export default function EmployeesPage() {
       sx: {
         fontWeight: "700",
         fontSize: "12px",
+        py: 0.5,
       },
     },
     muiTableBodyCellProps: {
@@ -420,6 +475,7 @@ export default function EmployeesPage() {
         fontSize: "12px",
         fontWeight: "500",
         color: "var(--foreground)",
+        py: 0.4,
       },
     },
   });
@@ -455,6 +511,7 @@ export default function EmployeesPage() {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         staff={viewingStaff}
+        onEdit={() => handleEditFromProfile(viewingStaff)}
       />
 
       {/* Picture Pop-up */}
@@ -493,9 +550,9 @@ export default function EmployeesPage() {
 
                   <button
                     onClick={() => setOpenPhotoId(null)}
-                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-500 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90"
+                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-500 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90 cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
 
