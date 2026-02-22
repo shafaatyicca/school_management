@@ -40,7 +40,7 @@ export default function PageHeader({
           {buttonLabel && (
             <button
               onClick={onButtonClick}
-              className="group/btn relative flex h-8 items-center justify-center overflow-hidden rounded-lg bg-blue-600 px-1 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-90 cursor-pointer"
+              className="group/btn relative flex h-7 items-center justify-center overflow-hidden rounded-md bg-blue-600 px-2 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-90 cursor-pointer"
             >
               {/* Button Shimmer */}
               <span className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_50%,transparent_75%)] bg-[length:250%_250%] animate-[shimmer_3s_infinite]"></span>

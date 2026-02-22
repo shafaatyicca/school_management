@@ -125,6 +125,7 @@ export const handleExportRows = (
         cellPadding: 1,
         overflow: "linebreak",
         halign: "left",
+        valign: "middle",
       },
       columnStyles: {
         ...(addressIndex !== -1 && { [addressIndex]: { cellWidth: 80 } }),
@@ -149,6 +150,7 @@ export const handleExportRows = (
         if (data.column.index === addressIndex) {
           data.cell.styles.cellWidth = 50;
         }
+        data.cell.styles.valign = "middle";
       },
     });
     doc.save(`${fileName}.pdf`);
@@ -285,7 +287,8 @@ export const handlePrintTable = (table: any, title: string) => {
           body { font-family: sans-serif; font-size: 10px; padding: 20px; color: #333; }
           h2 { text-align: center; text-transform: uppercase; color: #2c3e50; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th, td { border: 1px solid #999; padding: 6px; }
+          
+          th, td { border: 1px solid #999; padding: 6px; vertical-align: middle; }
           th { background-color: #f2f2f2; font-weight: bold; }
           tr:nth-child(even) { background-color: #fafafa; }
         </style>

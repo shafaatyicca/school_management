@@ -3,6 +3,7 @@ import mongoose, { Schema, model, models, Document } from "mongoose";
 export interface IStudent extends Document {
   grNumber: number;
   fullName: string;
+  image?: string;
   email: string;
   password?: string;
   gender: string;
@@ -33,6 +34,7 @@ const StudentSchema = new Schema<IStudent>(
   {
     grNumber: { type: Number, unique: true },
     fullName: { type: String, required: true },
+    image: { type: String },
     email: { type: String, unique: true },
     password: { type: String },
     gender: { type: String, required: true },

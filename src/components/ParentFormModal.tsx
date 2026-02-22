@@ -10,6 +10,7 @@ import {
   TextField,
   MenuItem,
   IconButton,
+  Zoom,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
@@ -28,26 +29,22 @@ export default function ParentFormModal({
   parent,
   isLoading,
 }: Props) {
-  // 1. watch aur setValue zaroori hain MUI Select ki coordination ke liye
   const { register, handleSubmit, reset, watch, setValue } = useForm();
-
-  // 2. Gender ki current value ko track karna
   const genderValue = watch("gender");
 
   useEffect(() => {
-    if (isOpen) {
-      if (parent) {
-        reset(parent);
-      } else {
-        reset({
-          fullName: "",
-          cnic: "",
-          phone: "",
-          occupation: "",
-          gender: "Male",
-          address: "",
-        });
-      }
+    if (!isOpen) return;
+    if (parent) {
+      reset(parent);
+    } else {
+      reset({
+        fullName: "",
+        cnic: "",
+        phone: "",
+        occupation: "",
+        gender: "Male",
+        address: "",
+      });
     }
   }, [parent, isOpen, reset]);
 
@@ -57,61 +54,84 @@ export default function ParentFormModal({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      // Accessibility aur focus management
-      disableEnforceFocus={false}
+      disableEnforceFocus
+      disableAutoFocus
+      TransitionComponent={Zoom}
+      transitionDuration={200}
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(2px)",
+        },
+      }}
     >
-      <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
-        <span className="font-bold text-slate-700">
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid",
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background)",
+        }}
+      >
+        <span className="font-bold text-foreground text-sm">
           {parent ? "Edit Parent Details" : "Register New Parent"}
         </span>
-        <IconButton onClick={onClose} size="small">
+        <IconButton
+          onClick={onClose}
+          size="small"
+          tabIndex={-1}
+          sx={{
+            color: "var(--muted-foreground)",
+            "&:hover": { backgroundColor: "var(--muted)" },
+          }}
+        >
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <DialogContent dividers>
+        <DialogContent
+          dividers
+          sx={{ backgroundColor: "var(--background)", p: 2 }}
+        >
           <div className="flex flex-col gap-4">
             {/* Full Name */}
-            <div className="w-full">
-              <TextField
-                {...register("fullName", { required: true })}
-                label="Full Name"
-                fullWidth
-                size="small"
-                required
-              />
-            </div>
+            <TextField
+              {...register("fullName", { required: true })}
+              label="Full Name"
+              fullWidth
+              size="small"
+              required
+            />
 
-            {/* CNIC and Phone */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            {/* CNIC + Phone */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextField
                 {...register("cnic", { required: true })}
                 label="CNIC Number"
                 placeholder="42101-xxxxxxx-x"
-                className="w-full sm:w-1/2"
                 size="small"
                 required
               />
               <TextField
                 {...register("phone", { required: true })}
                 label="Phone Number"
-                className="w-full sm:w-1/2"
                 size="small"
                 required
               />
             </div>
 
-            {/* Gender and Occupation */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            {/* Gender + Occupation */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextField
                 select
                 label="Gender"
-                className="w-full sm:w-1/2"
                 size="small"
                 required
-                value={genderValue || ""} // Manual value link ki
-                onChange={(e) => setValue("gender", e.target.value)} // Manual update link kiya
+                value={genderValue || "Male"}
+                onChange={(e) => setValue("gender", e.target.value)}
               >
                 <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem>
@@ -121,42 +141,61 @@ export default function ParentFormModal({
               <TextField
                 {...register("occupation")}
                 label="Occupation"
-                className="w-full sm:w-1/2"
                 size="small"
               />
             </div>
 
             {/* Address */}
-            <div className="w-full">
-              <TextField
-                {...register("address", { required: true })}
-                label="Complete Address"
-                multiline
-                rows={2}
-                fullWidth
-                size="small"
-                required
-              />
-            </div>
+            <TextField
+              {...register("address", { required: true })}
+              label="Complete Address"
+              multiline
+              rows={2}
+              fullWidth
+              size="small"
+              required
+            />
           </div>
         </DialogContent>
 
-        <DialogActions className="p-4 bg-slate-50">
-          <Button onClick={onClose} color="inherit" disabled={isLoading}>
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "var(--border)",
+            backgroundColor: "var(--background)",
+            gap: 1,
+          }}
+        >
+          <Button
+            onClick={onClose}
+            disabled={isLoading}
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "var(--foreground)",
+              "&:hover": { backgroundColor: "var(--muted)" },
+            }}
+          >
             Cancel
           </Button>
           <Button
             type="submit"
             variant="contained"
             disabled={isLoading}
+            size="small"
             sx={{
-              backgroundColor: "#2563eb",
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
               textTransform: "none",
-              fontWeight: "600",
-              "&:hover": { backgroundColor: "#1d4ed8" },
+              px: 1,
+              py: 0.5,
             }}
           >
-            {isLoading ? "Saving..." : parent ? "Update Parent" : "Save Parent"}
+            {isLoading
+              ? "Processing..."
+              : parent
+                ? "Update Parent"
+                : "Register"}
           </Button>
         </DialogActions>
       </form>

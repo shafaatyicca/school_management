@@ -10,13 +10,14 @@ import {
   Button,
   TextField,
   IconButton,
+  Zoom,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Refreshing the table
+  onSuccess: () => void;
   editClass?: any | null;
   isLoading?: boolean;
 }
@@ -28,28 +29,21 @@ export default function ClassFormModal({
   editClass,
   isLoading,
 }: Props) {
-  // 1. React Hook Form setup exactly like Parent Modal
   const { register, handleSubmit, reset } = useForm();
 
   useEffect(() => {
-    if (isOpen) {
-      if (editClass) {
-        reset({
-          name: editClass.name,
-          sections: editClass.sections.join(", "), // Array to string
-          order: editClass.order || 0,
-        });
-      } else {
-        reset({
-          name: "",
-          sections: "",
-          order: 0,
-        });
-      }
+    if (!isOpen) return;
+    if (editClass) {
+      reset({
+        name: editClass.name,
+        sections: editClass.sections.join(", "),
+        order: editClass.order || 0,
+      });
+    } else {
+      reset({ name: "", sections: "", order: 0 });
     }
   }, [editClass, isOpen, reset]);
 
-  // 2. Form submission logic
   const onFormSubmit = async (data: any) => {
     const sectionsArray = data.sections
       ? data.sections
@@ -71,7 +65,6 @@ export default function ClassFormModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (res.ok) {
         onSuccess();
         onClose();
@@ -87,21 +80,49 @@ export default function ClassFormModal({
       onClose={onClose}
       maxWidth="xs"
       fullWidth
-      disableEnforceFocus={false}
+      disableEnforceFocus
+      disableAutoFocus
+      TransitionComponent={Zoom}
+      transitionDuration={200}
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(2px)",
+        },
+      }}
     >
-      <DialogTitle className="flex justify-between items-center bg-slate-50 border-b">
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid",
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background)",
+        }}
+      >
         <span className="font-bold text-foreground text-sm">
           {editClass ? "Edit Class Details" : "Add New Class"}
         </span>
-        <IconButton onClick={onClose} size="small">
+        <IconButton
+          onClick={onClose}
+          size="small"
+          tabIndex={-1}
+          sx={{
+            color: "var(--muted-foreground)",
+            "&:hover": { backgroundColor: "var(--muted)" },
+          }}
+        >
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <form onSubmit={handleSubmit(onFormSubmit)}>
-        <DialogContent dividers>
-          <div className="flex flex-col gap-5 py-2">
-            {/* Class Name - Full Width */}
+        <DialogContent
+          dividers
+          sx={{ backgroundColor: "var(--background)", p: 2 }}
+        >
+          <div className="flex flex-col gap-4 py-1">
             <TextField
               {...register("name", { required: true })}
               label="Class Name"
@@ -111,7 +132,6 @@ export default function ClassFormModal({
               required
             />
 
-            {/* Sections - Full Width */}
             <TextField
               {...register("sections")}
               label="Sections"
@@ -121,7 +141,6 @@ export default function ClassFormModal({
               helperText="Separate multiple sections with a comma"
             />
 
-            {/* Order - Full Width */}
             <TextField
               {...register("order")}
               label="Sort Order"
@@ -140,12 +159,23 @@ export default function ClassFormModal({
           </div>
         </DialogContent>
 
-        <DialogActions className="p-2 bg-slate-50">
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "var(--border)",
+            backgroundColor: "var(--background)",
+            gap: 1,
+          }}
+        >
           <Button
             onClick={onClose}
-            color="inherit"
             disabled={isLoading}
             size="small"
+            sx={{
+              textTransform: "none",
+              color: "var(--foreground)",
+              "&:hover": { backgroundColor: "var(--muted)" },
+            }}
           >
             Cancel
           </Button>
@@ -153,15 +183,17 @@ export default function ClassFormModal({
             type="submit"
             variant="contained"
             disabled={isLoading}
+            size="small"
             sx={{
-              backgroundColor: "#2563eb",
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
               textTransform: "none",
-              fontWeight: "600",
-              "&:hover": { backgroundColor: "#1d4ed8" },
+              px: 1,
+              py: 0.5,
             }}
           >
             {isLoading
-              ? "Saving..."
+              ? "Processing..."
               : editClass
                 ? "Update Class"
                 : "Save Class"}

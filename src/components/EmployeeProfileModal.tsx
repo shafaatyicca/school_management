@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Clock,
   Edit,
+  X,
   Printer,
 } from "lucide-react";
 import { calculateTenure, formatDate } from "@/lib/tenureUtils";
@@ -45,8 +46,8 @@ export default function EmployeeProfileModal({
       fullWidth
       disableEnforceFocus
       disableAutoFocus
-      TransitionComponent={Zoom} // 👈 Ye line add karein
-      transitionDuration={200} // Speed set karein
+      TransitionComponent={Zoom}
+      transitionDuration={200}
       BackdropProps={{
         sx: {
           backgroundColor: "rgba(0, 0, 0, 0.75)",
@@ -59,7 +60,7 @@ export default function EmployeeProfileModal({
           <img
             src={displayImg}
             alt={staff.fullName}
-            className="w-25 h-25 rounded-lg object-cover border-2 border-border flex-shrink-0"
+            className="w-25 h-25 rounded-md object-cover border-2 border-border flex-shrink-0"
           />
 
           {/* Employee Info */}
@@ -207,36 +208,27 @@ export default function EmployeeProfileModal({
 
           {/* Inactive Alert */}
           {staff.status === "inactive" && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+            <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
               <div className="flex items-center gap-2 mb-2">
                 <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
                 <span className="text-sm font-bold text-red-600 dark:text-red-400">
                   Employment Ended
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-red-500 text-xs">Date:</span>{" "}
-                  <span className="text-red-600 dark:text-red-400">
+                  <span className="text-red-600 dark:text-red-400 text-xs italic">
                     {formatDate(staff.inactiveDate)}
                   </span>
                 </div>
+
                 <div>
-                  <span className="text-red-500 text-xs">Total Tenure:</span>{" "}
-                  <span className="text-red-600 dark:text-red-400 font-semibold">
-                    {calculateTenure(
-                      staff.joiningDate,
-                      staff.inactiveDate,
-                      staff.status,
-                    )}
+                  <span className="text-red-500 text-xs">Reason:</span>{" "}
+                  <span className="text-red-600 dark:text-red-400 text-xs italic">
+                    {staff.inactiveReason}
                   </span>
                 </div>
-              </div>
-              <div className="pt-2 border-t border-red-200 dark:border-red-800">
-                <span className="text-red-500 text-xs">Reason:</span>{" "}
-                <span className="text-red-600 dark:text-red-400">
-                  {staff.inactiveReason}
-                </span>
               </div>
             </div>
           )}
@@ -247,7 +239,7 @@ export default function EmployeeProfileModal({
           borderTop: "1px solid",
           borderColor: "var(--border)",
           backgroundColor: "var(--background)",
-          px: 2, // Spacing align karne ke liye
+          px: 2,
           py: 1.5,
           gap: 1,
         }}
@@ -257,11 +249,12 @@ export default function EmployeeProfileModal({
           onClick={() => window.print()}
           variant="outlined"
           size="small"
+          startIcon={<Printer className="w-4 h-4" />}
           sx={{
             textTransform: "none",
             borderColor: "var(--border)",
             color: "var(--foreground)",
-            marginRight: "auto", // Isse ye button left pe chala jayega
+            marginRight: "auto",
             "&:hover": {
               backgroundColor: "var(--muted)",
               borderColor: "var(--border)",
@@ -275,6 +268,7 @@ export default function EmployeeProfileModal({
         <Button
           onClick={onClose}
           size="small"
+          startIcon={<X className="w-4 h-4" />}
           sx={{
             textTransform: "none",
             color: "var(--foreground)",
@@ -290,6 +284,7 @@ export default function EmployeeProfileModal({
           onClick={onEdit}
           variant="contained"
           size="small"
+          startIcon={<Edit className="w-4 h-4" />}
           sx={{
             backgroundColor: "#1e293b", // Aapke Form Modal wala color
             "&:hover": { backgroundColor: "#334155" },

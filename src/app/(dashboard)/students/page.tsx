@@ -6,9 +6,12 @@ import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
+import ParentFormModal from "@/components/ParentFormModal";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { useStudentModal } from "@/hooks/useStudentModal";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
@@ -20,19 +23,18 @@ import {
   FileSpreadsheet,
   FileText,
   Printer,
+  X,
 } from "lucide-react";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [viewingStudent, setViewingStudent] = useState<any>(null);
   const [isParentModalOpen, setIsParentModalOpen] = useState(false);
   const [viewingParent, setViewingParent] = useState<any>(null);
+  const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
+  const [isParentFormOpen, setIsParentFormOpen] = useState(false);
+  const [isParentLoading, setIsParentLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -56,9 +58,22 @@ export default function StudentsPage() {
     }
   };
 
+  const {
+    isViewModalOpen,
+    setIsViewModalOpen,
+    viewingStudent,
+    openStudentProfile,
+    handleEditFromProfile,
+    isModalOpen,
+    setIsModalOpen,
+    selectedStudent,
+    setSelectedStudent,
+    isLoading,
+    handleFormSubmit,
+  } = useStudentModal(students, setStudents);
+
   const handleOpenStudentFromParent = (studentData: any) => {
-    setViewingStudent(studentData);
-    setIsViewModalOpen(true);
+    openStudentProfile(studentData);
   };
 
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -89,17 +104,50 @@ export default function StudentsPage() {
       {
         id: "S#",
         header: "S.No",
-        enableColumnDragging: false, // Move column disable
-        enableColumnOrdering: false, // Column reordering disable
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableColumnDragging: false,
+        enableColumnOrdering: false,
         size: 30,
-        enableResizing: false,
         Cell: ({ row }) => (
           <span className="text-muted-foreground font-mono">
             {row.index + 1}
           </span>
         ),
       },
+      {
+        id: "image",
+        header: "Photo",
+        enableColumnDragging: false,
+        enableColumnOrdering: false,
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableResizing: false,
+        size: 50,
+        Cell: ({ row }) => {
+          const image = row.original.image;
+          const name = row.original.fullName;
+          const displayImg =
+            image ||
+            (row.original.gender === "Female"
+              ? "/studentfemale-avatar.jpg"
+              : "/studentmale-avatar.jpg");
 
+          return (
+            <div
+              className="flex items-center justify-center cursor-pointer"
+              onClick={() => setOpenPhotoId(row.original._id?.toString())}
+            >
+              <img
+                src={displayImg}
+                alt={name}
+                className="w-7 h-7 rounded-full object-cover hover:scale-110 transition-transform"
+                style={{ border: "1px solid var(--border)" }}
+              />
+            </div>
+          );
+        },
+      },
       {
         id: "studentName",
         header: "Student Name",
@@ -111,14 +159,11 @@ export default function StudentsPage() {
             row.fullName || "---",
           ],
         },
-        size: 150,
+        size: 130,
         Cell: ({ row }) => (
           <div
             className="flex items-center gap-2 cursor-pointer group"
-            onClick={() => {
-              setViewingStudent(row.original);
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => openStudentProfile(row.original)}
           >
             <span className=" text-[11px] font-mono text-slate-500 dark:text-slate-400 group-hover:underline">
               ({row.original.grNumber || "---"})
@@ -132,7 +177,7 @@ export default function StudentsPage() {
       {
         accessorKey: "parentId.fullName",
         header: "Father Name",
-        size: 150,
+        size: 130,
         Cell: ({ row }) => {
           const parentData = row.original.parentId;
 
@@ -158,8 +203,18 @@ export default function StudentsPage() {
         },
       },
       {
+        accessorKey: "dateOfBirth",
+        header: "D.O.B",
+        size: 60,
+        Cell: ({ cell }) => (
+          <span className="text-slate-700 dark:text-slate-300">
+            {formatDate(cell.getValue<any>(), "short")}
+          </span>
+        ),
+      },
+      {
         accessorKey: "parentId.address",
-        header: "Home Address",
+        header: "Address",
         size: 200,
         Cell: ({ row }) => {
           const address = row.original.parentId?.address;
@@ -185,26 +240,24 @@ export default function StudentsPage() {
       {
         id: "class_info",
         header: "Class",
+        accessorFn: (row) =>
+          `${(row.classId as any)?.name || "N/A"} (${row.section || ""})`,
         meta: {
           getExportValue: (row) =>
             `${(row.classId as any)?.name || "N/A"} (${row.section || ""})`,
         },
-        size: 100,
+        size: 60,
         Cell: ({ row }) => {
           const className = (row.original.classId as any)?.name || "N/A";
           const section = row.original.section || "";
 
           return (
             <div className="flex items-center font-mono">
-              <span className="font-bold text-black-800 text-[12px]">
-                {className}
-              </span>
+              <span className="text-black-800 text-[12px]">{className}</span>
 
               <span className="mx-0.5 text-black-400">-</span>
 
-              <span className="font-bold text-pink-600 text-[12px]">
-                ({section})
-              </span>
+              <span className="text-pink-600 text-[12px]">({section})</span>
             </div>
           );
         },
@@ -212,26 +265,28 @@ export default function StudentsPage() {
       {
         accessorKey: "bFormNumber",
         header: "B-Form / CNIC",
-        size: 130,
+        size: 60,
         Cell: ({ cell }) => (
           <span className="text-[11px] font-mono text-black-600">
             {cell.getValue<string>() || "---"}
           </span>
         ),
       },
+
       {
-        accessorKey: "dateOfBirth",
-        header: "D.O.B",
-        size: 110,
-        Cell: ({ cell }) => {
-          const d = cell.getValue<string>();
-          return d ? new Date(d).toLocaleDateString("en-GB") : "---";
-        },
+        accessorKey: "enrollmentDate",
+        header: "D.O.A",
+        size: 50,
+        Cell: ({ cell }) => (
+          <span className="text-slate-700 dark:text-slate-300">
+            {formatDate(cell.getValue<any>(), "short")}
+          </span>
+        ),
       },
       {
         accessorKey: "gender",
         header: "Gender",
-        size: 80,
+        size: 40,
         Cell: ({ row }) => (
           <span className="text-[11px] text-black-600 font-medium">
             {row.original.gender}
@@ -242,7 +297,7 @@ export default function StudentsPage() {
       {
         accessorKey: "parentId.phone",
         header: "Contact#",
-        size: 120,
+        size: 60,
         meta: {
           getExportValue: (row) => {
             const f = row.parentId?.phone || "";
@@ -262,9 +317,55 @@ export default function StudentsPage() {
         ),
       },
       {
+        id: "age",
+        header: "Student Age",
+        accessorFn: (row) => calculateAge(row.dateOfBirth),
+        size: 100,
+        Cell: ({ row }) => (
+          <span className="text-[12px] text-slate-700">
+            {calculateAge(row.original.dateOfBirth)}
+          </span>
+        ),
+      },
+      {
+        id: "tenure",
+        header: "Student Tenure",
+        accessorFn: (row) =>
+          calculateTenure(row.enrollmentDate, row.leavingDate, row.status),
+        meta: {
+          // Export mein simple text dikhane ke liye
+          getExportValue: (row) =>
+            calculateTenure(row.enrollmentDate, row.leavingDate, row.status),
+        },
+        size: 150,
+        Cell: ({ row }) => {
+          const tenure = calculateTenure(
+            row.original.enrollmentDate,
+            row.original.leavingDate,
+            row.original.status,
+          );
+
+          return (
+            <div className="flex flex-col">
+              <span className="text-[12px] font-medium text-blue-600">
+                {tenure}
+              </span>
+              <span className="text-[10px] text-slate-400 italic">
+                Since joining
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "previousSchool",
+        header: "Previous School",
+        size: 100,
+      },
+      {
         accessorKey: "status",
         header: "Status",
-        size: 100,
+        size: 40,
         Cell: ({ cell }) => {
           const status = cell.getValue<string>();
           return (
@@ -285,7 +386,7 @@ export default function StudentsPage() {
       {
         accessorKey: "inactiveReason",
         header: "Remarks / Reason",
-        size: 150,
+        size: 50,
         meta: {
           getExportValue: (row) =>
             row.status === "inactive"
@@ -313,7 +414,7 @@ export default function StudentsPage() {
         },
       },
     ],
-    [setIsViewModalOpen, setIsParentModalOpen],
+    [openStudentProfile],
   );
 
   const table = useMaterialReactTable({
@@ -331,15 +432,18 @@ export default function StudentsPage() {
         "parentId.address": false,
         reason: false,
         inactiveReason: false,
-        dateOfBirth: false,
+        dateOfBirth: true,
         bFormNumber: false,
         gender: false,
+        previousSchool: false,
+        age: false,
+        tenure: false,
       },
     },
     enableRowActions: true,
     positionActionsColumn: "last",
     displayColumnDefOptions: {
-      "mrt-row-actions": { size: 120, header: "Actions" },
+      "mrt-row-actions": { size: 50, header: "Actions" },
     },
     renderRowActions: ({ row }) => (
       <div className="flex gap-1">
@@ -408,11 +512,13 @@ export default function StudentsPage() {
       },
     },
     muiTableHeadCellProps: {
-      sx: { fontWeight: "700", fontSize: "12px" },
+      sx: { fontWeight: "700", fontSize: "12px", py: 0.5 },
     },
     muiTableBodyCellProps: {
       sx: {
         fontSize: "12px",
+        fontWeight: "500",
+        py: 0.4,
       },
     },
   });
@@ -435,25 +541,7 @@ export default function StudentsPage() {
       <StudentFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={async (data: any) => {
-          setIsLoading(true);
-          const method = selectedStudent ? "PUT" : "POST";
-          const res = await fetch("/api/students", {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(
-              selectedStudent ? { id: selectedStudent._id, ...data } : data,
-            ),
-          });
-          if (res.ok) {
-            await fetchData();
-            setIsModalOpen(false);
-          } else {
-            const err = await res.json();
-            alert("Error: " + err.message);
-          }
-          setIsLoading(false);
-        }}
+        onSubmit={handleFormSubmit}
         student={selectedStudent}
         classes={classes}
         isLoading={isLoading}
@@ -463,6 +551,7 @@ export default function StudentsPage() {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
+        onEdit={handleEditFromProfile}
       />
 
       <ParentProfileModal
@@ -470,6 +559,34 @@ export default function StudentsPage() {
         onClose={() => setIsParentModalOpen(false)}
         parent={viewingParent}
         onStudentClick={handleOpenStudentFromParent}
+        onEdit={(parent) => {
+          setViewingParent(parent);
+          setIsParentFormOpen(true);
+        }}
+      />
+
+      <ParentFormModal
+        isOpen={isParentFormOpen}
+        onClose={() => setIsParentFormOpen(false)}
+        parent={viewingParent}
+        isLoading={isParentLoading}
+        onSubmit={async (data: any) => {
+          setIsParentLoading(true);
+          const res = await fetch("/api/parents", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: viewingParent._id, ...data }),
+          });
+          if (res.ok) {
+            setViewingParent({ ...viewingParent, ...data }); // profile auto-update
+            await fetchData();
+            setIsParentFormOpen(false);
+          } else {
+            const err = await res.json();
+            alert("Error: " + err.message);
+          }
+          setIsParentLoading(false);
+        }}
       />
 
       <DeleteConfirmDialog
@@ -478,6 +595,55 @@ export default function StudentsPage() {
         onConfirm={handleDelete}
         itemName="Student"
       />
+
+      {/* Picture Pop-up */}
+      {openPhotoId &&
+        (() => {
+          const selectedStudent = students.find(
+            (std: any) => std._id?.toString() === openPhotoId.toString(),
+          );
+
+          if (!selectedStudent) return null;
+
+          const displayImg =
+            (selectedStudent as any).image ||
+            ((selectedStudent as any).gender === "Female"
+              ? "/studentfemale-avatar.jpg"
+              : "/studentmale-avatar.jpg");
+
+          return (
+            <div
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-300"
+              onClick={() => setOpenPhotoId(null)}
+            >
+              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+              <div
+                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="relative">
+                  <img
+                    src={displayImg}
+                    className="w-full h-72 object-cover rounded-[2.2rem] shadow-inner border border-slate-100 dark:border-slate-800"
+                    alt="Preview"
+                  />
+                  <button
+                    onClick={() => setOpenPhotoId(null)}
+                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-500 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="py-2 px-2 text-center">
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">
+                    GR: {(selectedStudent as any).grNumber} {" | "}
+                    {(selectedStudent as any).fullName}
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }

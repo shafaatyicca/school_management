@@ -1,32 +1,33 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import {
+  FileSpreadsheet,
+  FileText,
+  Printer,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { useParentModal } from "@/hooks/useParentModal";
+import ParentFormModal from "@/components/ParentFormModal";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
-import PageHeader from "@/components/PageHeader";
-import ParentFormModal from "@/components/ParentFormModal";
-import ParentProfileModal from "@/components/ParentProfileModal";
-import StudentProfileModal from "@/components/StudentProfileModal";
-import { Pencil, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 export default function ParentsPage() {
   const [parents, setParents] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
-
-  // Modals States
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [selectedParent, setSelectedParent] = useState<any>(null);
-
-  // Student Modal states
-  const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [parentToDelete, setParentToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchParents();
@@ -45,26 +46,35 @@ export default function ParentsPage() {
       setFetchLoading(false);
     }
   };
+  const openDeleteDialog = (original: any) => {
+    setParentToDelete({ id: original._id, name: original.fullName });
+    setDeleteDialogOpen(true);
+  };
+  const confirmDelete = async () => {
+    if (!parentToDelete) return;
 
-  const handleDelete = async (id: string) => {
-    if (
-      confirm(
-        "Are you sure you want to delete this parent? This may affect linked students.",
-      )
-    ) {
-      try {
-        await fetch("/api/parents", {
-          method: "DELETE",
-          body: JSON.stringify({ id }),
-          headers: { "Content-Type": "application/json" },
-        });
-
-        fetchParents();
-      } catch (error) {
-        console.error("Delete failed");
-      }
+    try {
+      await fetch("/api/parents", {
+        method: "DELETE",
+        body: JSON.stringify({ id: parentToDelete.id }),
+        headers: { "Content-Type": "application/json" },
+      });
+      fetchParents(); // List refresh karein
+    } catch (error) {
+      console.error("Delete failed");
+    } finally {
+      setDeleteDialogOpen(false);
+      setParentToDelete(null);
     }
   };
+  const {
+    isFormOpen,
+    setIsFormOpen,
+    isLoading,
+    handleSubmit,
+    openEditParent,
+    selectedParent,
+  } = useParentModal(parents, setParents);
 
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
@@ -83,40 +93,29 @@ export default function ParentsPage() {
           </span>
         ),
       },
-
       {
         id: "parent_info",
         header: "Parent Details",
         accessorFn: (row) => `${row.fullName} (${row.p_id})`,
         meta: {
-          exportHeaders: ["P-ID", "Full Name"],
-          getExportValue: (row: any) => [
-            row.p_id || "---",
-            row.fullName || "---",
-          ],
+          exportHeaders: ["P-ID", "Parent Name"],
+          getExportValue: (row) => [row.p_id || "---", row.fullName || "---"],
         },
-        size: 180,
+        size: 120,
         Cell: ({ row }) => (
-          <div
-            className="flex items-center gap-1.5 cursor-pointer group"
-            onClick={() => {
-              setSelectedParent(row.original);
-              setIsViewOpen(true);
-            }}
-          >
-            <span className="font-mono text-slate-500 dark:text-slate-200 group-hover:underline">
+          <div className="flex items-center gap-1.5">
+            {/* onClick aur cursor-pointer remove kar diya gaya hai */}
+            <span className="font-mono text-slate-500 dark:text-slate-200">
               ({row.original.p_id})
             </span>
-            <span className="text-sky-600 dark:text-sky-400 group-hover:underline transition-all">
-              {row.original.fullName}
-            </span>
+            <span className="text-foreground">{row.original.fullName}</span>
           </div>
         ),
       },
 
-      { accessorKey: "cnic", header: "CNIC", size: 130 },
+      { accessorKey: "cnic", header: "CNIC", size: 100 },
 
-      { accessorKey: "phone", header: "Phone", size: 120 },
+      { accessorKey: "phone", header: "Phone", size: 100 },
 
       {
         accessorKey: "address",
@@ -131,8 +130,46 @@ export default function ParentsPage() {
           </div>
         ),
       },
-      { accessorKey: "gender", header: "Gender", size: 100 },
-      { accessorKey: "occupation", header: "Occupation", size: 120 },
+      { accessorKey: "gender", header: "Gender", size: 80 },
+      { accessorKey: "occupation", header: "Occupation", size: 80 },
+      {
+        id: "siblings",
+        header: "Registered Children",
+        size: 180,
+        accessorFn: (row) =>
+          row.students
+            ?.map(
+              (s: any) =>
+                `GR-${s.grNumber} ${s.fullName} (${s.classId?.name || "N/A"} - ${s.section || ""})`,
+            )
+            .join("\n") || "No students",
+        Cell: ({ row }) => (
+          <div className="flex flex-col gap-1">
+            {row.original.students && row.original.students.length > 0 ? (
+              row.original.students.map((child: any) => (
+                <div
+                  key={child._id}
+                  className="w-fit text-[11px] px-1 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded text-foreground leading-tight flex items-center gap-1.5"
+                >
+                  <span className=" text-sky-700 dark:text-sky-400">
+                    GR-{child.grNumber}
+                  </span>
+                  <span className=" text-slate-700 dark:text-slate-200">
+                    {child.fullName}
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold border border-amber-100 dark:border-amber-900/30 ">
+                    {child.classId?.name || "N/A"} - {child.section || ""}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <span className="text-muted-foreground text-[10px] italic px-2">
+                No students
+              </span>
+            )}
+          </div>
+        ),
+      },
     ],
 
     [],
@@ -149,7 +186,7 @@ export default function ParentsPage() {
     enableColumnActions: false, // 3 dots menu disable
     initialState: {
       density: "compact",
-      columnVisibility: { address: true, gender: true },
+      columnVisibility: { address: true, gender: false, occupation: false },
     },
 
     enableRowActions: true,
@@ -199,11 +236,7 @@ export default function ParentsPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => {
-            setSelectedParent(row.original);
-
-            setIsFormOpen(true);
-          }}
+          onClick={() => openEditParent(row.original)}
           className="h-8 w-8 cursor-pointer hover:bg-accent"
         >
           <Pencil className="h-4 w-4 text-sky-500" />
@@ -212,7 +245,7 @@ export default function ParentsPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => handleDelete(row.original._id)}
+          onClick={() => openDeleteDialog(row.original)}
           className="h-8 w-8 cursor-pointer hover:bg-destructive/10"
         >
           <Trash2 className="h-4 w-4 text-destructive" />
@@ -222,7 +255,6 @@ export default function ParentsPage() {
 
     muiTablePaperProps: {
       elevation: 0,
-
       sx: {
         borderRadius: "16px",
         border: "1px solid var(--border)",
@@ -237,6 +269,9 @@ export default function ParentsPage() {
     muiTableBodyCellProps: {
       sx: {
         fontSize: "12px",
+        whiteSpace: "pre-line",
+        verticalAlign: "center",
+        padding: "5px",
       },
     },
   });
@@ -246,61 +281,24 @@ export default function ParentsPage() {
       <PageHeader
         title="Parents Management"
         buttonLabel="Add Parent"
-        onButtonClick={() => {
-          setSelectedParent(null);
-
-          setIsFormOpen(true);
-        }}
+        onButtonClick={() => openEditParent(null)}
       />
 
       <div className="border border-border rounded-xl shadow-sm bg-background overflow-hidden">
         <MaterialReactTable table={table} />
       </div>
-
       <ParentFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         parent={selectedParent}
         isLoading={isLoading}
-        onSubmit={async (data: any) => {
-          setIsLoading(true);
-
-          const method = selectedParent ? "PUT" : "POST";
-          const res = await fetch("/api/parents", {
-            method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(
-              selectedParent ? { id: selectedParent._id, ...data } : data,
-            ),
-          });
-
-          if (res.ok) {
-            await fetchParents();
-            setIsFormOpen(false);
-          } else {
-            const err = await res.json();
-            alert("Error: " + err.message);
-          }
-
-          setIsLoading(false);
-        }}
+        onSubmit={handleSubmit}
       />
-
-      <ParentProfileModal
-        isOpen={isViewOpen}
-        onClose={() => setIsViewOpen(false)}
-        parent={selectedParent}
-        onStudentClick={(student) => {
-          setSelectedStudent(student);
-
-          setIsStudentViewOpen(true);
-        }}
-      />
-
-      <StudentProfileModal
-        isOpen={isStudentViewOpen}
-        onClose={() => setIsStudentViewOpen(false)}
-        student={selectedStudent}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={parentToDelete?.name || "this parent"}
       />
     </div>
   );

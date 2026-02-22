@@ -1,6 +1,15 @@
 "use client";
-import React, { useEffect, useState, useMemo, forwardRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  forwardRef,
+  useCallback,
+} from "react";
+import ImageUploadWithCrop from "./ImageUploadWithCrop";
 import { useForm } from "react-hook-form";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { Autocomplete, Box, createFilterOptions } from "@mui/material";
 import {
   Dialog,
   DialogTitle,
@@ -12,16 +21,10 @@ import {
   IconButton,
   Typography,
   Divider,
-  Slide,
+  Zoom,
 } from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
-import { Autocomplete, Box, createFilterOptions } from "@mui/material";
 
 const filter = createFilterOptions();
-
-const Transition = forwardRef(function Transition(props: any, ref: any) {
-  return <Slide direction="up" ref={ref} {...props} />;
-});
 
 export default function StudentFormModal({
   isOpen,
@@ -42,6 +45,18 @@ export default function StudentFormModal({
   const selectedSection = watch("section");
   const parentIdValue = watch("parentId") || "";
   const fatherGender = watch("parentData.gender") || "Male";
+  const currentImage = watch("image");
+
+  const handleImageDone = useCallback(
+    (blob: Blob) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        setValue("image", reader.result as string, { shouldDirty: true });
+      };
+    },
+    [setValue],
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -52,6 +67,7 @@ export default function StudentFormModal({
       if (student) {
         reset({
           ...student,
+          image: student.image || "",
           dateOfBirth: student.dateOfBirth
             ? new Date(student.dateOfBirth).toISOString().split("T")[0]
             : "",
@@ -75,6 +91,7 @@ export default function StudentFormModal({
         reset({
           fullName: "",
           gender: "Male",
+          image: "",
           cast: "",
           religion: "Islam",
           nationality: "Pakistani",
@@ -108,50 +125,151 @@ export default function StudentFormModal({
     }
   }, [currentStatus, setValue]);
 
+  useEffect(() => {
+    if (!studentGender) return;
+    if (!student) return;
+    const isAvatar =
+      currentImage === "/studentfemale-avatar.jpg" ||
+      currentImage === "/studentmale-avatar.jpg";
+
+    if (isAvatar) {
+      setValue(
+        "image",
+        studentGender === "Female"
+          ? "/studentfemale-avatar.jpg"
+          : "/studentmale-avatar.jpg",
+      );
+    }
+  }, [studentGender]);
+
   return (
     <Dialog
       open={isOpen}
       onClose={onClose}
       fullWidth
       maxWidth="md"
-      TransitionComponent={Transition}
+      disableEnforceFocus
+      disableAutoFocus
+      TransitionComponent={Zoom}
+      transitionDuration={200}
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(2px)",
+        },
+      }}
     >
-      <DialogTitle className="flex justify-between items-center border-b bg-background px-6">
-        <span className="font-bold text-[11px] uppercase tracking-[0.15em]">
-          {student ? `Edit: ${student.fullName}` : "Student Admission Form"}
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid",
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background)",
+        }}
+      >
+        <span className=" text-foreground text-sm uppercase">
+          {student
+            ? `Edit Profile of ${student.fullName}`
+            : "Student Admission Form"}
         </span>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon style={{ fontSize: "16px" }} />
+        <IconButton
+          onClick={onClose}
+          size="small"
+          tabIndex={-1}
+          sx={{
+            color: "var(--muted-foreground)",
+            "&:hover": { backgroundColor: "var(--muted)" },
+          }}
+        >
+          <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
-      <Divider />
 
       <form
-        onSubmit={handleSubmit((data) =>
-          onSubmit({ ...data, isNewParent: student ? false : isNewParent }),
-        )}
+        onSubmit={handleSubmit((data) => {
+          if (!data.image || data.image.startsWith("/student")) {
+            data.image =
+              data.gender === "Female"
+                ? "/studentfemale-avatar.jpg"
+                : "/studentmale-avatar.jpg";
+          }
+          onSubmit({ ...data, isNewParent: student ? false : isNewParent });
+        })}
       >
-        <DialogContent className="space-y-6">
-          <div className="space-y-6">
-            <Typography className="font-bold text-blue-600 text-sm uppercase pb-4">
-              1. Personal Details
-            </Typography>
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-              <div className="md:col-span-6">
+        <DialogContent
+          dividers
+          sx={{
+            backgroundColor: "var(--background)",
+            p: 1.5,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <div className="flex flex-row gap-4 items-start">
+            {/* Left: Image */}
+            <div className="flex-shrink-0">
+              <div
+                className="flex flex-col items-center justify-center p-1 border-2 border-dashed rounded-xl h-36 w-36"
+                style={{
+                  borderColor: "var(--border)",
+                  backgroundColor: "var(--card)",
+                }}
+              >
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider mb-1"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
+                  Profile Picture
+                </p>
+                {currentImage ? (
+                  <div className="relative group flex flex-col items-center">
+                    <img
+                      src={currentImage}
+                      className="w-24 h-24 rounded-full object-cover shadow-md"
+                      style={{ border: "4px solid var(--border)" }}
+                      alt="Profile"
+                    />
+                    <Button
+                      type="button"
+                      size="small"
+                      variant="text"
+                      sx={{
+                        fontSize: "8px",
+                        color: "#ef4444",
+                        "&:hover": {
+                          backgroundColor: "rgba(239, 68, 68, 0.3)",
+                        },
+                      }}
+                      onClick={() => setValue("image", "")}
+                    >
+                      Remove Photo
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <ImageUploadWithCrop onImageCropped={handleImageDone} />
+                  </div>
+                )}
+                <input type="hidden" {...register("image")} />
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              <div className="grid grid-cols-3 gap-3">
                 <TextField
                   fullWidth
                   label="Full Name *"
+                  className="col-span-2"
                   {...register("fullName")}
                   size="small"
                 />
-              </div>
-
-              <div className="md:col-span-3">
                 <TextField
                   select
                   fullWidth
                   label="Gender *"
-                  value={studentGender || "Male"} // Upar wala variable yahan use hoga
+                  value={studentGender || "Male"}
                   onChange={(e) => setValue("gender", e.target.value)}
                   size="small"
                 >
@@ -159,7 +277,7 @@ export default function StudentFormModal({
                   <MenuItem value="Female">Female</MenuItem>
                 </TextField>
               </div>
-              <div className="md:col-span-3">
+              <div className="grid grid-cols-3 gap-3">
                 <TextField
                   fullWidth
                   type="date"
@@ -168,16 +286,12 @@ export default function StudentFormModal({
                   {...register("dateOfBirth")}
                   size="small"
                 />
-              </div>
-              <div className="md:col-span-4">
                 <TextField
                   fullWidth
                   label="Cast"
                   {...register("cast")}
                   size="small"
                 />
-              </div>
-              <div className="md:col-span-4">
                 <TextField
                   fullWidth
                   label="Religion"
@@ -185,23 +299,19 @@ export default function StudentFormModal({
                   size="small"
                 />
               </div>
-              <div className="md:col-span-4">
+              <div className="grid grid-cols-3 gap-3">
                 <TextField
                   fullWidth
                   label="Nationality"
                   {...register("nationality")}
                   size="small"
                 />
-              </div>
-              <div className="md:col-span-6">
                 <TextField
                   fullWidth
                   label="Place of Birth"
                   {...register("placeOfBirth")}
                   size="small"
                 />
-              </div>
-              <div className="md:col-span-6">
                 <TextField
                   fullWidth
                   label="B-Form / CNIC"
@@ -212,82 +322,72 @@ export default function StudentFormModal({
             </div>
           </div>
 
-          <div className="space-y-6">
-            <Typography className="font-bold text-emerald-600 text-sm uppercase pb-4">
-              2. Academic Details
-            </Typography>
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-              <div className="md:col-span-4">
-                <TextField
-                  select
-                  fullWidth
-                  label="Class *"
-                  value={selectedClassId || ""}
-                  onChange={(e) => setValue("classId", e.target.value)}
-                  size="small"
-                >
-                  {classes.map((c: any) => (
-                    <MenuItem key={c._id} value={c._id}>
-                      {c.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </div>
-              <div className="md:col-span-4">
-                <TextField
-                  select
-                  fullWidth
-                  label="Section *"
-                  value={
-                    availableSections.includes(selectedSection)
-                      ? selectedSection
-                      : ""
-                  }
-                  onChange={(e) => setValue("section", e.target.value)}
-                  size="small"
-                >
-                  {availableSections.map((s) => (
-                    <MenuItem key={s} value={s}>
-                      {s}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </div>
-              <div className="md:col-span-4">
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="Enrollment Date"
-                  slotProps={{ inputLabel: { shrink: true } }}
-                  {...register("enrollmentDate")}
-                  size="small"
-                />
-              </div>
-              <div className="md:col-span-12">
-                <TextField
-                  fullWidth
-                  label="Previous School"
-                  {...register("previousSchool")}
-                  size="small"
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-4">
+              <TextField
+                select
+                fullWidth
+                label="Class *"
+                value={selectedClassId || ""}
+                onChange={(e) => setValue("classId", e.target.value)}
+                size="small"
+              >
+                {classes.map((c: any) => (
+                  <MenuItem key={c._id} value={c._id}>
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </div>
+            <div className="md:col-span-4">
+              <TextField
+                select
+                fullWidth
+                label="Section *"
+                value={
+                  availableSections.includes(selectedSection)
+                    ? selectedSection
+                    : ""
+                }
+                onChange={(e) => setValue("section", e.target.value)}
+                size="small"
+              >
+                {availableSections.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </div>
+            <div className="md:col-span-4">
+              <TextField
+                fullWidth
+                type="date"
+                label="Enrollment Date"
+                slotProps={{ inputLabel: { shrink: true } }}
+                {...register("enrollmentDate")}
+                size="small"
+              />
+            </div>
+            <div className="md:col-span-12">
+              <TextField
+                fullWidth
+                label="Previous School"
+                {...register("previousSchool")}
+                size="small"
+              />
             </div>
           </div>
 
-          <div className="space-y-4">
-            <Typography className="font-bold text-amber-600 text-sm uppercase pb-4">
-              3. Parent Details
-            </Typography>
+          <div>
             <Autocomplete
               value={parents.find((p: any) => p._id === parentIdValue) || null}
               onChange={(event, newValue: any) => {
                 if (newValue && newValue.inputValue) {
-                  // "+ Add New Parent" logic
                   setIsNewParent(true);
                   setValue("parentId", "");
                   setValue("parentData.fullName", newValue.inputValue);
                 } else if (newValue) {
-                  // Existing Parent logic
                   setIsNewParent(false);
                   setValue("parentId", newValue._id);
                   setValue("parentData", {
@@ -310,7 +410,7 @@ export default function StudentFormModal({
                 if (inputValue !== "") {
                   filtered.push({
                     inputValue,
-                    fullName: `+ Add "${inputValue}" as New Parent`,
+                    fullName: `Add "${inputValue}" as New Parent`,
                   });
                 }
                 return filtered;
@@ -329,13 +429,13 @@ export default function StudentFormModal({
                   <li
                     key={key}
                     {...optionProps}
-                    className={`${optionProps.className} border-b last:border-0 py-2`}
+                    className={`${optionProps.className} border-b last:border-0 py-1`}
                   >
-                    <Box className="flex items-center gap-3 w-full">
+                    <Box className="flex items-center gap-2 w-full">
                       {!isAddNew && (
                         <Typography
                           variant="caption"
-                          className="bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-bold min-w-[25px] text-center"
+                          className="text-sm bg-slate-200 px-2 py-0.5 rounded text-slate-600 min-w-[20px] text-center"
                         >
                           {index + 1}
                         </Typography>
@@ -348,7 +448,7 @@ export default function StudentFormModal({
                           className={
                             isAddNew
                               ? "text-blue-600 font-bold"
-                              : "font-semibold min-w-[150px]"
+                              : "font-semibold min-w-[120px]"
                           }
                         >
                           {option.fullName}
@@ -359,13 +459,13 @@ export default function StudentFormModal({
                           <Box className="flex gap-4 items-center">
                             <Typography
                               variant="caption"
-                              className="bg-blue-50 text-blue-700 px-2 rounded border border-blue-100"
+                              className="bg-blue-50 text-blue-700 px-1 rounded border border-blue-100"
                             >
                               <strong>CNIC:</strong> {option.cnic || "N/A"}
                             </Typography>
                             <Typography
                               variant="caption"
-                              className="bg-green-50 text-green-700 px-2 rounded border border-green-100"
+                              className="bg-green-50 text-green-700 px-1 rounded border border-green-100"
                             >
                               <strong>Phone:</strong> {option.phone || "N/A"}
                             </Typography>
@@ -382,7 +482,10 @@ export default function StudentFormModal({
                   label="Search Father or Type New Name"
                   size="small"
                   fullWidth
-                  helperText="Type to search, or type a new name to add a new record"
+                  helperText="Type to search, if parent exists select from list, otherwise click 'Add' and fill in the details"
+                  FormHelperTextProps={{
+                    sx: { color: "#3A9AFF" },
+                  }}
                 />
               )}
             />
@@ -437,130 +540,138 @@ export default function StudentFormModal({
             )}
           </div>
 
-          <div className="space-y-6">
-            <Typography className="font-bold text-pink-600 text-sm uppercase pb-2">
-              4. Mother's Information
-            </Typography>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <TextField
-                fullWidth
-                label="Mother Name"
-                {...register("motherName")}
-                size="small"
-              />
-              <TextField
-                fullWidth
-                label="Mother Profession"
-                {...register("motherProfession")}
-                size="small"
-              />
-              <TextField
-                fullWidth
-                label="Mother Phone"
-                {...register("motherPhone")}
-                size="small"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <TextField
+              fullWidth
+              label="Mother Name"
+              {...register("motherName")}
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Mother Profession"
+              {...register("motherProfession")}
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Mother Phone"
+              {...register("motherPhone")}
+              size="small"
+            />
           </div>
 
-          <div className="space-y-6">
-            <Typography className="font-bold text-purple-600 text-sm uppercase pb-2">
-              5. Guardian's Information
-            </Typography>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <TextField
-                fullWidth
-                label="Guardian Name"
-                {...register("guardianName")}
-                size="small"
-              />
-              <TextField
-                fullWidth
-                label="Relation with Student"
-                {...register("guardianRelation")}
-                size="small"
-              />
-              <TextField
-                fullWidth
-                label="Guardian Phone"
-                {...register("guardianPhone")}
-                size="small"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <TextField
+              fullWidth
+              label="Guardian Name"
+              {...register("guardianName")}
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Relation with Student"
+              {...register("guardianRelation")}
+              size="small"
+            />
+            <TextField
+              fullWidth
+              label="Guardian Phone"
+              {...register("guardianPhone")}
+              size="small"
+            />
           </div>
 
-          <div className="space-y-6">
-            <Typography className="font-bold text-slate-600 text-sm uppercase pb-4">
-              6. Status & Notes
-            </Typography>
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-              <div className="md:col-span-4">
-                <TextField
-                  select
-                  fullWidth
-                  label="Current Status"
-                  value={currentStatus || "active"}
-                  onChange={(e) => setValue("status", e.target.value)}
-                  size="small"
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                </TextField>
-              </div>
-              {currentStatus === "inactive" && (
-                <>
-                  <div className="md:col-span-4">
-                    <TextField
-                      fullWidth
-                      type="date"
-                      label="Inactive Date"
-                      slotProps={{ inputLabel: { shrink: true } }}
-                      {...register("inactiveDate")}
-                      size="small"
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-4">
-                    <TextField
-                      fullWidth
-                      label="Reason for Inactive"
-                      {...register("inactiveReason")}
-                      size="small"
-                      required
-                      placeholder="e.g. SLC Issued"
-                    />
-                  </div>
-                </>
-              )}
-              <div className="md:col-span-12">
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={2}
-                  label="Remarks"
-                  {...register("detailedNote")}
-                  size="small"
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="md:col-span-4">
+              <TextField
+                select
+                fullWidth
+                label="Current Status"
+                value={currentStatus || "active"}
+                onChange={(e) => setValue("status", e.target.value)}
+                size="small"
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+              </TextField>
+            </div>
+            {currentStatus === "inactive" && (
+              <>
+                <div className="md:col-span-4">
+                  <TextField
+                    fullWidth
+                    type="date"
+                    label="Inactive Date"
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    {...register("inactiveDate")}
+                    size="small"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-4">
+                  <TextField
+                    fullWidth
+                    label="Reason for Inactive"
+                    {...register("inactiveReason")}
+                    size="small"
+                    required
+                    placeholder="e.g. SLC Issued"
+                  />
+                </div>
+              </>
+            )}
+            <div className="md:col-span-12">
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="Remarks"
+                {...register("detailedNote")}
+                size="small"
+              />
             </div>
           </div>
         </DialogContent>
         <Divider />
-        <DialogActions className="px-6 py-2 gap-3">
-          <Button onClick={onClose} className="text-[10px] tracking-widest">
-            CANCEL
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "var(--border)",
+            backgroundColor: "var(--background)",
+            gap: 1,
+          }}
+        >
+          <Button
+            onClick={onClose}
+            disabled={isLoading}
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "var(--foreground)",
+              "&:hover": { backgroundColor: "var(--muted)" },
+            }}
+          >
+            Cancel
           </Button>
           <Button
             type="submit"
             variant="contained"
             disabled={isLoading}
-            className="bg-primary text-primary-foreground px-6 text-[10px] tracking-widest"
+            size="small"
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 1,
+              py: 0.5,
+            }}
           >
             {isLoading
-              ? "PROCESSING..."
+              ? "Processing..."
               : student
-                ? "UPDATE STUDENT"
-                : "CONFIRM ADMISSION"}
+                ? "Update Student"
+                : "Confirm Admission"}
           </Button>
         </DialogActions>
       </form>

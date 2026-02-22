@@ -1,12 +1,26 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ParentModel } from "@/models/Parent";
+import StudentModel from "@/models/Student";
 
 export async function GET() {
   try {
     await connectDB();
-    const parents = await ParentModel.find().sort({ fullName: 1 });
-    return NextResponse.json(parents);
+    const parents = await ParentModel.find().sort({ fullName: 1 }).lean();
+    const parentsWithStudents = await Promise.all(
+      parents.map(async (parent) => {
+        const students = await StudentModel.find({ parentId: parent._id })
+          .populate("classId")
+          .lean();
+
+        return {
+          ...parent,
+          students: students,
+        };
+      }),
+    );
+
+    return NextResponse.json(parentsWithStudents);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

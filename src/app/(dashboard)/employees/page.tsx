@@ -15,16 +15,13 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
-import { calculateTenure } from "@/lib/tenureUtils";
+import { calculateTenure, formatDate } from "@/lib/tenureUtils";
+import { Subject } from "@mui/icons-material";
+import { useEmployeeModal } from "@/hooks/useEmployeeModal";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<IEmployee[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<IEmployee | null>(
-    null,
-  );
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -34,15 +31,6 @@ export default function EmployeesPage() {
     open: false,
     id: null,
   });
-
-  // For Staff Profile Modal
-  const [viewingStaff, setViewingStaff] = useState<any>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  const handleViewProfile = useCallback((staff: IEmployee) => {
-    setViewingStaff(staff);
-    setIsViewModalOpen(true);
-  }, []);
 
   useEffect(() => {
     fetchEmployees();
@@ -63,60 +51,16 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleSubmit = useCallback(
-    async (formData: any) => {
-      setIsLoading(true);
-      try {
-        const method = selectedEmployee ? "PUT" : "POST";
-        const body = selectedEmployee
-          ? { id: selectedEmployee._id, ...formData }
-          : formData;
-
-        const response = await fetch("/api/employees", {
-          method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Something went wrong");
-        }
-
-        await fetchEmployees();
-
-        // 🔥 YE LINE ADD KARO - Profile modal update hoga
-        if (selectedEmployee && isViewModalOpen) {
-          const updatedEmployee = { ...selectedEmployee, ...formData };
-          setViewingStaff(updatedEmployee);
-        }
-
-        setIsModalOpen(false);
-        setSelectedEmployee(null);
-      } catch (error: any) {
-        alert(error.message || "Failed to save employee");
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [selectedEmployee, isViewModalOpen], // Dependencies add karo
-  );
-
-  const handleEdit = useCallback((employee: IEmployee) => {
-    setSelectedEmployee(employee);
-    setIsModalOpen(true);
-  }, []);
-
   const handleDelete = async () => {
     if (!deleteDialog.id) return;
     try {
       const response = await fetch("/api/employees", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: deleteDialog.id }), // state se id lein
+        body: JSON.stringify({ id: deleteDialog.id }),
       });
       if (!response.ok) throw new Error("Failed to delete");
-      await fetchEmployees();
+      setEmployees((prev) => prev.filter((emp) => emp._id !== deleteDialog.id));
     } catch (error) {
       alert("Failed to delete employee");
     } finally {
@@ -124,15 +68,19 @@ export default function EmployeesPage() {
     }
   };
 
-  const openAddModal = useCallback(() => {
-    setSelectedEmployee(null);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleEditFromProfile = useCallback((staff: IEmployee) => {
-    setSelectedEmployee(staff);
-    setIsModalOpen(true);
-  }, []);
+  const {
+    isViewModalOpen,
+    setIsViewModalOpen,
+    viewingStaff,
+    openEmployeeProfile,
+    handleEditFromProfile,
+    isModalOpen,
+    setIsModalOpen,
+    selectedEmployee,
+    setSelectedEmployee,
+    isLoading,
+    handleFormSubmit,
+  } = useEmployeeModal(employees, setEmployees);
 
   // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
@@ -195,7 +143,7 @@ export default function EmployeesPage() {
         Cell: ({ row }) => (
           <div
             className="flex items-center gap-1.5 cursor-pointer group"
-            onClick={() => handleViewProfile(row.original)}
+            onClick={() => openEmployeeProfile(row.original)}
           >
             <span className="font-mono text-slate-500 dark:text-slate-400 group-hover:underline">
               ({row.original.emp_id || "---"})
@@ -230,29 +178,32 @@ export default function EmployeesPage() {
         size: 90,
       },
       {
+        accessorKey: "dateOfBirth",
+        header: "DOB",
+        size: 90,
+        Cell: ({ cell }) => (
+          <span className="text-slate-700 dark:text-slate-300">
+            {formatDate(cell.getValue<any>(), "short")}
+          </span>
+        ),
+      },
+      {
         accessorKey: "nicNumber",
         header: "NIC",
         size: 90,
       },
+      { accessorKey: "subject", header: "Subject", size: 50 },
       {
-        accessorKey: "dateOfBirth",
-        header: "DOB",
-        size: 90,
-        Cell: ({ cell }) => {
-          const date = cell.getValue<any>();
-          if (!date) return "---";
-
-          return (
-            <span className="text-slate-700 dark:text-slate-300">
-              {new Intl.DateTimeFormat("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              }).format(new Date(date))}
-            </span>
-          );
-        },
+        accessorKey: "joiningDate",
+        header: "Joining Date",
+        size: 50,
+        Cell: ({ cell }) => (
+          <span className="text-slate-700 dark:text-slate-300">
+            {formatDate(cell.getValue<any>(), "short")}
+          </span>
+        ),
       },
+
       {
         accessorKey: "staffCategory",
         header: "Category",
@@ -369,7 +320,7 @@ export default function EmployeesPage() {
         },
       },
     ],
-    [handleViewProfile],
+    [],
   );
 
   const table = useMaterialReactTable({
@@ -393,11 +344,12 @@ export default function EmployeesPage() {
         // email: false,
         // password: false,
         // role: false,
-        qualification: true,
+        qualification: false,
         tenure: false,
         designation: false,
         experience: false,
         address: false,
+        subject: false,
       },
     },
     enableRowActions: true,
@@ -407,7 +359,10 @@ export default function EmployeesPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => handleEdit(row.original)}
+          onClick={() => {
+            setSelectedEmployee(row.original);
+            setIsModalOpen(true);
+          }}
           className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           <Pencil className="h-4 w-4 text-sky-500" />
@@ -485,7 +440,10 @@ export default function EmployeesPage() {
       <PageHeader
         title="Employees Management"
         buttonLabel="Add Employee"
-        onButtonClick={openAddModal}
+        onButtonClick={() => {
+          setSelectedEmployee(null);
+          setIsModalOpen(true);
+        }}
         icon={<Users className="w-3.5 h-3.5" />}
       />
       <div className="w-full border border-border rounded-xl shadow-sm bg-background overflow-hidden">
@@ -497,7 +455,7 @@ export default function EmployeesPage() {
           setIsModalOpen(false);
           setSelectedEmployee(null);
         }}
-        onSubmit={handleSubmit}
+        onSubmit={handleFormSubmit}
         employee={selectedEmployee}
         isLoading={isLoading}
       />
@@ -511,7 +469,7 @@ export default function EmployeesPage() {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         staff={viewingStaff}
-        onEdit={() => handleEditFromProfile(viewingStaff)}
+        onEdit={handleEditFromProfile}
       />
 
       {/* Picture Pop-up */}
