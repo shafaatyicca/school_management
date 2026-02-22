@@ -149,7 +149,7 @@ export default function ParentsPage() {
               row.original.students.map((child: any) => (
                 <div
                   key={child._id}
-                  className="w-fit text-[11px] px-1 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded text-foreground leading-tight flex items-center gap-1.5"
+                  className="w-fit text-[11px] px-1 bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded text-foreground leading-tight flex items-center gap-1.5"
                 >
                   <span className=" text-sky-700 dark:text-sky-400">
                     GR-{child.grNumber}

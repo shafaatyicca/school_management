@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ParentModel } from "@/models/Parent";
 import StudentModel from "@/models/Student";
+import "@/models/Class";
 
 export async function GET() {
   try {
