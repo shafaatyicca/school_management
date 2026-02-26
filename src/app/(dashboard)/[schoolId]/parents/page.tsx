@@ -1,5 +1,6 @@
 "use client";
 
+import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import {
@@ -21,6 +22,8 @@ import {
 } from "material-react-table";
 
 export default function ParentsPage() {
+  const params = useParams();
+  const schoolId = params.schoolId as string;
   const [parents, setParents] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -31,18 +34,34 @@ export default function ParentsPage() {
 
   useEffect(() => {
     fetchParents();
-  }, []);
+  }, [schoolId]);
 
   const fetchParents = async () => {
+    // 1. Pehle loader start karein
     setFetchLoading(true);
 
     try {
-      const res = await fetch("/api/parents");
+      // 2. SchoolId check karein
+      if (!schoolId) {
+        console.error("School ID missing from URL");
+        setFetchLoading(false);
+        return;
+      }
+
+      const res = await fetch(`/api/parents?schoolId=${schoolId}`);
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Server error");
+      }
+
       const data = await res.json();
-      setParents(data);
+      setParents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch parents:", error);
+      setParents([]); // Error ki surat mein list khali kar do
     } finally {
+      // 4. Ye line sabse aham hai. Chahe success ho ya error, loader ruk jayega.
       setFetchLoading(false);
     }
   };
@@ -54,7 +73,7 @@ export default function ParentsPage() {
     if (!parentToDelete) return;
 
     try {
-      await fetch("/api/parents", {
+      await fetch(`/api/parents?schoolId=${schoolId}`, {
         method: "DELETE",
         body: JSON.stringify({ id: parentToDelete.id }),
         headers: { "Content-Type": "application/json" },
@@ -74,7 +93,7 @@ export default function ParentsPage() {
     handleSubmit,
     openEditParent,
     selectedParent,
-  } = useParentModal(parents, setParents);
+  } = useParentModal(parents, setParents, schoolId);
 
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
@@ -293,6 +312,7 @@ export default function ParentsPage() {
         parent={selectedParent}
         isLoading={isLoading}
         onSubmit={handleSubmit}
+        schoolId={schoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialogOpen}

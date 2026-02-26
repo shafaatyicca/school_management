@@ -2,6 +2,7 @@ import { Schema, model, models } from "mongoose";
 
 // 1. Interface update ki gayi hai 'order' field ke sath
 export interface IClass {
+  schoolId: string;
   name: string;
   sections: string[];
   order: number; // Classes ki sequence handle karne ke liye
@@ -21,6 +22,11 @@ const classSchema = new Schema<IClass>(
     order: {
       type: Number,
       default: 0,
+    },
+    schoolId: {
+      type: String,
+      required: [true, "School ID is required"],
+      index: true, // Classes fetch karne ki speed barhane ke liye
     },
   },
   {

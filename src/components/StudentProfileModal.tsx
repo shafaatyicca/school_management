@@ -24,6 +24,7 @@ interface Props {
   onClose: () => void;
   student: any;
   onEdit: () => void;
+  schoolId?: string;
 }
 
 export default function StudentProfileModal({
@@ -31,6 +32,7 @@ export default function StudentProfileModal({
   onClose,
   student,
   onEdit,
+  schoolId,
 }: Props) {
   if (!student) return null;
   const displayImg =

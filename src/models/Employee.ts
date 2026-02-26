@@ -31,14 +31,18 @@ export interface IEmployee {
   };
   createdAt?: Date;
   updatedAt?: Date;
+  schoolId: string;
 }
 
 const EmployeeSchema = new Schema<IEmployee>(
   {
-    // Auto-generated ID
+    schoolId: {
+      type: String,
+      required: [true, "School ID is required"],
+      index: true,
+    },
     emp_id: {
       type: Number,
-      unique: true,
     },
     fullName: {
       type: String,
@@ -127,42 +131,47 @@ const EmployeeSchema = new Schema<IEmployee>(
   },
   { timestamps: true },
 );
+EmployeeSchema.index({ schoolId: 1, emp_id: 1 }, { unique: true });
 
 EmployeeSchema.pre<IEmployee>("save", async function () {
-  if (this.isNew) {
+  const doc = this;
+  if (doc.isNew) {
     try {
       const EmployeeModel =
         mongoose.models.Employee ||
         mongoose.model<IEmployee>("Employee", EmployeeSchema);
 
-      const lastEmployee = await EmployeeModel.findOne(
-        {} as any,
-        { emp_id: 1 },
-        { sort: { emp_id: -1 } },
-      ).lean();
+      // 1. Calculate emp_id per school
+      const lastEmp = await EmployeeModel.findOne({
+        schoolId: doc.schoolId,
+      } as any)
+        .sort({ emp_id: -1 })
+        .select("emp_id")
+        .lean();
 
-      const nextIdNumber =
-        lastEmployee && lastEmployee.emp_id
-          ? Number(lastEmployee.emp_id) + 1
+      const nextId =
+        lastEmp && (lastEmp as any).emp_id
+          ? Number((lastEmp as any).emp_id) + 1
           : 1;
+      doc.emp_id = nextId;
 
-      this.emp_id = nextIdNumber;
+      // 2. Short Prefix Logic (e.g., "mcs")
+      const prefix = String(doc.schoolId)
+        .replace(/[^a-zA-Z]/g, "")
+        .toLowerCase()
+        .substring(0, 3);
 
-      if (!this.email) {
-        this.email = `${nextIdNumber}staff@ccw.com`.toLowerCase();
+      // 3. Email & Password Generation
+      // Format: mcs1emp@myschoolapp.com
+      doc.email = `${prefix}${nextId}emp@schoolapp.com`.toLowerCase();
+
+      if (!doc.password) {
+        doc.password = `${prefix}${nextId}123`;
       }
 
-      if (!this.password) {
-        this.password = `staff${nextIdNumber}012`;
-      }
-
-      if (!this.role) {
-        this.role = "employee";
-      }
+      if (!doc.role) doc.role = "employee";
     } catch (error: any) {
-      throw new Error(
-        "Error generating Employee credentials: " + error.message,
-      );
+      throw error;
     }
   }
 });

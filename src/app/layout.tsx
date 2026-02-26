@@ -1,4 +1,5 @@
 import { ThemeWrapper } from "@/components/siteTheme/ThemeProvider";
+import AuthProvider from "@/components/AuthProvider"; // Naya import
 import "./globals.css";
 
 export default function RootLayout({
@@ -9,7 +10,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeWrapper>{children}</ThemeWrapper>
+        <AuthProvider>
+          <ThemeWrapper>{children}</ThemeWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Employee from "@/models/Employee";
 
-// GET → list employees
-export async function GET() {
+// GET → list employees (Filtered by schoolId)
+export async function GET(req: Request) {
+  // <-- Tabdeeli 1: 'req' parameter add kiya
   try {
     await connectDB();
-    const employees = await Employee.find().sort({ createdAt: -1 }).lean();
+
+    // <-- Tabdeeli 2: URL se schoolId pakadna
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
+    const filter = schoolId ? { schoolId } : {};
+
+    const employees = await Employee.find(filter)
+      .sort({ createdAt: -1 })
+      .lean();
     return NextResponse.json(employees);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -19,7 +28,7 @@ export async function POST(req: Request) {
     await connectDB();
     const body = await req.json();
 
-    // 1. Validation: Sirf wo cheez check karein jo user ne lazmi deni hay
+    // Validation: Full Name check
     if (!body.fullName) {
       return NextResponse.json(
         { message: "Full Name is required" },
@@ -27,11 +36,15 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Create instance (Don't use .create())
-    // Hum password/email nahi bhej rahe, Schema hook handle karega
+    // <-- Tabdeeli 4: Ensure schoolId is present (Optional validation)
+    if (!body.schoolId) {
+      return NextResponse.json(
+        { message: "School ID is required" },
+        { status: 400 },
+      );
+    }
     const employee = new Employee(body);
 
-    // 3. Save (Yehi wo point hay jahan pre-save hook trigger hota hay)
     await employee.save();
 
     return NextResponse.json(employee, { status: 201 });
@@ -40,7 +53,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }
-// PUT → update employee
+
+// PUT → update employee (Aapka logic bilkul wahi rakha hai)
 export async function PUT(req: Request) {
   try {
     await connectDB();
@@ -53,16 +67,14 @@ export async function PUT(req: Request) {
       );
     }
 
-    // Logic for active status
     if (updateData.status === "active") {
       updateData.inactiveDate = null;
       updateData.inactiveReason = "";
     }
 
-    // IS LINE KO DEKHEIN: Main ne { $set: updateData } add kiya hay
     const updated = await Employee.findByIdAndUpdate(
       id,
-      { $set: updateData }, // Yeh ensure karega ke har field update ho
+      { $set: updateData },
       {
         new: true,
         runValidators: true,
@@ -85,7 +97,7 @@ export async function PUT(req: Request) {
   }
 }
 
-// DELETE → delete employee
+// DELETE → delete employee (No changes needed)
 export async function DELETE(req: Request) {
   try {
     await connectDB();

@@ -1,6 +1,7 @@
 import mongoose, { Schema, model, models, Document } from "mongoose";
 
 export interface IStudent extends Document {
+  schoolId: string;
   grNumber: number;
   fullName: string;
   image?: string;
@@ -32,7 +33,12 @@ export interface IStudent extends Document {
 
 const StudentSchema = new Schema<IStudent>(
   {
-    grNumber: { type: Number, unique: true },
+    schoolId: {
+      type: String,
+      required: [true, "School ID is required"],
+      index: true,
+    },
+    grNumber: { type: Number },
     fullName: { type: String, required: true },
     image: { type: String },
     email: { type: String, unique: true },
@@ -62,31 +68,43 @@ const StudentSchema = new Schema<IStudent>(
   },
   { timestamps: true },
 );
+StudentSchema.index({ schoolId: 1, grNumber: 1 }, { unique: true });
 
 StudentSchema.pre<IStudent>("save", async function () {
-  if (this.isNew) {
-    const StudentModel =
-      mongoose.models.Student ||
-      mongoose.model<IStudent>("Student", StudentSchema);
+  const doc = this;
+  if (doc.isNew) {
+    try {
+      const StudentModel =
+        mongoose.models.Student ||
+        mongoose.model<IStudent>("Student", StudentSchema);
 
-    // 1. Calculate GR Number
-    const lastStudent = await StudentModel.findOne(
-      {} as any,
-      { grNumber: 1 },
-      { sort: { grNumber: -1 } },
-    ).lean();
-    const nextGrNumber =
-      lastStudent && lastStudent.grNumber ? lastStudent.grNumber + 1 : 1;
+      // 1. Calculate GR Number (Per School)
+      const lastStudent = await StudentModel.findOne({ schoolId: doc.schoolId })
+        .sort({ grNumber: -1 })
+        .select("grNumber")
+        .lean();
 
-    this.grNumber = nextGrNumber;
+      const nextGrNumber =
+        lastStudent && (lastStudent as any).grNumber
+          ? (lastStudent as any).grNumber + 1
+          : 1;
+      doc.grNumber = nextGrNumber;
 
-    // 2. Generate Email (Format: 1st@themuslimcollegaiteschool.com)
-    this.email =
-      `${nextGrNumber}st@themuslimcollegaiteschool.com`.toLowerCase();
+      // 2. Prefix Logic (Aggressive Short)
+      const shortPrefix = String(doc.schoolId)
+        .replace(/[^a-zA-Z]/g, "")
+        .toLowerCase()
+        .substring(0, 3);
 
-    // 3. Generate Default Password
-    if (!this.password) {
-      this.password = `std${nextGrNumber}123`;
+      // 3. Email & Password (mcs1st@myschoolapp.com)
+      doc.email =
+        `${shortPrefix}${nextGrNumber}st@myschoolapp.com`.toLowerCase();
+
+      if (!doc.password) {
+        doc.password = `${shortPrefix}${nextGrNumber}123`;
+      }
+    } catch (error: any) {
+      throw error;
     }
   }
 });

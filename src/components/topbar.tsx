@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react"; // 1. Session aur SignOut import kiya
 import { Button } from "@/components/ui/button";
 import {
   LogOut,
@@ -25,6 +26,7 @@ import {
 import { ThemeToggle } from "@/components/siteTheme/ThemeToggle";
 
 export default function Topbar() {
+  const { data: session } = useSession(); // 2. Session data access kiya
   const [dateTime, setDateTime] = useState(new Date());
   const [mounted, setMounted] = useState(false);
 
@@ -35,7 +37,6 @@ export default function Topbar() {
   }, []);
 
   if (!mounted) {
-    // 1. Loading state background changed to bg-background
     return (
       <header className="h-20 w-full border-b border-border bg-background sticky top-0 z-50 flex items-center px-8">
         <div className="animate-pulse bg-muted h-10 w-48 rounded-lg" />
@@ -57,7 +58,6 @@ export default function Topbar() {
   });
 
   return (
-    // 2. Main Header: bg-background use kiya backdrop-blur ke sath
     <header className="h-20 w-full bg-background/80 backdrop-blur-xl flex items-center justify-between px-6 sticky top-0 z-50">
       {/* --- LEFT SECTION --- */}
       <div className="flex items-center gap-4">
@@ -105,7 +105,6 @@ export default function Topbar() {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-1">
           <ThemeToggle />
-
           <Button
             variant="ghost"
             size="icon"
@@ -113,7 +112,6 @@ export default function Topbar() {
           >
             <Search className="h-4 w-4" />
           </Button>
-
           <div className="relative">
             <Button
               variant="ghost"
@@ -122,7 +120,6 @@ export default function Topbar() {
             >
               <Bell className="h-4 w-4" />
             </Button>
-            {/* 3. Notification dot ring changed to ring-background */}
             <span className="absolute top-2 right-2 h-1.5 w-1.5 bg-sky-500 rounded-full ring-2 ring-background"></span>
           </div>
         </div>
@@ -135,30 +132,33 @@ export default function Topbar() {
                 <div className="h-8 w-8 rounded-lg bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
                   <User className="h-4 w-4 text-muted-foreground group-hover:text-sky-400" />
                 </div>
-                {/* Status dot ring changed to border-background */}
                 <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-background"></div>
               </div>
               <div className="text-left hidden sm:block">
+                {/* 3. Dynamic Name (Session se) */}
                 <p className="text-[11px] font-bold text-foreground leading-none tracking-wide">
-                  Hassan Jani
+                  {session?.user?.name || "User Name"}
                 </p>
+                {/* 4. Dynamic Role (Session se) */}
                 <p className="text-[9px] text-sky-400/80 font-bold mt-1 uppercase tracking-tighter">
-                  Super Admin
+                  {session?.user?.role?.replace("_", " ") || "Admin"}
                 </p>
               </div>
             </div>
           </DropdownMenuTrigger>
 
-          {/* 4. Dropdown content bg and border synced */}
           <DropdownMenuContent
             className="w-64 mt-2 bg-popover border-border shadow-2xl rounded-xl text-popover-foreground"
             align="end"
           >
             <DropdownMenuLabel className="font-normal p-4 bg-muted/30">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-bold text-foreground">Ali Khan</p>
+                {/* 5. Dropdown header Name & Email */}
+                <p className="text-sm font-bold text-foreground uppercase">
+                  {session?.user?.name || "Admin User"}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  ali.admin@school.com
+                  {session?.user?.email || "email@school.com"}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -178,7 +178,12 @@ export default function Topbar() {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem className="flex items-center gap-3 p-3 m-1 rounded-lg cursor-pointer text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/20 focus:text-rose-400 font-bold transition-colors">
+
+            {/* 6. Logout Functionality set kar di */}
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex items-center gap-3 p-3 m-1 rounded-lg cursor-pointer text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/20 focus:text-rose-400 font-bold transition-colors"
+            >
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </DropdownMenuItem>

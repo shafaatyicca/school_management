@@ -9,15 +9,23 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const parentId = searchParams.get("parentId");
+    // 1. URL se schoolId pakadna (Zaroori)
+    const schoolId = searchParams.get("schoolId");
+
+    // 2. Filter object banana
+    const filter: any = {};
+    if (schoolId) filter.schoolId = schoolId;
+    if (parentId) filter.parentId = parentId;
 
     if (parentId) {
-      const siblings = await Student.find({ parentId })
+      const siblings = await Student.find(filter) // Filter use kiya
         .populate("classId")
         .populate("parentId")
         .sort({ fullName: 1 });
       return NextResponse.json(siblings);
     }
-    const students = await Student.find()
+
+    const students = await Student.find(filter) // Filter use kiya
       .populate("classId")
       .populate("parentId")
       .sort({ grNumber: -1 });
@@ -38,14 +46,20 @@ export async function POST(req: Request) {
     let finalParentId = studentData.parentId;
 
     if (isNewParent && parentData) {
-      const newParent = await ParentModel.create(parentData);
+      // 3. Naye Parent mein bhi schoolId save karna taake wo school se link rahe
+      const newParent = await ParentModel.create({
+        ...parentData,
+        schoolId: studentData.schoolId,
+      });
       finalParentId = newParent._id;
     }
 
+    // 4. Student create karte waqt schoolId body mein honi chahiye
     const newStudent = await Student.create({
       ...studentData,
       parentId: finalParentId || undefined,
     });
+
     const populated = await Student.findById(newStudent._id)
       .populate("classId")
       .populate("parentId");
@@ -65,7 +79,11 @@ export async function PUT(req: Request) {
 
     let finalParentId = updateData.parentId;
     if (isNewParent && parentData) {
-      const newParent = await ParentModel.create(parentData);
+      // 5. Update case mein bhi agar naya parent banta hai to schoolId dena
+      const newParent = await ParentModel.create({
+        ...parentData,
+        schoolId: updateData.schoolId,
+      });
       finalParentId = newParent._id;
     }
 

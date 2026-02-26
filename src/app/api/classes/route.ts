@@ -2,32 +2,42 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ClassModel } from "@/models/Class";
 
-// 1. GET → List classes
-export async function GET() {
-  await connectDB();
-  // Sort by order ascending, then by name
-  const classes = await ClassModel.find().sort({ order: 1, name: 1 });
-  return NextResponse.json(classes);
+// 1. GET → List classes (Filtered by schoolId)
+export async function GET(req: Request) {
+  try {
+    await connectDB();
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
+
+    // Filter lagaya taake sirf us school ki classes milein
+    const filter = schoolId ? { schoolId } : {};
+
+    const classes = await ClassModel.find(filter).sort({ order: 1, name: 1 });
+    return NextResponse.json(classes);
+  } catch (error: any) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
 }
 
 // 2. POST → Add class
 export async function POST(req: Request) {
   try {
     await connectDB();
-    const { name, sections, order } = await req.json(); // Order receive karein
+    const body = await req.json();
+    const { name, sections, order, schoolId } = body; // schoolId receive kiya
 
-    if (!name) {
+    if (!name || !schoolId) {
       return NextResponse.json(
-        { message: "Class name is required" },
+        { message: "Class name and School ID are required" },
         { status: 400 },
       );
     }
 
-    // Sections array format mein hi save honge (jaisa Modal bhej raha hai)
     const newClass = await ClassModel.create({
       name,
       sections: sections || [],
       order: order || 0,
+      schoolId, // Database mein save kiya
     });
 
     return NextResponse.json(newClass, { status: 201 });
@@ -40,7 +50,8 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     await connectDB();
-    const { id, name, sections, order } = await req.json(); // Order receive karein
+    const body = await req.json();
+    const { id, name, sections, order, schoolId } = body;
 
     const updated = await ClassModel.findByIdAndUpdate(
       id,
@@ -48,6 +59,7 @@ export async function PUT(req: Request) {
         name,
         sections: sections || [],
         order: order,
+        schoolId, // Safety ke liye schoolId update/keep rakhein
       },
       {
         new: true,
@@ -62,14 +74,16 @@ export async function PUT(req: Request) {
   }
 }
 
-// 4. PATCH → Bulk Order (Safe rakha hai purane logic ke liye)
+// 4. PATCH → Bulk Order (Drag & Drop sorting ke liye)
 export async function PATCH(req: Request) {
-  await connectDB();
   try {
+    await connectDB();
     const { items } = await req.json();
+
     const updatePromises = items.map((item: any) =>
       ClassModel.findByIdAndUpdate(item.id, { order: item.order }),
     );
+
     await Promise.all(updatePromises);
     return NextResponse.json({ message: "Order updated successfully" });
   } catch (error: any) {
@@ -81,10 +95,10 @@ export async function PATCH(req: Request) {
 }
 
 // 5. DELETE
-export async function DELETE(request: Request) {
+export async function DELETE(req: Request) {
   try {
     await connectDB();
-    const { searchParams } = new URL(request.url);
+    const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id)
@@ -92,7 +106,7 @@ export async function DELETE(request: Request) {
 
     await ClassModel.findByIdAndDelete(id);
     return NextResponse.json({ message: "Deleted successfully" });
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });
   }
 }

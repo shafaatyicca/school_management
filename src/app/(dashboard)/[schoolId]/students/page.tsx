@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "next-auth/react";
+import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { Box, Chip } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
@@ -27,6 +29,9 @@ import {
 } from "lucide-react";
 
 export default function StudentsPage() {
+  const params = useParams();
+  const schoolId = params.schoolId as string;
+
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -37,15 +42,18 @@ export default function StudentsPage() {
   const [isParentLoading, setIsParentLoading] = useState(false);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (schoolId) {
+      fetchData();
+    }
+  }, [schoolId]);
 
   const fetchData = async () => {
+    if (!schoolId) return;
     setFetchLoading(true);
     try {
       const [stdRes, clsRes] = await Promise.all([
-        fetch("/api/students"),
-        fetch("/api/classes"),
+        fetch(`/api/students?schoolId=${schoolId}`),
+        fetch(`/api/classes?schoolId=${schoolId}`),
       ]);
       const stdData = await stdRes.json();
       const clsData = await clsRes.json();
@@ -70,7 +78,7 @@ export default function StudentsPage() {
     setSelectedStudent,
     isLoading,
     handleFormSubmit,
-  } = useStudentModal(students, setStudents);
+  } = useStudentModal(students, setStudents, schoolId);
 
   const handleOpenStudentFromParent = (studentData: any) => {
     openStudentProfile(studentData);
@@ -85,9 +93,9 @@ export default function StudentsPage() {
   });
 
   const handleDelete = async () => {
-    if (!deleteDialog.id) return;
+    if (!deleteDialog.id || !schoolId) return;
     try {
-      await fetch("/api/students", {
+      await fetch(`/api/students?schoolId=${schoolId}`, {
         method: "DELETE",
         body: JSON.stringify({ id: deleteDialog.id }),
         headers: { "Content-Type": "application/json" },
@@ -533,11 +541,9 @@ export default function StudentsPage() {
           setIsModalOpen(true);
         }}
       />
-
       <div className="border border-border rounded-xl shadow-sm bg-background overflow-hidden">
         <MaterialReactTable table={table} />
       </div>
-
       <StudentFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -545,15 +551,14 @@ export default function StudentsPage() {
         student={selectedStudent}
         classes={classes}
         isLoading={isLoading}
+        schoolId={schoolId}
       />
-
       <StudentProfileModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
         onEdit={handleEditFromProfile}
       />
-
       <ParentProfileModal
         isOpen={isParentModalOpen}
         onClose={() => setIsParentModalOpen(false)}
@@ -563,19 +568,20 @@ export default function StudentsPage() {
           setViewingParent(parent);
           setIsParentFormOpen(true);
         }}
+        schoolId={schoolId} // <-- YAHAN pehle "" tha, isey session wala schoolId dein
       />
-
       <ParentFormModal
         isOpen={isParentFormOpen}
         onClose={() => setIsParentFormOpen(false)}
         parent={viewingParent}
         isLoading={isParentLoading}
+        schoolId={schoolId}
         onSubmit={async (data: any) => {
           setIsParentLoading(true);
-          const res = await fetch("/api/parents", {
+          const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: viewingParent._id, ...data }),
+            body: JSON.stringify({ id: viewingParent._id, ...data, schoolId }),
           });
           if (res.ok) {
             setViewingParent({ ...viewingParent, ...data }); // profile auto-update
@@ -588,14 +594,12 @@ export default function StudentsPage() {
           setIsParentLoading(false);
         }}
       />
-
       <DeleteConfirmDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
         onConfirm={handleDelete}
         itemName="Student"
       />
-
       {/* Picture Pop-up */}
       {openPhotoId &&
         (() => {

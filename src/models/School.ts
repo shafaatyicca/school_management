@@ -4,6 +4,7 @@ export interface ISchool extends Document {
   name: string;
   address: string;
   phone: string;
+  logo: string;
   isActive: boolean;
   createdAt: Date;
 }
@@ -14,6 +15,7 @@ const SchoolSchema = new Schema<ISchool>({
   phone: { type: String, required: true },
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
+  logo: { type: String, default: "" }, // Base64 string yahan save hogi
 });
 
 export const SchoolModel =

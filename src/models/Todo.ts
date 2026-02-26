@@ -6,6 +6,7 @@ export interface ITodo {
   assignedTo: string[]; // Number ki jagah String array karein kyunki hum _id use kar rahe hain
   status: "pending" | "completed";
   deadline?: Date;
+  schoolId: string;
 }
 
 const TodoSchema = new Schema(
@@ -17,6 +18,11 @@ const TodoSchema = new Schema(
       type: String,
       enum: ["pending", "completed"],
       default: "pending",
+    },
+    schoolId: {
+      type: String,
+      required: true,
+      index: true,
     },
   },
   { timestamps: true },

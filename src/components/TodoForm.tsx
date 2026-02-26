@@ -19,7 +19,8 @@ export default function TodoForm({
   onClose,
   employees = [],
   onRefresh,
-  editData, // Edit ke liye prop
+  editData,
+  schoolId,
 }: any) {
   const { register, handleSubmit, setValue, watch, reset } = useForm({
     defaultValues: {
@@ -48,7 +49,9 @@ export default function TodoForm({
 
   const onSubmit = async (data: any) => {
     const method = editData ? "PUT" : "POST";
-    const body = editData ? { ...data, id: editData._id } : data;
+    const body = editData
+      ? { ...data, id: editData._id, schoolId }
+      : { ...data, schoolId };
 
     const res = await fetch("/api/todo", {
       method: method,
@@ -58,8 +61,8 @@ export default function TodoForm({
 
     if (res.ok) {
       reset();
-      onClose();
       onRefresh();
+      onClose();
     }
   };
 

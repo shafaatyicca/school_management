@@ -20,6 +20,7 @@ interface Props {
   onSubmit: (data: any) => void;
   parent?: any;
   isLoading?: boolean;
+  schoolId: string | null;
 }
 
 export default function ParentFormModal({
@@ -28,6 +29,7 @@ export default function ParentFormModal({
   onSubmit,
   parent,
   isLoading,
+  schoolId,
 }: Props) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const genderValue = watch("gender");
@@ -47,6 +49,9 @@ export default function ParentFormModal({
       });
     }
   }, [parent, isOpen, reset]);
+  const handleFormSubmit = (data: any) => {
+    onSubmit({ ...data, schoolId });
+  };
 
   return (
     <Dialog
@@ -91,7 +96,7 @@ export default function ParentFormModal({
         </IconButton>
       </DialogTitle>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(handleFormSubmit)}>
         <DialogContent
           dividers
           sx={{ backgroundColor: "var(--background)", p: 2 }}

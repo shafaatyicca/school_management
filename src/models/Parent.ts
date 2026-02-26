@@ -1,6 +1,7 @@
 import { Schema, model, models, Document } from "mongoose";
 
 export interface IParent extends Document {
+  schoolId: string;
   p_id: number;
   fullName: string;
   cnic: string;
@@ -14,9 +15,10 @@ export interface IParent extends Document {
 
 const parentSchema = new Schema<IParent>(
   {
-    p_id: { type: Number, unique: true },
+    schoolId: { type: String, required: true, index: true },
+    p_id: { type: Number },
     fullName: { type: String, required: true },
-    cnic: { type: String, required: true, unique: true },
+    cnic: { type: String, required: true },
     phone: { type: String, required: true },
     address: { type: String, required: true },
     occupation: { type: String },
@@ -27,23 +29,43 @@ const parentSchema = new Schema<IParent>(
   { timestamps: true },
 );
 
-// Pre-save hook for p_id, email, and password
+// Compound Indexes: Aik school ke andar p_id aur cnic repeat nahi honge
+parentSchema.index({ schoolId: 1, p_id: 1 }, { unique: true });
+parentSchema.index({ schoolId: 1, cnic: 1 }, { unique: true });
+
+// PRE-SAVE HOOK (Logic for Unique ID, Email, and Password)
 parentSchema.pre<IParent>("save", async function () {
-  if (this.isNew) {
-    const ParentModel = models.Parent || model<IParent>("Parent", parentSchema);
+  const doc = this;
 
-    // 1. Calculate p_id (Auto-increment)
-    const lastParent = await ParentModel.findOne(
-      {} as any,
-      { p_id: 1 },
-      { sort: { p_id: -1 } },
-    ).lean();
+  if (doc.isNew) {
+    try {
+      // 1. Model Reference
+      const Parent = models.Parent || model<IParent>("Parent", parentSchema);
 
-    const nextPId = lastParent && lastParent.p_id ? lastParent.p_id + 1 : 1;
-    this.p_id = nextPId;
-    this.email = `${nextPId}p@themuslimcollegaiteschool.com`.toLowerCase();
-    if (!this.password) {
-      this.password = `prnt${nextPId}123`;
+      // 2. ID Generation (Per School)
+      const lastParent = await Parent.findOne({ schoolId: doc.schoolId })
+        .sort({ p_id: -1 })
+        .select("p_id")
+        .lean();
+
+      const nextId =
+        lastParent && (lastParent as any).p_id
+          ? (lastParent as any).p_id + 1
+          : 1;
+      doc.p_id = nextId;
+      // 3. Email Generation
+      const rawId = String(doc.schoolId);
+      const cleanId = rawId.replace(/[^a-zA-Z]/g, "").toLowerCase();
+      const shortPrefix = cleanId.substring(0, 3); // Sirf pehle 3 harf (e.g., 'mcs')
+
+      doc.email = `${shortPrefix}${nextId}p@myschoolapp.com`.toLowerCase();
+
+      if (!doc.password) {
+        doc.password = `${shortPrefix}${nextId}123`;
+      }
+    } catch (error: any) {
+      console.error("Hook Error:", error);
+      throw error;
     }
   }
 });

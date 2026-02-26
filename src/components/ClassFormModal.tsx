@@ -20,6 +20,7 @@ interface Props {
   onSuccess: () => void;
   editClass?: any | null;
   isLoading?: boolean;
+  schoolId: string | undefined;
 }
 
 export default function ClassFormModal({
@@ -28,6 +29,7 @@ export default function ClassFormModal({
   onSuccess,
   editClass,
   isLoading,
+  schoolId,
 }: Props) {
   const { register, handleSubmit, reset } = useForm();
 
@@ -57,6 +59,7 @@ export default function ClassFormModal({
       name: data.name,
       sections: sectionsArray,
       order: Number(data.order),
+      schoolId: schoolId,
     };
 
     try {

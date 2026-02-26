@@ -3,6 +3,7 @@ import { useState } from "react";
 export function useStudentModal(
   students: any[],
   setStudents: React.Dispatch<React.SetStateAction<any[]>>,
+  schoolId: string | undefined,
 ) {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingStudent, setViewingStudent] = useState<any>(null);
@@ -25,12 +26,13 @@ export function useStudentModal(
       setIsLoading(true);
 
       const method = selectedStudent ? "PUT" : "POST";
-      const res = await fetch("/api/students", {
+      const payload = selectedStudent
+        ? { id: selectedStudent._id, ...data, schoolId }
+        : { ...data, schoolId };
+      const res = await fetch(`/api/students?schoolId=${schoolId}`, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          selectedStudent ? { id: selectedStudent._id, ...data } : data,
-        ),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

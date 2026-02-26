@@ -9,6 +9,8 @@ import type { IEmployee } from "@/models/Employee";
 import { FileSpreadsheet, FileText, Printer, X } from "lucide-react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { useSession } from "next-auth/react";
+import { useParams } from "next/navigation";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -16,10 +18,11 @@ import {
 } from "material-react-table";
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 import { calculateTenure, formatDate } from "@/lib/tenureUtils";
-import { Subject } from "@mui/icons-material";
 import { useEmployeeModal } from "@/hooks/useEmployeeModal";
 
 export default function EmployeesPage() {
+  const params = useParams();
+  const schoolId = params.schoolId as string;
   const [employees, setEmployees] = useState<IEmployee[]>([]);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -33,14 +36,17 @@ export default function EmployeesPage() {
   });
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (schoolId) {
+      fetchEmployees();
+    }
+  }, [schoolId]);
 
   const fetchEmployees = async () => {
+    if (!schoolId) return;
     setFetchLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/employees");
+      const response = await fetch(`/api/employees?schoolId=${schoolId}`);
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setEmployees(data);
@@ -52,9 +58,9 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteDialog.id) return;
+    if (!deleteDialog.id || !schoolId) return;
     try {
-      const response = await fetch("/api/employees", {
+      const response = await fetch(`/api/employees?schoolId=${schoolId}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: deleteDialog.id }),
@@ -80,7 +86,7 @@ export default function EmployeesPage() {
     setSelectedEmployee,
     isLoading,
     handleFormSubmit,
-  } = useEmployeeModal(employees, setEmployees);
+  } = useEmployeeModal(employees, setEmployees, schoolId);
 
   // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
@@ -458,6 +464,7 @@ export default function EmployeesPage() {
         onSubmit={handleFormSubmit}
         employee={selectedEmployee}
         isLoading={isLoading}
+        schoolId={schoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}

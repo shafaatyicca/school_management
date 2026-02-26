@@ -4,6 +4,7 @@ import type { IEmployee } from "@/models/Employee";
 export function useEmployeeModal(
   employees: IEmployee[],
   setEmployees: React.Dispatch<React.SetStateAction<IEmployee[]>>,
+  schoolId: string | undefined,
 ) {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingStaff, setViewingStaff] = useState<any>(null);
@@ -28,12 +29,13 @@ export function useEmployeeModal(
       setIsLoading(true);
 
       const method = selectedEmployee ? "PUT" : "POST";
-      const res = await fetch("/api/employees", {
+      const payload = selectedEmployee
+        ? { id: selectedEmployee._id, ...data, schoolId }
+        : { ...data, schoolId };
+      const res = await fetch(`/api/employees?schoolId=${schoolId}`, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          selectedEmployee ? { id: selectedEmployee._id, ...data } : data,
-        ),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

@@ -1,8 +1,8 @@
 "use client";
 
+import { usePathname, useParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -16,21 +16,29 @@ import {
   BriefcaseBusiness,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const menu = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Classes", href: "/classes", icon: BookOpen },
-  { name: "Students", href: "/students", icon: GraduationCap },
-  { name: "Employees", href: "/employees", icon: BriefcaseBusiness },
-  { name: "Parents", href: "/parents", icon: UsersRound },
-];
+import { useSession } from "next-auth/react";
 
 export default function Sidebar() {
+  const { data: session } = useSession();
+  const params = useParams();
+  const schoolId = params.schoolId || session?.user?.schoolId;
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const sidebarWidth = isCollapsed ? "lg:w-[70px]" : "lg:w-[220px]";
+
+  const menu = [
+    { name: "Dashboard", href: `/${schoolId}`, icon: LayoutDashboard },
+    { name: "Classes", href: `/${schoolId}/classes`, icon: BookOpen },
+    { name: "Students", href: `/${schoolId}/students`, icon: GraduationCap },
+    {
+      name: "Employees",
+      href: `/${schoolId}/employees`,
+      icon: BriefcaseBusiness,
+    },
+    { name: "Parents", href: `/${schoolId}/parents`, icon: UsersRound },
+  ];
 
   return (
     <>

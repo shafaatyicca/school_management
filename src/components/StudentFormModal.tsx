@@ -33,6 +33,7 @@ export default function StudentFormModal({
   student,
   classes,
   isLoading,
+  schoolId,
 }: any) {
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const [parents, setParents] = useState([]);
@@ -60,7 +61,7 @@ export default function StudentFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/parents")
+      fetch(`/api/parents?schoolId=${schoolId}`)
         .then((res) => res.json())
         .then((data) => setParents(data));
 

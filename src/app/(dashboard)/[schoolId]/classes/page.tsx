@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+
+import React, { useState, useEffect, useMemo } from "react";
 import { ArrowDown10, Save, X, BookOpen, Pencil, Trash2 } from "lucide-react";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
@@ -12,8 +13,14 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { useSession } from "next-auth/react";
 
-export default function ClassPage() {
+export default function ClassPage({
+  params,
+}: {
+  params: Promise<{ schoolId: string }>;
+}) {
+  const { schoolId } = React.use(params);
   const [classes, setClasses] = useState<any[]>([]);
   const [isOrderMode, setIsOrderMode] = useState(false);
   const [orderMap, setOrderMap] = useState<{ [key: string]: number }>({});
@@ -21,9 +28,10 @@ export default function ClassPage() {
   const [loading, setLoading] = useState(false);
 
   const fetchClasses = async () => {
+    if (!schoolId) return;
     setLoading(true); // Loader start
     try {
-      const res = await fetch("/api/classes");
+      const res = await fetch(`/api/classes?schoolId=${schoolId}`);
       const data = await res.json();
       setClasses(
         data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
@@ -39,8 +47,10 @@ export default function ClassPage() {
   };
 
   useEffect(() => {
-    fetchClasses();
-  }, []);
+    if (schoolId) {
+      fetchClasses();
+    }
+  }, [schoolId]);
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -53,9 +63,12 @@ export default function ClassPage() {
   const handleDelete = async () => {
     if (!deleteDialog.id) return; // Check karein id hai ya nahi
     try {
-      const res = await fetch(`/api/classes?id=${deleteDialog.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/classes?id=${deleteDialog.id}&schoolId=${schoolId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (res.ok) {
         fetchClasses();
         setDeleteDialog({ open: false, id: null });
@@ -74,7 +87,7 @@ export default function ClassPage() {
     await fetch("/api/classes", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, schoolId }),
     });
     setIsOrderMode(false);
     setLoading(false);
@@ -301,6 +314,7 @@ export default function ClassPage() {
         onClose={() => setModal({ open: false, data: null })}
         editClass={modal.data}
         onSuccess={fetchClasses}
+        schoolId={schoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}

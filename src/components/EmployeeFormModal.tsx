@@ -23,6 +23,7 @@ interface Props {
   onSubmit: (data: any) => void;
   employee?: IEmployee | null;
   isLoading?: boolean;
+  schoolId: string | undefined;
 }
 
 export default function EmployeeFormModal({

@@ -8,20 +8,7 @@ import {
   Chip,
   Zoom,
 } from "@mui/material";
-import {
-  User,
-  Users,
-  KeyRound,
-  Edit,
-  Phone,
-  Home,
-  Briefcase,
-  Fingerprint,
-  Mail,
-  Lock,
-  BadgeCheck,
-  X,
-} from "lucide-react";
+import { User, Users, KeyRound, Edit } from "lucide-react";
 
 interface Props {
   isOpen: boolean;
@@ -29,6 +16,7 @@ interface Props {
   parent: any;
   onStudentClick: (student: any) => void;
   onEdit?: (parent: any) => void;
+  schoolId: string | null;
 }
 
 // Matches StudentProfileModal's InfoItem exactly
@@ -49,17 +37,19 @@ export default function ParentProfileModal({
   parent,
   onStudentClick,
   onEdit,
+  schoolId,
 }: Props) {
   const [siblings, setSiblings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ── Fetch linked students (logic unchanged) ──────────────────────────────
   useEffect(() => {
-    if (isOpen && parent?._id) {
+    if (isOpen && parent?._id && schoolId) {
       const fetchSiblings = async () => {
         setLoading(true);
         try {
-          const res = await fetch(`/api/students?parentId=${parent._id}`);
+          const res = await fetch(
+            `/api/students?parentId=${parent._id}&schoolId=${schoolId}`,
+          );
           const data = await res.json();
           setSiblings(Array.isArray(data) ? data : []);
         } catch (error) {
@@ -70,7 +60,7 @@ export default function ParentProfileModal({
       };
       fetchSiblings();
     }
-  }, [isOpen, parent]);
+  }, [isOpen, parent, schoolId]);
 
   if (!parent) return null;
 

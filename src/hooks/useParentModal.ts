@@ -5,6 +5,7 @@ import { useState } from "react";
 export function useParentModal(
   parents: any[],
   setParents: React.Dispatch<React.SetStateAction<any[]>>,
+  schoolId: string | null,
 ) {
   // Parent Profile
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -49,7 +50,9 @@ export function useParentModal(
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          selectedParent ? { id: selectedParent._id, ...data } : data,
+          selectedParent
+            ? { id: selectedParent._id, ...data, schoolId }
+            : { ...data, schoolId },
         ),
       });
 
