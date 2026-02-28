@@ -1,25 +1,25 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Users,
-  LayoutDashboard,
-  Plus,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  Edit,
-  GraduationCap,
-  BookOpen,
-} from "lucide-react";
 import { Button, Collapse, IconButton, Tooltip } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
 import TodoForm from "@/components/TodoForm";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { StatsCard } from "@/components/dashboard/StatsCard";
+import {
+  Users,
+  LayoutDashboard,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Edit,
+  GraduationCap,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
@@ -27,13 +27,20 @@ export default function DashboardPage() {
   const [employees, setEmployees] = useState([]);
   const [todos, setTodos] = useState([]);
   const [editingTodo, setEditingTodo] = useState<any>(null);
-
+  const [stats, setStats] = useState({
+    totalStudents: 0,
+    totalParents: 0,
+    totalTeachers: 0,
+    status: "active",
+  });
+  const [isInactive, setIsInactive] = useState(false);
+  const [loading, setLoading] = useState(true);
   const params = useParams();
   const schoolId = params.schoolId;
-
   const { data: session } = useSession();
   const router = useRouter();
 
+  // Fetch employees, todos, and stats in parallel
   const fetchData = async () => {
     try {
       const [empRes, todoRes] = await Promise.all([
@@ -72,30 +79,33 @@ export default function DashboardPage() {
     setIsTodoModalOpen(true);
   };
 
+  // Dashboard Student Count Fetching Logic
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      const currentSchoolId =
+        (params?.schoolId as string) || session?.user?.schoolId;
+
+      if (currentSchoolId) {
+        try {
+          const res = await fetch(`/api/stats?schoolId=${currentSchoolId}`);
+          const data = await res.json();
+          setStats(data);
+          if (data.status === "inactive") {
+            setIsInactive(true);
+          }
+        } catch (err) {
+          console.error("Stats fetch error:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchDashboardStats();
+  }, [params?.schoolId, session?.user?.schoolId]);
+
   return (
     <div className="space-y-4 pb-4 bg-[#f8fafc] dark:bg-background min-h-screen font-sans transition-colors duration-300">
-      {/* --- YAHAN SE ADD KAREIN --- */}
-      {session?.user?.role === "super_admin" && (
-        <div className="bg-indigo-600 text-white px-4 py-2 flex justify-between items-center shadow-md animate-in slide-in-from-top duration-300">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => router.push("/superadmin")}
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1 rounded-md text-[11px] font-bold transition-all border border-white/20"
-            >
-              <ArrowLeft size={14} /> Back to Super Admin
-            </button>
-            <div className="h-4 w-[1px] bg-white/30 ml-1" />
-            <p className="text-[11px] font-medium tracking-wide">
-              VIEWING MODE:{" "}
-              <span className="text-amber-300">School ID {schoolId}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] font-black bg-amber-400 text-indigo-900 px-2.5 py-1 rounded-full uppercase italic">
-            <ShieldCheck size={12} /> Root Access
-          </div>
-        </div>
-      )}
-      {/* --- YAHAN TAK --- */}
       {/* Top Header */}
       <div className="flex justify-between items-center">
         <PageHeader
@@ -108,46 +118,31 @@ export default function DashboardPage() {
 
       {/* Stats Cards - Added Left & Right Borders for Dark Mode */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[
-          {
-            label: "Total Students",
-            value: "120",
-            icon: GraduationCap,
-            // Dark mode: Background card color, Border left/right blue, top/bottom faint border
-            color:
-              "bg-blue-600 dark:bg-card dark:border-x-4 dark:border-x-blue-600 dark:border-y dark:border-y-border dark:text-foreground dark:shadow-none",
-          },
-          {
-            label: "Total Classes",
-            value: "10",
-            icon: BookOpen,
-            color:
-              "bg-emerald-600 dark:bg-card dark:border-x-4 dark:border-x-emerald-600 dark:border-y dark:border-y-border dark:text-foreground dark:shadow-none",
-          },
-          {
-            label: "Total Teachers",
-            value: "15",
-            icon: Users,
-            color:
-              "bg-purple-600 dark:bg-card dark:border-x-4 dark:border-x-purple-600 dark:border-y dark:border-y-border dark:text-foreground dark:shadow-none",
-          },
-        ].map((stat, i) => (
-          <Card
-            key={i}
-            // "border-none" ko remove kar diya taaki custom borders nazar ayein
-            className={`${stat.color} text-white shadow-sm transition-all`}
-          >
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-white/80 dark:text-muted-foreground text-[10px] font-light tracking-wide uppercase">
-                  {stat.label}
-                </p>
-                <h3 className="text-2xl font-light">{stat.value}</h3>
-              </div>
-              <stat.icon className="w-8 h-8 opacity-20 dark:opacity-40 dark:text-muted-foreground" />
-            </CardContent>
-          </Card>
-        ))}
+        {/* STUDENT CARD - Dynamic Data */}
+        <StatsCard
+          title="Total Students"
+          value={loading ? "..." : stats.totalStudents}
+          icon={GraduationCap}
+          variant="sky"
+          className="dark:border-x-4 dark:border-x-blue-600"
+        />
+
+        <StatsCard
+          title="Total Parents"
+          value={loading ? "..." : stats.totalParents}
+          icon={UserCheck}
+          variant="emerald"
+          className="dark:border-x-4 dark:border-x-emerald-600"
+        />
+
+        {/* TEACHERS CARD - Static for now, can be dynamic later */}
+        <StatsCard
+          title="Total Teachers"
+          value={loading ? "..." : stats.totalTeachers}
+          icon={Users}
+          variant="rose"
+          className="dark:border-x-4 dark:border-x-purple-600 dark:border-y-border"
+        />
       </div>
 
       {/* Tasks Section Header */}
@@ -301,6 +296,46 @@ export default function DashboardPage() {
         editData={editingTodo}
         schoolId={schoolId}
       />
+
+      {/* Inactive Account Overlay Modal */}
+      {isInactive && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4">
+          <div className="bg-white dark:bg-card p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-4 border-rose-600 animate-in zoom-in duration-300">
+            <div className="bg-rose-100 dark:bg-rose-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck className="text-rose-600 dark:text-rose-400 w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2 italic">
+              Account Suspended
+            </h2>
+            <p className="text-slate-500 dark:text-muted-foreground text-sm mb-8 leading-relaxed">
+              {session?.user?.role === "super_admin"
+                ? "Viewing Mode Note: This school is currently **Inactive**. You cannot manage its dashboard until it is activated."
+                : "Aapka school account is waqt **Inactive** kar diya gaya hai. Mazeed maloomat ke liye Super Admin se rabta karein."}
+            </p>
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={() =>
+                session?.user?.role === "super_admin"
+                  ? router.push("/superadmin")
+                  : router.push("/login")
+              }
+              sx={{
+                bgcolor: "#e11d48",
+                borderRadius: "12px",
+                py: 1.5,
+                textTransform: "none",
+                fontWeight: "bold",
+                "&:hover": { bgcolor: "#be123c" },
+              }}
+            >
+              {session?.user?.role === "super_admin"
+                ? "Back to Super Admin Panel"
+                : "Sign Out & Go Back"}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

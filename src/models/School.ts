@@ -5,7 +5,7 @@ export interface ISchool extends Document {
   address: string;
   phone: string;
   logo: string;
-  isActive: boolean;
+  status: "active" | "inactive";
   createdAt: Date;
 }
 
@@ -13,7 +13,7 @@ const SchoolSchema = new Schema<ISchool>({
   name: { type: String, required: true },
   address: { type: String, required: true },
   phone: { type: String, required: true },
-  isActive: { type: Boolean, default: true },
+  status: { type: String, default: "active", enum: ["active", "inactive"] },
   createdAt: { type: Date, default: Date.now },
   logo: { type: String, default: "" }, // Base64 string yahan save hogi
 });

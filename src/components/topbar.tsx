@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession, signOut } from "next-auth/react"; // 1. Session aur SignOut import kiya
+import { useParams } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   LogOut,
@@ -13,6 +14,8 @@ import {
   KeyRound,
   UserCircle,
   User,
+  ShieldCheck,
+  ArrowLeft,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,11 +27,45 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/siteTheme/ThemeToggle";
+import { useRouter } from "next/navigation";
 
 export default function Topbar() {
-  const { data: session } = useSession(); // 2. Session data access kiya
   const [dateTime, setDateTime] = useState(new Date());
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+
+  const { data: session } = useSession();
+  const params = useParams();
+
+  const [schoolData, setSchoolData] = useState<{
+    name: string;
+    logo: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchSchoolInfo = async () => {
+      const currentSchoolId =
+        (params?.schoolId as string) || session?.user?.schoolId;
+
+      if (currentSchoolId) {
+        try {
+          const res = await fetch(
+            `/api/superadmin/schools?id=${currentSchoolId}`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            setSchoolData(data);
+          }
+        } catch (err) {
+          console.error("Error fetching school data:", err);
+        }
+      } else {
+        setSchoolData({ name: "SYSTEM CONTROL", logo: "" });
+      }
+    };
+
+    fetchSchoolInfo();
+  }, [params?.schoolId, session?.user?.schoolId]);
 
   useEffect(() => {
     setMounted(true);
@@ -63,18 +100,25 @@ export default function Topbar() {
       <div className="flex items-center gap-4">
         <div className="relative group cursor-pointer hidden sm:block">
           <div className="absolute -inset-1 bg-gradient-to-r from-sky-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-card border border-border shadow-xl">
-            <GraduationCap className="h-6 w-6 text-sky-400" />
+          <div className="relative flex h-15 w-15 items-center justify-center rounded-xl bg-card border border-border shadow-xl overflow-hidden">
+            {/* Agar School Logo hai to wo dikhaye, warna GraduationCap icon */}
+            {schoolData?.logo ? (
+              <img
+                src={schoolData.logo}
+                alt="School Logo"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <GraduationCap className="h-6 w-6 text-sky-400" />
+            )}
           </div>
         </div>
 
         <div className="flex flex-col">
-          <h1 className="text-sm md:text-lg font-bold tracking-wider text-foreground leading-none">
-            BRIGHT<span className="text-sky-400 italic">FUTURE</span>
-            <span className="hidden md:inline ml-2 text-muted-foreground font-light text-xs">
-              | MANAGEMENT
-            </span>
-          </h1>
+          <h3 className="text-[11px] md:text-lg tracking-wider text-foreground leading-none">
+            {/* School Name dynamic ho gaya */}
+            {schoolData?.name ? schoolData.name.toUpperCase() : "School Name"}
+          </h3>
 
           <div className="flex items-center gap-2 mt-2">
             <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-border">
@@ -94,11 +138,30 @@ export default function Topbar() {
       </div>
 
       {/* --- MIDDLE SECTION --- */}
-      <div className="hidden lg:flex items-center gap-2 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/10">
-        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
-        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em]">
-          Core System Online
-        </span>
+      <div className="flex items-center justify-center">
+        {session?.user?.role === "super_admin" ? (
+          /* PROFESSIONAL SUPER ADMIN INDICATOR */
+          <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1.5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 animate-in fade-in zoom-in duration-500">
+            <button
+              onClick={() => router.push("/superadmin")}
+              className="flex items-center gap-1.5 text-[10px] font-bold dark: text-slate-100 text-slate-500 hover:text-indigo-600 transition-colors group cursor-pointer"
+            >
+              <ArrowLeft
+                size={12}
+                className="group-hover:-translate-x-0.5 transition-transform"
+              />
+              Back to Super Admin
+            </button>
+          </div>
+        ) : (
+          /* STANDARD SYSTEM ONLINE BLOCK */
+          <div className="hidden lg:flex items-center gap-2 bg-emerald-500/5 px-3 py-1 rounded-full border border-emerald-500/10">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+            <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-[0.2em]">
+              System Online
+            </span>
+          </div>
+        )}
       </div>
 
       {/* --- RIGHT SECTION --- */}

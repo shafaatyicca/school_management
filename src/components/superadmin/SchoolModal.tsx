@@ -91,12 +91,19 @@ export const SchoolModal = ({
             <button
               type="button"
               onClick={() =>
-                setFormData({ ...formData, isActive: !formData.isActive })
+                setFormData({
+                  ...formData,
+                  status: formData.status === "active" ? "inactive" : "active",
+                })
               }
-              className={`w-12 h-6 rounded-full transition-all relative ${formData.isActive ? "bg-emerald-500" : "bg-slate-300"}`}
+              className={`w-12 h-6 rounded-full transition-all relative ${
+                formData.status === "active" ? "bg-emerald-500" : "bg-slate-300"
+              }`}
             >
               <div
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.isActive ? "left-7" : "left-1"}`}
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                  formData.status === "active" ? "left-7" : "left-1"
+                }`}
               />
             </button>
           </div>

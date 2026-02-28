@@ -40,9 +40,7 @@ export async function POST(req: Request) {
   try {
     await connectDB();
     const body = await req.json();
-
     const { isNewParent, parentData, email, ...studentData } = body;
-
     let finalParentId = studentData.parentId;
 
     if (isNewParent && parentData) {
