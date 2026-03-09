@@ -87,11 +87,31 @@ export default function DashboardPage() {
 
       if (currentSchoolId) {
         try {
+          // 1. School Stats aur Status fetch karein
           const res = await fetch(`/api/stats?schoolId=${currentSchoolId}`);
           const data = await res.json();
           setStats(data);
-          if (data.status === "inactive") {
+
+          // 2. Invoices check karein
+          const invRes = await fetch(
+            `/api/superadmin/invoices?schoolId=${currentSchoolId}`,
+          );
+          const invoices = await invRes.json();
+
+          // Check: Kya koi Pending Invoice Overdue hai?
+          const hasOverdueInvoice = invoices.some(
+            (inv: any) =>
+              inv.status.toLowerCase() === "pending" &&
+              new Date(inv.dueDate) < new Date(),
+          );
+
+          // --- DONO LOGICS KA MILAAP ---
+          // A. Agar School Status manually 'inactive' hai (Old Logic)
+          // B. YA agar koi Overdue Invoice pending hai (New Logic)
+          if (data.status === "inactive" || hasOverdueInvoice) {
             setIsInactive(true);
+          } else {
+            setIsInactive(false);
           }
         } catch (err) {
           console.error("Stats fetch error:", err);
@@ -309,8 +329,8 @@ export default function DashboardPage() {
             </h2>
             <p className="text-slate-500 dark:text-muted-foreground text-sm mb-8 leading-relaxed">
               {session?.user?.role === "super_admin"
-                ? "Viewing Mode Note: This school is currently **Inactive**. You cannot manage its dashboard until it is activated."
-                : "Aapka school account is waqt **Inactive** kar diya gaya hai. Mazeed maloomat ke liye Super Admin se rabta karein."}
+                ? "VIEWING MODE: This school is restricted due to inactivity or unpaid dues."
+                : "Aapka account suspend kar diya gaya hai. Shayad aapki fees pending hai ya subscription expire ho chuki hai. Mazeed maloomat ke liye rabta karein."}
             </p>
             <Button
               variant="contained"

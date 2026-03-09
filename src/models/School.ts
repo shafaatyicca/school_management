@@ -5,17 +5,41 @@ export interface ISchool extends Document {
   address: string;
   phone: string;
   logo: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive"; // Yehi field lock/unlock control karegi
   createdAt: Date;
+
+  // Essential Subscription Fields
+  planId: mongoose.Types.ObjectId;
+  customPrice: number;
+  expiryDate: Date; // Is date ke guzarte hi status auto-inactive ho jayega
 }
 
 const SchoolSchema = new Schema<ISchool>({
   name: { type: String, required: true },
   address: { type: String, required: true },
   phone: { type: String, required: true },
-  status: { type: String, default: "active", enum: ["active", "inactive"] },
+  logo: { type: String, default: "" },
+  status: {
+    type: String,
+    default: "active",
+    enum: ["active", "inactive"],
+  },
   createdAt: { type: Date, default: Date.now },
-  logo: { type: String, default: "" }, // Base64 string yahan save hogi
+
+  // Sirf zaroori fields rakhi hain
+  planId: {
+    type: Schema.Types.ObjectId,
+    ref: "Plan",
+    required: true,
+  },
+  customPrice: {
+    type: Number,
+    default: 0,
+  },
+  expiryDate: {
+    type: Date,
+    required: true,
+  },
 });
 
 export const SchoolModel =

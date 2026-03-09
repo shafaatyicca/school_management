@@ -153,8 +153,8 @@ export default function EmployeeFormModal({
       fullWidth
       disableEnforceFocus
       disableAutoFocus
-      TransitionComponent={Zoom} // 👈 Ye line add karein
-      transitionDuration={200} // Speed set karein
+      TransitionComponent={Zoom}
+      transitionDuration={200}
       BackdropProps={{
         sx: {
           backgroundColor: "rgba(0, 0, 0, 0.4)",

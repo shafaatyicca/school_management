@@ -1,137 +1,295 @@
-import { X, Building2, Phone, MapPin, ImageIcon, Plus } from "lucide-react";
+"use client";
 
-export const SchoolModal = ({
+import { useEffect, useCallback, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  MenuItem,
+  IconButton,
+  Zoom,
+  InputAdornment,
+} from "@mui/material";
+import {
+  Close as CloseIcon,
+  Business as SchoolIcon,
+  Payments as PayIcon,
+} from "@mui/icons-material";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: any) => void;
+  school?: any | null;
+  plans: any[];
+  isLoading?: boolean;
+}
+
+export default function SchoolFormModal({
   isOpen,
   onClose,
-  formData,
-  setFormData,
   onSubmit,
-  isEditing,
-}: any) => {
-  if (!isOpen) return null;
+  school,
+  plans,
+  isLoading,
+}: Props) {
+  const { register, handleSubmit, reset, watch, setValue } = useForm({
+    defaultValues: useMemo(
+      () => ({
+        name: "",
+        phone: "",
+        address: "",
+        logo: "",
+        status: "active",
+        planId: "",
+        customPrice: 0,
+        expiryDate: "",
+        // subscriptionStatus yahan se khatam
+      }),
+      [],
+    ),
+  });
 
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const currentStatus = watch("status");
+  const selectedPlanId = watch("planId");
+  const currentLogo = watch("logo");
+
+  useEffect(() => {
+    if (selectedPlanId && plans.length > 0) {
+      const selectedPlan = plans.find((p) => p._id === selectedPlanId);
+      if (selectedPlan) {
+        setValue("customPrice", selectedPlan.price);
+      }
+    }
+  }, [selectedPlanId, plans, setValue]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (school) {
+      reset({
+        ...school,
+        planId: school.planId?._id || school.planId || "",
+        expiryDate: school.expiryDate
+          ? new Date(school.expiryDate).toISOString().split("T")[0]
+          : "",
+      });
+    } else {
+      reset({
+        name: "",
+        phone: "",
+        address: "",
+        logo: "",
+        status: "active",
+        planId: "",
+        customPrice: 0,
+        expiryDate: "",
+      });
+    }
+  }, [school, isOpen, reset]);
+
+  const onFormSubmit = useCallback(
+    (data: any) => {
+      const formattedData = {
+        ...data,
+        id: school?._id,
+        customPrice: Number(data.customPrice),
+      };
+      onSubmit(formattedData);
+    },
+    [onSubmit, school],
+  );
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, logo: reader.result as string });
+        setValue("logo", reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="p-8 pb-0 flex justify-between items-start">
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-            {isEditing ? "Update School" : "Register School"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 bg-slate-50 text-slate-400 rounded-xl"
-          >
-            <X size={20} />
-          </button>
-        </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      TransitionComponent={Zoom}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <span className="font-bold text-sm flex items-center gap-2">
+          <SchoolIcon fontSize="small" />
+          {school ? "Update Institution" : "Register New Institution"}
+        </span>
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={onSubmit} className="p-8 space-y-6">
-          <div className="flex justify-center">
-            <label className="relative cursor-pointer group">
-              <div className="w-24 h-24 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center text-slate-300 group-hover:border-indigo-400 group-hover:text-indigo-500 transition-all overflow-hidden">
-                {formData.logo ? (
+      <form onSubmit={handleSubmit(onFormSubmit)}>
+        <DialogContent dividers sx={{ p: 2 }}>
+          <div className="flex flex-col gap-4">
+            {/* Logo Section remain same... */}
+            <div className="flex items-center gap-2 p-2 border rounded-2xl border-dashed bg-slate-50/50">
+              {/* ... (Same logo code as before) ... */}
+              <div className="w-20 h-20 rounded-2xl bg-white border flex items-center justify-center overflow-hidden">
+                {currentLogo ? (
                   <img
-                    src={formData.logo}
+                    src={currentLogo}
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <ImageIcon size={24} />
+                  <SchoolIcon sx={{ fontSize: 40, color: "#cbd5e1" }} />
                 )}
               </div>
               <input
                 type="file"
                 className="hidden"
-                accept="image/*"
-                onChange={handleLogoChange}
+                id="logo-up"
+                onChange={handleLogoUpload}
               />
-              <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1.5 rounded-lg">
-                <Plus size={12} />
+              <label
+                htmlFor="logo-up"
+                className="bg-indigo-600 text-white p-1 rounded-md cursor-pointer"
+              >
+                <PayIcon sx={{ fontSize: 14 }} />
+              </label>
+              <div>
+                <p className="text-xs font-bold text-slate-700">
+                  Institution Identity
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  Square logo (PNG/JPG)
+                </p>
               </div>
-            </label>
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ModalInput
+            {/* Basic Info */}
+            <TextField
+              {...register("name", { required: true })}
               label="School Name"
-              icon={<Building2 size={16} />}
-              value={formData.name}
-              onChange={(v) => setFormData({ ...formData, name: v })}
+              fullWidth
+              size="small"
+              required
             />
-            <ModalInput
-              label="Phone"
-              icon={<Phone size={16} />}
-              value={formData.phone}
-              onChange={(v) => setFormData({ ...formData, phone: v })}
-            />
-            <div className="md:col-span-2">
-              <ModalInput
-                label="Address"
-                icon={<MapPin size={16} />}
-                value={formData.address}
-                onChange={(v) => setFormData({ ...formData, address: v })}
+            <div className="grid grid-cols-2 gap-4">
+              <TextField
+                {...register("phone", { required: true })}
+                label="Contact Number"
+                size="small"
+                required
               />
+              <TextField
+                {...register("status")}
+                select
+                label="Operational Status"
+                size="small"
+                value={currentStatus || "active"}
+                onChange={(e) => setValue("status", e.target.value)}
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="inactive">Inactive</MenuItem>
+              </TextField>
+            </div>
+            <TextField
+              {...register("address", { required: true })}
+              label="Complete Address"
+              multiline
+              rows={2}
+              fullWidth
+              size="small"
+              required
+            />
+
+            {/* Subscription Section - CLEANED */}
+            <div className="mt-4 p-4 border rounded-2xl bg-slate-50 space-y-4">
+              <p className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <PayIcon sx={{ fontSize: 18, color: "#4f46e5" }} /> Plan &
+                Expiry
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <TextField
+                  {...register("planId", { required: true })}
+                  select
+                  label="Choose Plan"
+                  size="small"
+                  fullWidth
+                  value={selectedPlanId || ""}
+                  onChange={(e) => setValue("planId", e.target.value)}
+                >
+                  {plans.map((p) => (
+                    <MenuItem key={p._id} value={p._id}>
+                      {p.name} — ${p.price}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  {...register("customPrice", { required: true })}
+                  label="Final Price ($)"
+                  type="number"
+                  size="small"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">$</InputAdornment>
+                    ),
+                  }}
+                />
+
+                {/* Expiry Date Full Width or nicely aligned */}
+                <TextField
+                  {...register("expiryDate", { required: true })}
+                  label="Expiry Date"
+                  type="date"
+                  size="small"
+                  fullWidth
+                  className="md:col-span-2" // Isko full width kar diya taake subscriptionStatus ki jagah fill ho jaye
+                  InputLabelProps={{ shrink: true }}
+                  onClick={(e: any) => e.target.showPicker?.()}
+                />
+              </div>
             </div>
           </div>
+        </DialogContent>
 
-          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
-            <span className="text-sm font-bold text-slate-700">
-              Operational Status
-            </span>
-            <button
-              type="button"
-              onClick={() =>
-                setFormData({
-                  ...formData,
-                  status: formData.status === "active" ? "inactive" : "active",
-                })
-              }
-              className={`w-12 h-6 rounded-full transition-all relative ${
-                formData.status === "active" ? "bg-emerald-500" : "bg-slate-300"
-              }`}
-            >
-              <div
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                  formData.status === "active" ? "left-7" : "left-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          <button className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-            {isEditing ? "Save Changes" : "Create Institution"}
-          </button>
-        </form>
-      </div>
-    </div>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={onClose}
+            disabled={isLoading}
+            size="small"
+            sx={{ textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={isLoading}
+            size="small"
+            sx={{ backgroundColor: "#1e293b", textTransform: "none", px: 3 }}
+          >
+            {isLoading
+              ? "Processing..."
+              : school
+                ? "Update Details"
+                : "Register School"}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
-};
-
-const ModalInput = ({ label, icon, value, onChange }: any) => (
-  <div className="space-y-1">
-    <label className="text-[10px] font-bold text-slate-400 uppercase ml-2">
-      {label}
-    </label>
-    <div className="relative">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300">
-        {icon}
-      </div>
-      <input
-        required
-        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:border-indigo-500 outline-none text-sm transition-all"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  </div>
-);
+}

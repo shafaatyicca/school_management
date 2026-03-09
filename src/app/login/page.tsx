@@ -16,7 +16,6 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // 1. signIn ko "redirect: false" ke sath call karein
       const res = await signIn("credentials", {
         email,
         password,
@@ -24,15 +23,23 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        setError("Email ya Password galat hai!");
+        if (
+          res.error.includes("User nahi mila") ||
+          res.error.includes("Password galat")
+        ) {
+          setError("Email ya Password galat hai!");
+        } else {
+          setError(
+            "Login nahi ho saka. Meharbani karke dubara koshish karein.",
+          );
+        }
         setLoading(false);
       } else {
-        // window.location.href = "/"  <-- ISAY HATA DEIN
-        router.push("/"); // Behtar hai
-        router.refresh(); // Server components ko refresh karne ke liye
+        router.push("/");
+        router.refresh();
       }
     } catch (err) {
-      setError("Kuch galti hui, dobara koshish karein.");
+      setError("System mein koi masla hua hai.");
       setLoading(false);
     }
   };
