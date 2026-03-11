@@ -1,17 +1,17 @@
 import mongoose, { Schema, Document } from "mongoose";
+import "./Plan";
 
 export interface ISchool extends Document {
   name: string;
   address: string;
   phone: string;
   logo: string;
-  status: "active" | "inactive"; // Yehi field lock/unlock control karegi
+  status: "active" | "inactive";
   createdAt: Date;
 
-  // Essential Subscription Fields
   planId: mongoose.Types.ObjectId;
   customPrice: number;
-  expiryDate: Date; // Is date ke guzarte hi status auto-inactive ho jayega
+  expiryDate: Date;
 }
 
 const SchoolSchema = new Schema<ISchool>({
@@ -26,7 +26,6 @@ const SchoolSchema = new Schema<ISchool>({
   },
   createdAt: { type: Date, default: Date.now },
 
-  // Sirf zaroori fields rakhi hain
   planId: {
     type: Schema.Types.ObjectId,
     ref: "Plan",

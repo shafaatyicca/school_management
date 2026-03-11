@@ -137,18 +137,26 @@ export async function PUT(req: Request) {
       const newPaid = Number(invoice.amountPaid || 0) + payAmount;
       const newRemaining = Math.max(0, Number(invoice.finalAmount) - newPaid);
 
+      // Status decide karein
+      let newStatus: "pending" | "partially_paid" | "paid" = "pending";
+      if (newRemaining <= 0) {
+        newStatus = "paid";
+      } else if (newPaid > 0) {
+        newStatus = "partially_paid";
+      }
+
       const updated = await SchoolInvoiceModel.findByIdAndUpdate(
         invoiceId,
         {
           amountPaid: newPaid,
           remainingAmount: newRemaining,
-          status: newRemaining <= 0 ? "paid" : "pending",
-          paidAt:
-            newRemaining <= 0 ? paymentDate || new Date() : invoice.paidAt,
+          status: newStatus,
+          // FIX: Har payment par paidAt ko update karein taake chart mein show ho
+          paidAt: paymentDate ? new Date(paymentDate) : new Date(),
           $push: {
             paymentHistory: {
               amount: payAmount,
-              date: paymentDate || new Date(),
+              date: paymentDate ? new Date(paymentDate) : new Date(),
             },
           },
         },

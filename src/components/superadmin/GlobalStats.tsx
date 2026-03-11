@@ -87,7 +87,7 @@ export default function GlobalStats({
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-2">
       <StatCard
         title="Total Schools"
         value={stats.totalSchools}

@@ -152,7 +152,7 @@ export default function SuperAdminLayout({
           </div>
         </header>
 
-        <div className="p-4 max-w-7xl mx-auto">{children}</div>
+        <div className="px-3 py-2 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
   );

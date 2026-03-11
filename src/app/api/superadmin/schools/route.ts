@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { SchoolModel } from "@/models/School";
+import PlanModel from "@/models/Plan";
 
 // 1. GET ALL SCHOOLS
 export async function GET(req: Request) {
@@ -85,7 +86,6 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. UPDATE SCHOOL
 // 3. UPDATE SCHOOL
 export async function PUT(req: Request) {
   try {

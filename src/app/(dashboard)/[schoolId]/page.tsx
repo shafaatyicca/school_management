@@ -7,7 +7,7 @@ import TodoForm from "@/components/TodoForm";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { StatsCard } from "@/components/dashboard/StatsCard";
+import { StatsCard } from "@/components/schoolDashboard/StatsCard";
 import {
   Users,
   LayoutDashboard,
@@ -88,7 +88,9 @@ export default function DashboardPage() {
       if (currentSchoolId) {
         try {
           // 1. School Stats aur Status fetch karein
-          const res = await fetch(`/api/stats?schoolId=${currentSchoolId}`);
+          const res = await fetch(
+            `/api/schoolStats?schoolId=${currentSchoolId}`,
+          );
           const data = await res.json();
           setStats(data);
 
@@ -105,7 +107,6 @@ export default function DashboardPage() {
               new Date(inv.dueDate) < new Date(),
           );
 
-          // --- DONO LOGICS KA MILAAP ---
           // A. Agar School Status manually 'inactive' hai (Old Logic)
           // B. YA agar koi Overdue Invoice pending hai (New Logic)
           if (data.status === "inactive" || hasOverdueInvoice) {

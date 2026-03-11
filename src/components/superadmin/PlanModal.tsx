@@ -181,7 +181,7 @@ export const PlanModal = ({
               type="submit"
               className="w-full bg-slate-900 hover:bg-indigo-600 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-slate-200 hover:shadow-indigo-100 active:scale-[0.98] border-b-4 border-indigo-500"
             >
-              {isEditing ? "Update Subscription" : "Generate Plan"}
+              {isEditing ? "Update Plan" : "Generate Plan"}
             </button>
           </div>
         </form>
