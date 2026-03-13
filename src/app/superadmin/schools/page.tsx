@@ -2,12 +2,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, Plus } from "lucide-react";
+import { notify } from "@/lib/notify";
 
 // Components
 import { AdminList } from "@/components/superadmin/UserList";
 import SchoolFormModal from "@/components/superadmin/SchoolModal";
 import { UserModal } from "@/components/superadmin/UserModal";
-import SchoolCard from "@/components/superadmin/SchoolCard"; // Naya component import karein
+import SchoolCard from "@/components/superadmin/SchoolCard";
 
 export default function SchoolsPage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function SchoolsPage() {
       setSchools(Array.isArray(data) ? data : []);
     } catch (err) {
       setSchools([]);
+      notify.error("Error!", "Failed to load schools");
     } finally {
       setLoading(false);
     }
@@ -67,6 +69,14 @@ export default function SchoolsPage() {
       setIsSchoolModalOpen(false);
       setEditId(null);
       fetchSchools();
+      notify.success(
+        editId ? "School Updated!" : "School Added!",
+        editId
+          ? "School updated successfully"
+          : "New school added successfully",
+      );
+    } else {
+      notify.error("Failed!", "Could not save school");
     }
   };
 
@@ -85,24 +95,30 @@ export default function SchoolsPage() {
     if (res.ok) {
       setIsUserModalOpen(false);
       if (expandedSchool) fetchUsers(expandedSchool);
+      notify.success(
+        userEditId ? "Admin Updated!" : "Admin Added!",
+        userEditId
+          ? "Admin updated successfully"
+          : "New admin added successfully",
+      );
+    } else {
+      notify.error("Failed!", "Could not save admin");
     }
   };
-  const handleDeleteAdmin = async (userId: string) => {
-    if (!confirm("Are you sure you want to remove this admin?")) return;
 
+  const handleDeleteAdmin = async (userId: string) => {
     try {
       const res = await fetch(`/api/superadmin/users?id=${userId}`, {
         method: "DELETE",
       });
-
       if (res.ok) {
-        // Delete hone ke baad list ko refresh karein
         if (expandedSchool) fetchUsers(expandedSchool);
+        notify.success("Deleted!", "Admin has been removed successfully");
       } else {
-        alert("Failed to delete admin");
+        notify.error("Failed!", "Could not delete admin");
       }
     } catch (err) {
-      console.error("Delete admin error:", err);
+      notify.error("Error!", "Something went wrong");
     }
   };
 
@@ -176,11 +192,11 @@ export default function SchoolsPage() {
                       setUserForm({
                         name: u.name,
                         email: u.email,
-                        password: "", // password empty rakhein edit ke waqt
+                        password: "",
                       });
                       setIsUserModalOpen(true);
                     }}
-                    onDeleteAdmin={handleDeleteAdmin} // Ye ab sahi function ko call karega
+                    onDeleteAdmin={handleDeleteAdmin}
                   />
                 </div>
               )}

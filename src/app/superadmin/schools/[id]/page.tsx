@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Trash2, Edit3, CreditCard, Plus, Calendar } from "lucide-react";
+import { Trash2, Edit3, CreditCard, Plus } from "lucide-react";
 import InvoiceModal from "@/components/superadmin/InvoiceModal";
 import PaymentModal from "@/components/superadmin/PaymentModal";
+import { notify } from "@/lib/notify";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 export default function SchoolBillingPage() {
   const { id } = useParams();
@@ -15,11 +17,15 @@ export default function SchoolBillingPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
+  // Delete Dialog States
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState("");
+
   useEffect(() => {
     if (id) fetchData();
   }, [id]);
 
-  // FIX 1: Added cache: 'no-store' and timestamp to force fresh data
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -72,11 +78,18 @@ export default function SchoolBillingPage() {
     if (res.ok) {
       setIsInvoiceModalOpen(false);
       setSelectedInvoice(null);
-      await fetchData(); // Wait for fresh data
+      await fetchData();
+      notify.success(
+        selectedInvoice ? "Invoice Updated!" : "Invoice Created!",
+        selectedInvoice
+          ? "Invoice updated successfully"
+          : "New invoice created successfully",
+      );
+    } else {
+      notify.error("Failed!", "Could not save invoice");
     }
   };
 
-  // FIX 2: Added await before fetchData() to ensure UI updates after DB write
   const handlePaymentSubmit = async (
     invoiceId: string,
     amount: number,
@@ -94,19 +107,37 @@ export default function SchoolBillingPage() {
     });
     if (res.ok) {
       setIsPaymentModalOpen(false);
-      // Chota sa delay taake DB process finish kar le
+      notify.success(
+        "Payment Recorded!",
+        "Payment has been saved successfully",
+      );
       setTimeout(async () => {
         await fetchData();
       }, 300);
+    } else {
+      notify.error("Failed!", "Could not record payment");
     }
   };
 
-  const deleteInvoice = async (invoiceId: string) => {
-    if (!confirm("Delete this invoice?")) return;
-    await fetch(`/api/superadmin/invoices?id=${invoiceId}`, {
+  const deleteInvoice = (invoiceId: string, invoiceNumber: string) => {
+    setDeletingId(invoiceId);
+    setDeletingName(invoiceNumber);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const res = await fetch(`/api/superadmin/invoices?id=${deletingId}`, {
       method: "DELETE",
     });
-    fetchData();
+    if (res.ok) {
+      fetchData();
+      notify.success("Deleted!", `Invoice ${deletingName} has been deleted`);
+    } else {
+      notify.error("Failed!", "Could not delete invoice");
+    }
+    setDeleteDialogOpen(false);
+    setDeletingId(null);
   };
 
   if (loading || !school)
@@ -116,7 +147,7 @@ export default function SchoolBillingPage() {
     <div className="max-w-7xl mx-auto space-y-4">
       <div className="flex justify-between items-center bg-white p-2 rounded-md border shadow-sm">
         <div>
-          <h1 className=" font-bold text-slate-800 uppercase">{school.name}</h1>
+          <h1 className="font-bold text-slate-800 uppercase">{school.name}</h1>
           <p className="text-slate-500 text-sm italic">
             {school.address}
             <span className="text-xs text-slate-400"> {school.phone}</span>
@@ -140,11 +171,11 @@ export default function SchoolBillingPage() {
               <th className="p-2">Inv #</th>
               <th className="p-2">Month</th>
               <th className="p-2">Plan Fee</th>
-              <th className="p-2 ">Feeding</th>
-              <th className="p-2 ">Discount</th>
-              <th className="p-2 ">Total Bill</th>
-              <th className="p-2 ">Paid</th>
-              <th className="p-2 ">Remaining</th>
+              <th className="p-2">Feeding</th>
+              <th className="p-2">Discount</th>
+              <th className="p-2">Total Bill</th>
+              <th className="p-2">Paid</th>
+              <th className="p-2">Remaining</th>
               <th className="p-2">Status & Date</th>
               <th className="p-2 text-right">Actions</th>
             </tr>
@@ -202,7 +233,7 @@ export default function SchoolBillingPage() {
                     <Edit3 size={15} />
                   </button>
                   <button
-                    onClick={() => deleteInvoice(inv._id)}
+                    onClick={() => deleteInvoice(inv._id, inv.invoiceNumber)}
                     className="text-rose-400 p-1 hover:bg-rose-50 rounded"
                   >
                     <Trash2 size={15} />
@@ -211,7 +242,7 @@ export default function SchoolBillingPage() {
               </tr>
             ))}
           </tbody>
-          <tfoot className=" font-bold text-sm bg-slate-50">
+          <tfoot className="font-bold text-sm bg-slate-50">
             <tr>
               <td
                 colSpan={2}
@@ -262,7 +293,20 @@ export default function SchoolBillingPage() {
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         invoice={selectedInvoice}
-        onPaid={() => fetchData()}
+        onPaid={() => {
+          fetchData();
+          notify.success(
+            "Payment Received!",
+            "Payment has been recorded successfully",
+          );
+        }}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={deletingName}
       />
     </div>
   );

@@ -62,7 +62,7 @@ export async function PUT(req: Request) {
 
     const updateData: any = { name, email };
 
-    if (password) {
+    if (password && password.trim() !== "") {
       updateData.password = await bcrypt.hash(password, 10);
     }
 

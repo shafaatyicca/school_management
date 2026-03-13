@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { notify } from "@/lib/notify";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -112,7 +113,7 @@ export default function InvoiceModal({
       await onSubmit(formattedData);
       onClose();
     } catch (error) {
-      console.error(error);
+      notify.error("Error!", "Something went wrong");
     } finally {
       setIsSubmitting(false);
     }

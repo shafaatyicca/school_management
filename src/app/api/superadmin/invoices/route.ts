@@ -35,20 +35,23 @@ export async function POST(req: Request) {
         "planId",
       );
       let count = 0;
+      let skipped = 0;
 
       for (const school of schools) {
         const existing = await SchoolInvoiceModel.findOne({
           schoolId: school._id,
           billingMonth,
         });
-        if (existing) continue;
+        if (existing) {
+          skipped++;
+          continue;
+        }
 
         const planFee =
           Number(school.customPrice) ||
           Number((school.planId as any)?.price) ||
           0;
 
-        // PICHLA FEEDING ARREARS: Sirf wo amount uthayega jo pichli invoice k feedingSplit.month2 mein tha
         const lastInv = await SchoolInvoiceModel.findOne({
           schoolId: school._id,
         }).sort({ createdAt: -1 });
@@ -67,7 +70,7 @@ export async function POST(req: Request) {
           invoiceNumber,
           schoolId: school._id,
           planAmount: planFee,
-          feedingSplit: { month1: feedingArrears, month2: 0 }, // Pichla month2 ab month1 ban gaya
+          feedingSplit: { month1: feedingArrears, month2: 0 },
           finalAmount: totalAmount,
           amountPaid: 0,
           remainingAmount: totalAmount,
@@ -83,12 +86,26 @@ export async function POST(req: Request) {
       }
       return NextResponse.json({
         success: true,
-        message: `${count} Invoices Created!`,
+        message: `${count} Invoices Created!${skipped > 0 ? ` (${skipped} already existed)` : ""}`,
+        skipped,
       });
     }
 
     // --- SINGLE GENERATE LOGIC ---
     const { schoolId, planAmount, feedingSplit, discount } = body;
+
+    // Duplicate check
+    const existingInvoice = await SchoolInvoiceModel.findOne({
+      schoolId,
+      billingMonth,
+    });
+    if (existingInvoice) {
+      return NextResponse.json(
+        { error: `Invoice for ${billingMonth} already exists!` },
+        { status: 409 },
+      );
+    }
+
     const counter = await GlobalCounterModel.findOneAndUpdate(
       { id: "school_invoice" },
       { $inc: { seq: 1 } },
@@ -105,7 +122,7 @@ export async function POST(req: Request) {
       invoiceNumber,
       schoolId,
       planAmount: Number(planAmount),
-      feedingSplit, // { month1: X, month2: Y }
+      feedingSplit,
       discount: Number(discount || 0),
       finalAmount,
       amountPaid: 0,
@@ -137,7 +154,6 @@ export async function PUT(req: Request) {
       const newPaid = Number(invoice.amountPaid || 0) + payAmount;
       const newRemaining = Math.max(0, Number(invoice.finalAmount) - newPaid);
 
-      // Status decide karein
       let newStatus: "pending" | "partially_paid" | "paid" = "pending";
       if (newRemaining <= 0) {
         newStatus = "paid";
@@ -151,7 +167,6 @@ export async function PUT(req: Request) {
           amountPaid: newPaid,
           remainingAmount: newRemaining,
           status: newStatus,
-          // FIX: Har payment par paidAt ko update karein taake chart mein show ho
           paidAt: paymentDate ? new Date(paymentDate) : new Date(),
           $push: {
             paymentHistory: {
@@ -203,13 +218,11 @@ export async function DELETE(req: Request) {
     const ids = searchParams.get("ids");
 
     if (ids) {
-      // Bulk Delete
       await SchoolInvoiceModel.deleteMany({ _id: { $in: ids.split(",") } });
       return NextResponse.json({ message: "Selected invoices deleted" });
     }
 
     if (id) {
-      // Single Delete
       await SchoolInvoiceModel.findByIdAndDelete(id);
       return NextResponse.json({ message: "Invoice deleted" });
     }

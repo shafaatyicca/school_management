@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notify";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import GlobalStats from "@/components/superadmin/GlobalStats";
@@ -16,7 +18,7 @@ export default function SuperAdminDashboard() {
       const data = await res.json();
       setSchools(data);
     } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
+      notify.error("Dashboard Error", "Failed to load schools data");
     } finally {
       setLoading(false);
     }
@@ -28,7 +30,7 @@ export default function SuperAdminDashboard() {
       const data = await res.json();
       if (Array.isArray(data)) setRevenueData(data);
     } catch (error) {
-      console.error("Failed to fetch revenue data:", error);
+      notify.error("Revenue Error", "Failed to load revenue data");
     }
   };
 

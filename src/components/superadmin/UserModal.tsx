@@ -1,5 +1,21 @@
 "use client";
-import { X, Loader2, Shield } from "lucide-react";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  IconButton,
+  Zoom,
+  InputAdornment,
+} from "@mui/material";
+import {
+  Close as CloseIcon,
+  Visibility,
+  VisibilityOff,
+} from "@mui/icons-material";
 
 export const UserModal = ({
   isOpen,
@@ -9,87 +25,160 @@ export const UserModal = ({
   onSubmit,
   isEditing,
 }: any) => {
-  if (!isOpen) return null;
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="bg-indigo-600 p-6 text-white flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-lg">
-              <Shield size={20} />
-            </div>
-            <h3 className="font-bold text-lg">
-              {isEditing ? "Edit Admin" : "Add New Admin"}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="hover:bg-white/20 p-1 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      disableEnforceFocus
+      disableAutoFocus
+      TransitionComponent={Zoom}
+      transitionDuration={200}
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(2px)",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          borderBottom: "1px solid",
+          borderColor: "var(--border)",
+          backgroundColor: "var(--background)",
+          py: 1.5,
+          px: 2,
+        }}
+      >
+        <span className="font-bold text-foreground text-sm">
+          {isEditing ? "Edit Admin" : "Add New Admin"}
+        </span>
+        <IconButton
+          onClick={onClose}
+          size="small"
+          tabIndex={-1}
+          sx={{
+            color: "var(--muted-foreground)",
+            "&:hover": { backgroundColor: "var(--muted)" },
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-              Full Name
-            </label>
-            <input
+      <form onSubmit={onSubmit}>
+        <DialogContent
+          dividers
+          sx={{ backgroundColor: "var(--background)", p: 2 }}
+        >
+          <div className="flex flex-col gap-4">
+            <TextField
+              label="Full Name"
+              fullWidth
+              size="small"
               required
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all bg-slate-50"
-              placeholder="e.g. John Doe"
               value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
             />
-          </div>
 
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-              Email Address
-            </label>
-            <input
-              required
+            <TextField
+              label="Email Address"
               type="email"
+              fullWidth
+              size="small"
+              required
               disabled={isEditing}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all bg-slate-50 disabled:opacity-50"
-              placeholder="admin@school.com"
               value={formData.email}
               onChange={(e) =>
                 setFormData({ ...formData, email: e.target.value })
               }
             />
+
+            <TextField
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              fullWidth
+              size="small"
+              required={!isEditing}
+              placeholder={
+                isEditing ? "Leave blank to keep current password" : ""
+              }
+              helperText={
+                isEditing
+                  ? "Blank chhod dein agar password change nahi karna"
+                  : ""
+              }
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      edge="end"
+                      size="small"
+                      tabIndex={-1}
+                      sx={{ color: "var(--muted-foreground)" }}
+                    >
+                      {showPassword ? (
+                        <VisibilityOff fontSize="small" />
+                      ) : (
+                        <Visibility fontSize="small" />
+                      )}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
           </div>
+        </DialogContent>
 
-          {!isEditing && (
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">
-                Password
-              </label>
-              <input
-                required
-                type="password"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm transition-all bg-slate-50"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-              />
-            </div>
-          )}
-
-          <button
+        <DialogActions
+          sx={{
+            borderTop: "1px solid",
+            borderColor: "var(--border)",
+            backgroundColor: "var(--background)",
+            gap: 1,
+            px: 2,
+            py: 1,
+          }}
+        >
+          <Button
+            onClick={onClose}
+            size="small"
+            sx={{
+              textTransform: "none",
+              color: "var(--foreground)",
+              "&:hover": { backgroundColor: "var(--muted)" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
             type="submit"
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-100 transition-all active:scale-[0.98] mt-4"
+            variant="contained"
+            size="small"
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 2,
+            }}
           >
             {isEditing ? "Update Admin" : "Create Admin Access"}
-          </button>
-        </form>
-      </div>
-    </div>
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 };

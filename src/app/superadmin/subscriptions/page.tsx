@@ -2,9 +2,13 @@
 import { useState, useEffect } from "react"; // useEffect add kiya
 import { Plus, Trash2, Edit3, CheckCircle2, Loader2 } from "lucide-react";
 import { PlanModal } from "@/components/superadmin/PlanModal";
+import { notify } from "@/lib/notify";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 export default function SubscriptionsPage() {
-  // 1. States ko yahan define kiya (Kyunke ab ye props se nahi aa rahi)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState("");
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -25,7 +29,7 @@ export default function SubscriptionsPage() {
       const data = await res.json();
       setPlans(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Fetch error:", error);
+      notify.error("Error!", "Failed to load plans");
     } finally {
       setLoading(false);
     }
@@ -79,16 +83,36 @@ export default function SubscriptionsPage() {
     if (res.ok) {
       setIsPlanModalOpen(false);
       fetchPlans();
+      notify.success(
+        planEditId ? "Plan Updated!" : "Plan Created!",
+        planEditId
+          ? "Plan has been updated successfully"
+          : "New plan has been created",
+      );
+    } else {
+      notify.error("Failed!", "Could not save plan");
     }
   };
 
-  const handlePlanDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this plan?")) {
-      const res = await fetch(`/api/superadmin/plans?id=${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) fetchPlans();
+  const handlePlanDelete = (id: string, name: string) => {
+    setDeletingId(id);
+    setDeletingName(name);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const res = await fetch(`/api/superadmin/plans?id=${deletingId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      fetchPlans();
+      notify.success("Plan Deleted!", `${deletingName} has been deleted`);
+    } else {
+      notify.error("Failed!", "Could not delete plan");
     }
+    setDeleteDialogOpen(false);
+    setDeletingId(null);
   };
 
   // Loading state handling
@@ -178,7 +202,7 @@ export default function SubscriptionsPage() {
                 <Edit3 size={14} /> Edit Plan
               </button>
               <button
-                onClick={() => handlePlanDelete(plan._id)}
+                onClick={() => handlePlanDelete(plan._id, plan.name)}
                 className="p-2.5 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
               >
                 <Trash2 size={16} />
@@ -195,6 +219,12 @@ export default function SubscriptionsPage() {
         setFormData={setPlanForm}
         onSubmit={handlePlanSubmit}
         isEditing={!!planEditId}
+      />
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={deletingName}
       />
     </div>
   );

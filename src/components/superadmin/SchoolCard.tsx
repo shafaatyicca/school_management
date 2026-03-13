@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -10,6 +10,8 @@ import {
   Trash2,
   ChevronDown,
 } from "lucide-react";
+import { notify } from "@/lib/notify";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 interface SchoolCardProps {
   school: any;
@@ -28,19 +30,28 @@ const SchoolCard = ({
   onRefresh,
   isExpanded,
 }: SchoolCardProps) => {
-  const handleDelete = async (e: React.MouseEvent) => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (
-      confirm("Are you sure? This will delete the school and all its data!")
-    ) {
-      try {
-        const res = await fetch(`/api/superadmin/schools?id=${school._id}`, {
-          method: "DELETE",
-        });
-        if (res.ok) onRefresh();
-      } catch (err) {
-        console.error("Delete failed:", err);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      const res = await fetch(`/api/superadmin/schools?id=${school._id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        onRefresh();
+        notify.success("Deleted!", `${school.name} has been deleted`);
+      } else {
+        notify.error("Failed!", "Could not delete school");
       }
+    } catch (err) {
+      notify.error("Error!", "Something went wrong");
+    } finally {
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -53,9 +64,14 @@ const SchoolCard = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: school._id, status: newStatus }),
       });
-      if (res.ok) onRefresh();
+      if (res.ok) {
+        onRefresh();
+        notify.success("Status Updated!", `School is now ${newStatus}`);
+      } else {
+        notify.error("Failed!", "Could not update status");
+      }
     } catch (err) {
-      console.error("Status update failed:", err);
+      notify.error("Error!", "Something went wrong");
     }
   };
 
@@ -76,7 +92,7 @@ const SchoolCard = ({
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <div className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4 rounded-md border border-slate-600">
+      <div className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4 rounded-md">
         <div className="flex items-center gap-4 w-full lg:w-auto">
           <div className="relative cursor-pointer" onClick={handleToggleStatus}>
             <div className="w-12 h-12 bg-slate-50 rounded-xl overflow-hidden border border-slate-100 flex items-center justify-center">
@@ -167,6 +183,13 @@ const SchoolCard = ({
           </div>
         </div>
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={school.name}
+      />
     </div>
   );
 };

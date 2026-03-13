@@ -3,6 +3,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import PaymentModal from "@/components/superadmin/PaymentModal";
 import InvoiceModal from "@/components/superadmin/InvoiceModal";
 import { Select, MenuItem, FormControl, OutlinedInput } from "@mui/material";
+import { notify } from "@/lib/notify";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import {
   Zap,
   Trash2,
@@ -39,6 +41,10 @@ export default function AllInvoicesPage() {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState("");
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   // Bulk Form State
   const [bulkData, setBulkData] = useState({ month: "", dueDate: "" });
@@ -50,7 +56,7 @@ export default function AllInvoicesPage() {
       const data = await res.json();
       setInvoices(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Fetch Error:", error);
+      notify.error("Fetch Error", "Failed to load invoices");
     } finally {
       setLoading(false);
     }
@@ -108,19 +114,27 @@ export default function AllInvoicesPage() {
         await fetchInvoices();
         setIsInvoiceModalOpen(false);
         setSelectedInvoice(null);
+        notify.success(
+          "Invoice Updated!",
+          "Invoice has been updated successfully",
+        );
       } else {
         const err = await res.json();
-        alert("Error: " + err.error);
+        notify.error("Update Failed!", err.error || "Could not update invoice");
       }
     } catch (error) {
-      console.error("Update failed:", error);
+      notify.error("Error!", "Something went wrong");
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleBulkGenerate = async () => {
-    if (!bulkData.month || !bulkData.dueDate) return alert("Fields required");
+    if (!bulkData.month || !bulkData.dueDate)
+      return notify.warning(
+        "Fields Required",
+        "Please fill billing month and due date",
+      );
     setIsProcessing(true);
     try {
       const res = await fetch("/api/superadmin/invoices", {
@@ -134,20 +148,28 @@ export default function AllInvoicesPage() {
       });
       const result = await res.json();
       if (res.ok) {
-        alert(result.message);
         fetchInvoices();
         setIsBulkModalOpen(false);
         setBulkData({ month: "", dueDate: "" });
+        if (result.skipped > 0) {
+          notify.warning("Partially Generated!", result.message);
+        } else {
+          notify.success("Invoices Generated!", result.message);
+        }
+      } else {
+        notify.error("Failed!", "Could not generate invoices");
       }
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedInvoices.length === 0) return;
-    if (!confirm(`Delete ${selectedInvoices.length} selected invoices?`))
-      return;
+    setIsBulkDeleteDialogOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
     setIsProcessing(true);
     try {
       const res = await fetch(
@@ -157,11 +179,32 @@ export default function AllInvoicesPage() {
       if (res.ok) {
         setSelectedInvoices([]);
         fetchInvoices();
-        alert("Deleted Successfully");
+        notify.success(
+          "Deleted!",
+          `${selectedInvoices.length} invoices deleted successfully`,
+        );
+      } else {
+        notify.error("Failed!", "Could not delete invoices");
       }
     } finally {
       setIsProcessing(false);
+      setIsBulkDeleteDialogOpen(false);
     }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingId) return;
+    const res = await fetch(`/api/superadmin/invoices?id=${deletingId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      fetchInvoices();
+      notify.success("Deleted!", `Invoice ${deletingName} has been deleted`);
+    } else {
+      notify.error("Failed!", "Could not delete invoice");
+    }
+    setDeleteDialogOpen(false);
+    setDeletingId(null);
   };
 
   return (
@@ -580,14 +623,10 @@ export default function AllInvoicesPage() {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={async () => {
-                          if (confirm("Delete?")) {
-                            await fetch(
-                              `/api/superadmin/invoices?id=${inv._id}`,
-                              { method: "DELETE" },
-                            );
-                            fetchInvoices();
-                          }
+                        onClick={() => {
+                          setDeletingId(inv._id);
+                          setDeletingName(inv.invoiceNumber || "this invoice");
+                          setDeleteDialogOpen(true);
                         }}
                         sx={{
                           color: "#e11d48",
@@ -679,9 +718,27 @@ export default function AllInvoicesPage() {
           onPaid={() => {
             fetchInvoices();
             setIsPaymentModalOpen(false);
+            notify.success(
+              "Payment Received!",
+              "Payment has been recorded successfully",
+            );
           }}
         />
       )}
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={deletingName}
+      />
+
+      <DeleteConfirmDialog
+        open={isBulkDeleteDialogOpen}
+        onOpenChange={setIsBulkDeleteDialogOpen}
+        onConfirm={confirmBulkDelete}
+        itemName={`${selectedInvoices.length} selected invoices`}
+      />
 
       {/* Bulk Generate Modal */}
       {isBulkModalOpen && (

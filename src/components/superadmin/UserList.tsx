@@ -1,4 +1,6 @@
 import { UserPlus, Edit, Trash2 } from "lucide-react";
+import { useState } from "react";
+import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 
 interface AdminListProps {
   users: any[];
@@ -13,6 +15,23 @@ export const AdminList = ({
   onEditAdmin,
   onDeleteAdmin,
 }: AdminListProps) => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingName, setDeletingName] = useState("");
+
+  const handleDeleteClick = (id: string, name: string) => {
+    setDeletingId(id);
+    setDeletingName(name);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deletingId) return;
+    onDeleteAdmin(deletingId);
+    setDeleteDialogOpen(false);
+    setDeletingId(null);
+  };
+
   return (
     <div className="bg-slate-50/50 border-t border-slate-100 p-2 animate-in slide-in-from-top-2 duration-300">
       <div className="flex justify-between items-center mb-2">
@@ -55,7 +74,7 @@ export const AdminList = ({
                   <Edit size={14} />
                 </button>
                 <button
-                  onClick={() => onDeleteAdmin(u._id)}
+                  onClick={() => handleDeleteClick(u._id, u.name)}
                   className="p-1.5 text-slate-400 hover:text-red-600 transition-all cursor-pointer"
                 >
                   <Trash2 size={14} />
@@ -69,6 +88,13 @@ export const AdminList = ({
           </p>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={deletingName}
+      />
     </div>
   );
 };

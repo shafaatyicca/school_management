@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { notify } from "@/lib/notify";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -75,11 +76,13 @@ export default function PaymentModal({
         onClose();
       } else {
         const err = await res.json();
-        alert(err.error || "Payment failed");
+        notify.error(
+          "Payment Failed!",
+          err.error || "Could not process payment",
+        );
       }
     } catch (error) {
-      console.error("Payment Error:", error);
-      alert("Something went wrong!");
+      notify.error("Error!", "Something went wrong");
     } finally {
       setLoading(false);
     }

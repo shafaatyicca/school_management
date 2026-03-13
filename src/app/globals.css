@@ -1,6 +1,41 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Progress Bar Style */
+[data-sonner-toast]::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: currentColor;
+  opacity: 0.5;
+  animation: toast-progress linear forwards;
+  animation-duration: var(--duration, 4000ms);
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Top Gap Fix (20px gap kam karne k liye) */
+[data-sonner-toaster][data-y-position="top"] {
+  top: 10px !important;
+}
+
+/* Optional: Toast ko thora modern look dene k liye */
+[data-sonner-toast] {
+  font-family: inherit;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
