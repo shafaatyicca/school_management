@@ -42,7 +42,7 @@ export default function ClassPage({
     } catch (error) {
       console.error("Error fetching classes:", error);
     } finally {
-      setLoading(false); // Loader stop (chahe success ho ya error)
+      setLoading(false);
     }
   };
 

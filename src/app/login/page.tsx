@@ -207,9 +207,7 @@ export default function LoginPage() {
 
             {/* Title */}
             <div className="text-center">
-              <h1 className="text-3xl font-extrabold text-white tracking-tight mb-3">
-                Welcome Back
-              </h1>
+              <h1 className="text-3xl text-white mb-3">Welcome Back</h1>
               <p
                 className="text-[14px] font-medium mb-6"
                 style={{ color: "#fb923c" }}
@@ -249,7 +247,7 @@ export default function LoginPage() {
               {/* Email */}
               <div className="flex flex-col gap-1.5 mb-4">
                 <label
-                  className="text-[12px] font-bold uppercase tracking-widest mb-2"
+                  className="text-[12px] uppercase tracking-widest mb-2"
                   style={{ color: "#fb923c" }}
                 >
                   Email Address
@@ -267,7 +265,7 @@ export default function LoginPage() {
               {/* Password */}
               <div className="flex flex-col gap-1.5 mb-4">
                 <label
-                  className="text-[12px] font-bold uppercase tracking-widest mb-2"
+                  className="text-[12px] uppercase tracking-widest mb-2"
                   style={{ color: "#fb923c" }}
                 >
                   Password
@@ -348,7 +346,7 @@ export default function LoginPage() {
                   </>
                 ) : (
                   <>
-                    Login
+                    Login to Dashboard
                     <svg
                       width="14"
                       height="14"
@@ -372,17 +370,17 @@ export default function LoginPage() {
                 height="10"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="rgba(255,255,255,0.22)"
+                stroke="rgba(255,255,255,0.5)"
                 strokeWidth="2"
               >
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
               <span
-                className="text-[10px] font-medium"
-                style={{ color: "rgba(255,255,255,0.22)" }}
+                className="text-[14px]"
+                style={{ color: "rgba(255,255,255,0.5)" }}
               >
-                SSL Secured &bull; &copy; {new Date().getFullYear()}
+                Secured Login &bull; &copy; {new Date().getFullYear()}
               </span>
             </div>
           </div>

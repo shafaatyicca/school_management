@@ -11,6 +11,7 @@ import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
+import { notify } from "@/lib/notify";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -52,6 +53,7 @@ export default function EmployeesPage() {
       setEmployees(data);
     } catch (error) {
       setError("Failed to fetch employees");
+      notify.error("Failed to fetch employees");
     } finally {
       setFetchLoading(false);
     }
@@ -67,8 +69,9 @@ export default function EmployeesPage() {
       });
       if (!response.ok) throw new Error("Failed to delete");
       setEmployees((prev) => prev.filter((emp) => emp._id !== deleteDialog.id));
+      notify.success("Employee deleted successfully");
     } catch (error) {
-      alert("Failed to delete employee");
+      notify.error("Failed to delete employee");
     } finally {
       setDeleteDialog({ open: false, id: null });
     }
@@ -160,24 +163,6 @@ export default function EmployeesPage() {
           </div>
         ),
       },
-      // {
-      //   accessorKey: "email",
-      //   header: "Email",
-      //   size: 200,
-      // },
-      // {
-      //   accessorKey: "password",
-      //   header: "Password",
-      //   size: 100,
-      // },
-      // {
-      //   accessorKey: "role",
-      //   header: "Role",
-      //   size: 100,
-      //   Cell: ({ cell }) => (
-      //     <span className="capitalize">{cell.getValue<string>()}</span>
-      //   ),
-      // },
       {
         accessorKey: "phone",
         header: "Phone",
@@ -347,9 +332,6 @@ export default function EmployeesPage() {
         dateOfBirth: true,
         gender: false,
         salary: false,
-        // email: false,
-        // password: false,
-        // role: false,
         qualification: false,
         tenure: false,
         designation: false,
@@ -470,7 +452,11 @@ export default function EmployeesPage() {
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
         onConfirm={handleDelete}
-        itemName="Employee"
+        itemName={
+          deleteDialog.id
+            ? employees.find((emp) => emp._id === deleteDialog.id)?.fullName
+            : ""
+        }
       />
       <EmployeeProfileModal
         isOpen={isViewModalOpen}

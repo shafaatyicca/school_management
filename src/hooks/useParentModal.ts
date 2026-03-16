@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { notify } from "@/lib/notify";
 
 export function useParentModal(
   parents: any[],
@@ -19,8 +20,6 @@ export function useParentModal(
   const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
 
-  /* ────────────────────────────────────────────── */
-  /* OPEN PROFILE */
   const openParentProfile = (parent: any) => {
     setSelectedParent(parent);
     setIsViewOpen(true);
@@ -38,8 +37,6 @@ export function useParentModal(
     setIsFormOpen(true);
   };
 
-  /* ────────────────────────────────────────────── */
-  /* SUBMIT FORM (ADD + EDIT) */
   const handleSubmit = async (data: any) => {
     try {
       setIsLoading(true);
@@ -68,19 +65,28 @@ export function useParentModal(
         const id = selectedParent._id?.toString();
 
         setParents((prev) =>
-          prev.map((p) => (p._id?.toString() === id ? updatedParent : p)),
+          prev.map((p) =>
+            p._id?.toString() === id
+              ? { ...updatedParent, students: p.students }
+              : p,
+          ),
         );
 
         // Update Profile Live
-        setSelectedParent(updatedParent);
+        setSelectedParent({
+          ...updatedParent,
+          students: selectedParent.students,
+        });
+        notify.success("Parent details updated successfully");
       } else {
         // Add New Parent Top of Table
         setParents((prev) => [updatedParent, ...prev]);
+        notify.success("New parent registered successfully");
       }
 
       setIsFormOpen(false);
     } catch (error: any) {
-      alert("Error: " + error.message);
+      notify.error(error.message || "Failed to save parent details");
     } finally {
       setIsLoading(false);
     }

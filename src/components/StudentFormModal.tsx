@@ -10,6 +10,8 @@ import ImageUploadWithCrop from "./ImageUploadWithCrop";
 import { useForm } from "react-hook-form";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { Autocomplete, Box, createFilterOptions } from "@mui/material";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { validationSchema } from "@/lib/validation";
 import {
   Dialog,
   DialogTitle,
@@ -17,7 +19,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  MenuItem,
   IconButton,
   Typography,
   Divider,
@@ -35,7 +36,25 @@ export default function StudentFormModal({
   isLoading,
   schoolId,
 }: any) {
-  const { register, handleSubmit, reset, watch, setValue } = useForm();
+  // const { register, handleSubmit, reset, watch, setValue } = useForm();
+  // useForm ke sath types define karein (agar TS use kar rahe hain)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<any>({
+    resolver: zodResolver(validationSchema),
+    mode: "onTouched",
+    defaultValues: {
+      classId: "",
+      status: "active",
+      gender: "Male",
+      parentData: { gender: "Male" },
+    },
+  });
   const [parents, setParents] = useState([]);
   const [isNewParent, setIsNewParent] = useState(false);
   const [availableSections, setAvailableSections] = useState<string[]>([]);
@@ -66,6 +85,8 @@ export default function StudentFormModal({
         .then((data) => setParents(data));
 
       if (student) {
+        setIsNewParent(false);
+
         reset({
           ...student,
           image: student.image || "",
@@ -87,8 +108,17 @@ export default function StudentFormModal({
           guardianPhone: student.guardianPhone || "",
           classId: student.classId?._id || student.classId,
           parentId: student.parentId?._id || student.parentId,
+          // Important: Parent fields ko reset karein taake edit mode mein purana "New Parent" data nazar na aaye
+          parentData: {
+            fullName: "",
+            cnic: "",
+            phone: "",
+            address: "",
+            gender: "Male",
+          },
         });
       } else {
+        setIsNewParent(false);
         reset({
           fullName: "",
           gender: "Male",
@@ -97,6 +127,8 @@ export default function StudentFormModal({
           religion: "Islam",
           nationality: "Pakistani",
           status: "active",
+          classId: "",
+          section: "",
           enrollmentDate: new Date().toISOString().split("T")[0],
           parentData: {
             fullName: "",
@@ -107,10 +139,9 @@ export default function StudentFormModal({
           },
           parentId: "",
         });
-        setIsNewParent(false);
       }
     }
-  }, [isOpen, student, reset]);
+  }, [isOpen, student, reset, schoolId]);
 
   useEffect(() => {
     if (selectedClassId) {
@@ -190,6 +221,7 @@ export default function StudentFormModal({
 
       <form
         onSubmit={handleSubmit((data) => {
+          // Image handling logic
           if (!data.image || data.image.startsWith("/student")) {
             data.image =
               data.gender === "Female"
@@ -197,6 +229,7 @@ export default function StudentFormModal({
                 : "/studentmale-avatar.jpg";
           }
           onSubmit({ ...data, isNewParent: student ? false : isNewParent });
+          setIsNewParent(false);
         })}
       >
         <DialogContent
@@ -265,17 +298,23 @@ export default function StudentFormModal({
                   className="col-span-2"
                   {...register("fullName")}
                   size="small"
+                  error={!!errors.fullName}
+                  helperText={errors.fullName?.message as string}
                 />
                 <TextField
                   select
                   fullWidth
-                  label="Gender *"
+                  label="Gender"
                   value={studentGender || "Male"}
-                  onChange={(e) => setValue("gender", e.target.value)}
+                  onChange={(e) => setValue("gender", e.target.value)} // Simple update
                   size="small"
+                  SelectProps={{
+                    native: true,
+                  }}
+                  InputLabelProps={{ shrink: true }}
                 >
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
                 </TextField>
               </div>
               <div className="grid grid-cols-3 gap-3">
@@ -286,6 +325,8 @@ export default function StudentFormModal({
                   slotProps={{ inputLabel: { shrink: true } }}
                   {...register("dateOfBirth")}
                   size="small"
+                  error={!!errors.dateOfBirth}
+                  helperText={errors.dateOfBirth?.message as string}
                 />
                 <TextField
                   fullWidth
@@ -330,13 +371,24 @@ export default function StudentFormModal({
                 fullWidth
                 label="Class *"
                 value={selectedClassId || ""}
-                onChange={(e) => setValue("classId", e.target.value)}
+                onChange={(e) => {
+                  setValue("classId", e.target.value, { shouldValidate: true });
+                }}
                 size="small"
+                SelectProps={{
+                  native: true,
+                }}
+                InputLabelProps={{ shrink: true }}
+                error={!!errors.classId}
+                helperText={errors.classId?.message as string}
               >
+                <option value="" disabled>
+                  Select Class
+                </option>
                 {classes.map((c: any) => (
-                  <MenuItem key={c._id} value={c._id}>
+                  <option key={c._id} value={c._id}>
                     {c.name}
-                  </MenuItem>
+                  </option>
                 ))}
               </TextField>
             </div>
@@ -350,13 +402,24 @@ export default function StudentFormModal({
                     ? selectedSection
                     : ""
                 }
-                onChange={(e) => setValue("section", e.target.value)}
+                onChange={(e) => {
+                  setValue("section", e.target.value, { shouldValidate: true });
+                }}
                 size="small"
+                SelectProps={{
+                  native: true,
+                }}
+                InputLabelProps={{ shrink: true }}
+                error={!!errors.section}
+                helperText={errors.section?.message as string}
               >
+                <option value="" disabled>
+                  Select Section
+                </option>
                 {availableSections.map((s) => (
-                  <MenuItem key={s} value={s}>
+                  <option key={s} value={s}>
                     {s}
-                  </MenuItem>
+                  </option>
                 ))}
               </TextField>
             </div>
@@ -496,9 +559,13 @@ export default function StudentFormModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 bg-orange-50/30 rounded-xl border animate-in fade-in duration-500">
                 <TextField
                   fullWidth
-                  label="Father Name"
+                  label="Father Name *"
                   {...register("parentData.fullName")}
                   size="small"
+                  error={!!(errors.parentData as any)?.fullName}
+                  helperText={
+                    (errors.parentData as any)?.fullName?.message as string
+                  }
                 />
                 <TextField
                   select
@@ -509,25 +576,37 @@ export default function StudentFormModal({
                     setValue("parentData.gender", e.target.value)
                   }
                   size="small"
+                  SelectProps={{
+                    native: true,
+                  }}
+                  InputLabelProps={{ shrink: true }}
                 >
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
                 </TextField>
                 <TextField
                   fullWidth
-                  label="CNIC"
+                  label="CNIC Number *"
                   {...register("parentData.cnic")}
                   size="small"
+                  error={!!(errors.parentData as any)?.cnic}
+                  helperText={
+                    (errors.parentData as any)?.cnic?.message as string
+                  }
                 />
                 <TextField
                   fullWidth
-                  label="Phone"
+                  label="Phone *"
                   {...register("parentData.phone")}
                   size="small"
+                  error={!!(errors.parentData as any)?.phone}
+                  helperText={
+                    (errors.parentData as any)?.phone?.message as string
+                  }
                 />
                 <TextField
                   fullWidth
-                  label="Occupation (Peshah)"
+                  label="Occupation (Peshaha)"
                   {...register("parentData.occupation")}
                   size="small"
                 />
@@ -570,11 +649,29 @@ export default function StudentFormModal({
               size="small"
             />
             <TextField
+              select
               fullWidth
               label="Relation with Student"
               {...register("guardianRelation")}
               size="small"
-            />
+              SelectProps={{
+                native: true,
+              }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <option value="" disabled>
+                Select Relation
+              </option>
+              <option value="Father">Father</option>
+              <option value="Mother">Mother</option>
+              <option value="Brother">Brother</option>
+              <option value="Sister">Sister</option>
+              <option value="Uncle">Uncle</option>
+              <option value="Aunt">Aunt</option>
+              <option value="Grandfather">Grandfather</option>
+              <option value="Grandmother">Grandmother</option>
+              <option value="Other">Other</option>
+            </TextField>
             <TextField
               fullWidth
               label="Guardian Phone"
@@ -592,9 +689,13 @@ export default function StudentFormModal({
                 value={currentStatus || "active"}
                 onChange={(e) => setValue("status", e.target.value)}
                 size="small"
+                SelectProps={{
+                  native: true,
+                }}
+                InputLabelProps={{ shrink: true }}
               >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </TextField>
             </div>
             {currentStatus === "inactive" && (
@@ -603,20 +704,22 @@ export default function StudentFormModal({
                   <TextField
                     fullWidth
                     type="date"
-                    label="Inactive Date"
+                    label="Inactive Date *"
                     slotProps={{ inputLabel: { shrink: true } }}
                     {...register("inactiveDate")}
                     size="small"
-                    required
+                    error={!!errors.inactiveDate}
+                    helperText={errors.inactiveDate?.message as string}
                   />
                 </div>
                 <div className="md:col-span-4">
                   <TextField
                     fullWidth
-                    label="Reason for Inactive"
+                    label="Reason for Inactive *"
                     {...register("inactiveReason")}
                     size="small"
-                    required
+                    error={!!errors.inactiveReason}
+                    helperText={errors.inactiveReason?.message as string}
                     placeholder="e.g. SLC Issued"
                   />
                 </div>

@@ -43,7 +43,7 @@ const StudentSchema = new Schema<IStudent>(
     image: { type: String },
     email: { type: String, unique: true },
     password: { type: String },
-    gender: { type: String, required: true },
+    gender: { type: String },
     cast: { type: String },
     religion: { type: String, default: "Islam" },
     nationality: { type: String, default: "Pakistani" },

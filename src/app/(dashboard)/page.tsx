@@ -22,7 +22,6 @@ export default function RootPage() {
     }
   }, [status, session, router]);
 
-  // FIXED: Matching the Dashboard Loader style for seamless transition
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#f8fafc]">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>

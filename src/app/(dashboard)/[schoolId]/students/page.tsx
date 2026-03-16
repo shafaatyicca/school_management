@@ -12,6 +12,7 @@ import ParentFormModal from "@/components/ParentFormModal";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { useStudentModal } from "@/hooks/useStudentModal";
 import {
@@ -60,7 +61,7 @@ export default function StudentsPage() {
       setStudents(stdData);
       setClasses(clsData);
     } catch (error) {
-      console.error("Fetch error:", error);
+      notify.error("Failed to fetch students data. Please try again.");
     } finally {
       setFetchLoading(false);
     }
@@ -95,14 +96,21 @@ export default function StudentsPage() {
   const handleDelete = async () => {
     if (!deleteDialog.id || !schoolId) return;
     try {
-      await fetch(`/api/students?schoolId=${schoolId}`, {
+      const res = await fetch(`/api/students?schoolId=${schoolId}`, {
         method: "DELETE",
         body: JSON.stringify({ id: deleteDialog.id }),
         headers: { "Content-Type": "application/json" },
       });
-      fetchData();
-      setDeleteDialog({ open: false, id: null }); // Modal band
+
+      if (res.ok) {
+        notify.success("Student deleted successfully"); // Success Notification
+        fetchData();
+      } else {
+        notify.error("Failed to delete student"); // Error Notification
+      }
+      setDeleteDialog({ open: false, id: null });
     } catch (error) {
+      notify.error("Something went wrong during deletion");
       console.error("Delete failed");
     }
   };
@@ -568,7 +576,7 @@ export default function StudentsPage() {
           setViewingParent(parent);
           setIsParentFormOpen(true);
         }}
-        schoolId={schoolId} // <-- YAHAN pehle "" tha, isey session wala schoolId dein
+        schoolId={schoolId}
       />
       <ParentFormModal
         isOpen={isParentFormOpen}
@@ -578,27 +586,41 @@ export default function StudentsPage() {
         schoolId={schoolId}
         onSubmit={async (data: any) => {
           setIsParentLoading(true);
-          const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: viewingParent._id, ...data, schoolId }),
-          });
-          if (res.ok) {
-            setViewingParent({ ...viewingParent, ...data }); // profile auto-update
-            await fetchData();
-            setIsParentFormOpen(false);
-          } else {
-            const err = await res.json();
-            alert("Error: " + err.message);
+          try {
+            const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: viewingParent._id,
+                ...data,
+                schoolId,
+              }),
+            });
+            if (res.ok) {
+              notify.success("Parent details updated successfully");
+              setViewingParent({ ...viewingParent, ...data }); // profile auto-update
+              await fetchData();
+              setIsParentFormOpen(false);
+            } else {
+              const err = await res.json();
+              notify.error(err.message || "Failed to update parent details");
+            }
+          } catch (error) {
+            notify.error("Network error. Please try again.");
+          } finally {
+            setIsParentLoading(false);
           }
-          setIsParentLoading(false);
         }}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
         onConfirm={handleDelete}
-        itemName="Student"
+        itemName={
+          deleteDialog.id
+            ? students.find((s) => s._id === deleteDialog.id)?.fullName
+            : ""
+        }
       />
       {/* Picture Pop-up */}
       {openPhotoId &&

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useParentModal } from "@/hooks/useParentModal";
 import ParentFormModal from "@/components/ParentFormModal";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { notify } from "@/lib/notify";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
@@ -59,9 +60,9 @@ export default function ParentsPage() {
       setParents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch parents:", error);
-      setParents([]); // Error ki surat mein list khali kar do
+      notify.error("Could not load parents list");
+      setParents([]);
     } finally {
-      // 4. Ye line sabse aham hai. Chahe success ho ya error, loader ruk jayega.
       setFetchLoading(false);
     }
   };
@@ -73,14 +74,18 @@ export default function ParentsPage() {
     if (!parentToDelete) return;
 
     try {
-      await fetch(`/api/parents?schoolId=${schoolId}`, {
+      const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
         method: "DELETE",
         body: JSON.stringify({ id: parentToDelete.id }),
         headers: { "Content-Type": "application/json" },
       });
-      fetchParents(); // List refresh karein
+
+      if (!res.ok) throw new Error("Failed to delete");
+
+      notify.success("Parent deleted successfully");
+      fetchParents();
     } catch (error) {
-      console.error("Delete failed");
+      notify.error("Could not delete parent. Please try again.");
     } finally {
       setDeleteDialogOpen(false);
       setParentToDelete(null);

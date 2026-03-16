@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { IEmployee } from "@/models/Employee";
+import { notify } from "@/lib/notify";
 
 export function useEmployeeModal(
   employees: IEmployee[],
@@ -57,14 +58,16 @@ export function useEmployeeModal(
         setViewingStaff((prev: any) =>
           prev?._id?.toString() === id ? updatedEmployee : prev,
         );
+        notify.success("Employee details updated");
       } else {
         setEmployees((prev) => [updatedEmployee, ...prev]);
+        notify.success("New employee added successfully");
       }
 
       setIsModalOpen(false);
       setSelectedEmployee(null);
     } catch (error: any) {
-      alert("Error: " + error.message);
+      notify.error(error.message || "Failed to save employee");
     } finally {
       setIsLoading(false);
     }

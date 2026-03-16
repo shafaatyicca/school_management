@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { notify } from "@/lib/notify";
 
 export function useStudentModal(
   students: any[],
@@ -52,14 +53,16 @@ export function useStudentModal(
         setViewingStudent((prev: any) =>
           prev?._id?.toString() === id ? updatedStudent : prev,
         );
+        notify.success("Student updated successfully");
       } else {
         setStudents((prev) => [updatedStudent, ...prev]);
+        notify.success("Student registered successfully");
       }
 
       setIsModalOpen(false);
       setSelectedStudent(null);
     } catch (error: any) {
-      alert("Error: " + error.message);
+      notify.error(error.message || "Something went wrong");
     } finally {
       setIsLoading(false);
     }

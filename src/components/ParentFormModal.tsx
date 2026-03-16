@@ -1,6 +1,9 @@
 "use client";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { Close as CloseIcon } from "@mui/icons-material";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { parentSchema } from "@/lib/validation";
 import {
   Dialog,
   DialogTitle,
@@ -12,7 +15,6 @@ import {
   IconButton,
   Zoom,
 } from "@mui/material";
-import { Close as CloseIcon } from "@mui/icons-material";
 
 interface Props {
   isOpen: boolean;
@@ -31,7 +33,18 @@ export default function ParentFormModal({
   isLoading,
   schoolId,
 }: Props) {
-  const { register, handleSubmit, reset, watch, setValue } = useForm();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(parentSchema),
+    mode: "onTouched",
+  });
+
   const genderValue = watch("gender");
 
   useEffect(() => {
@@ -104,27 +117,30 @@ export default function ParentFormModal({
           <div className="flex flex-col gap-4">
             {/* Full Name */}
             <TextField
-              {...register("fullName", { required: true })}
+              {...register("fullName")}
               label="Full Name"
               fullWidth
               size="small"
-              required
+              error={!!errors.fullName}
+              helperText={errors.fullName?.message as string}
             />
 
             {/* CNIC + Phone */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextField
-                {...register("cnic", { required: true })}
+                {...register("cnic")}
                 label="CNIC Number"
                 placeholder="42101-xxxxxxx-x"
                 size="small"
-                required
+                error={!!errors.cnic}
+                helperText={errors.cnic?.message as string}
               />
               <TextField
-                {...register("phone", { required: true })}
+                {...register("phone")}
                 label="Phone Number"
                 size="small"
-                required
+                error={!!errors.phone}
+                helperText={errors.phone?.message as string}
               />
             </div>
 
@@ -134,13 +150,14 @@ export default function ParentFormModal({
                 select
                 label="Gender"
                 size="small"
-                required
                 value={genderValue || "Male"}
                 onChange={(e) => setValue("gender", e.target.value)}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
               >
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
-                <MenuItem value="Other">Other</MenuItem>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
               </TextField>
 
               <TextField
@@ -152,13 +169,12 @@ export default function ParentFormModal({
 
             {/* Address */}
             <TextField
-              {...register("address", { required: true })}
+              {...register("address")}
               label="Complete Address"
               multiline
               rows={2}
               fullWidth
               size="small"
-              required
             />
           </div>
         </DialogContent>

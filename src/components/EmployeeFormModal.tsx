@@ -16,6 +16,8 @@ import {
 import { Close as CloseIcon } from "@mui/icons-material";
 import type { IEmployee } from "@/models/Employee";
 import ImageUploadWithCrop from "./ImageUploadWithCrop";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { employeeValidationSchema } from "@/lib/validation";
 
 interface Props {
   isOpen: boolean;
@@ -33,14 +35,6 @@ export default function EmployeeFormModal({
   employee,
   isLoading,
 }: Props) {
-  const { register, handleSubmit, reset, watch, setValue } = useForm();
-
-  const staffCategory = watch("staffCategory");
-  const currentStatus = watch("status");
-  const currentRole = watch("role");
-  const currentGender = watch("gender");
-  const currentImage = watch("image");
-
   const defaultValues = useMemo(
     () => ({
       image: "",
@@ -67,6 +61,23 @@ export default function EmployeeFormModal({
     }),
     [],
   );
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors }, // Errors nikalne ke liye
+  } = useForm({
+    resolver: zodResolver(employeeValidationSchema),
+    defaultValues: defaultValues,
+    mode: "onTouched",
+  });
+  const staffCategory = watch("staffCategory");
+  const currentStatus = watch("status");
+  const currentRole = watch("role");
+  const currentGender = watch("gender");
+  const currentImage = watch("image") as string;
 
   const handleImageDone = useCallback(
     (blob: Blob) => {
@@ -110,15 +121,34 @@ export default function EmployeeFormModal({
     if (!employee) return;
   }, [isOpen, employee]);
 
+  useEffect(() => {
+    if (!currentGender) return;
+    if (!employee) return;
+
+    const isAvatar =
+      currentImage === "/male-avatar.jpg" ||
+      currentImage === "/female-avatar.jpg" ||
+      !currentImage;
+
+    if (isAvatar) {
+      setValue(
+        "image",
+        currentGender === "female" ? "/female-avatar.jpg" : "/male-avatar.jpg",
+        { shouldDirty: true },
+      );
+    }
+  }, [currentGender, setValue]);
+
   const onFormSubmit = useCallback(
     (data: any) => {
+      const actualGender = currentGender || data.gender;
       if (data.staffCategory !== "teacher") {
         data.subject = "";
       }
 
-      if (!data.image) {
+      if (!data.image || data.image.trim() === "") {
         data.image =
-          data.gender === "female" ? "/female-avatar.jpg" : "/male-avatar.jpg";
+          actualGender === "female" ? "/female-avatar.jpg" : "/male-avatar.jpg";
       }
 
       const formattedData = {
@@ -142,7 +172,7 @@ export default function EmployeeFormModal({
         reset(defaultValues);
       }
     },
-    [employee, onSubmit, reset, defaultValues],
+    [employee, onSubmit, reset, defaultValues, currentGender],
   );
 
   return (
@@ -251,53 +281,58 @@ export default function EmployeeFormModal({
 
               <div className="md:col-span-8 flex flex-col gap-4">
                 <TextField
-                  {...register("fullName", { required: true })}
-                  label="Full Name"
+                  {...register("fullName")}
+                  label="Full Name *"
                   fullWidth
                   size="small"
-                  required
+                  error={!!errors.fullName}
+                  helperText={errors.fullName?.message as string}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
-                    {...register("phone", { required: true })}
-                    label="Phone Number"
+                    {...register("phone")}
+                    label="Phone Number *"
                     size="small"
-                    required
+                    error={!!errors.phone}
+                    helperText={errors.phone?.message as string}
                   />
                   <TextField
-                    {...register("role", { required: true })}
+                    {...register("role")}
                     select
                     label="System Role"
                     size="small"
-                    required
                     value={currentRole || "employee"}
                     onChange={(e) => setValue("role", e.target.value)}
+                    SelectProps={{ native: true }}
+                    InputLabelProps={{ shrink: true }}
                   >
-                    <MenuItem value="admin">Admin</MenuItem>
-                    <MenuItem value="employee">Employee</MenuItem>
-                    <MenuItem value="accountant">Accountant</MenuItem>
+                    <option value="helpdesk">Helpdesk Staff</option>
+                    <option value="employee">Employee</option>
+                    <option value="accountant">Accountant</option>
                   </TextField>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
-                    {...register("nicNumber", { required: true })}
+                    {...register("nicNumber")}
                     label="NIC Number"
                     size="small"
-                    required
                   />
                   <TextField
-                    {...register("gender", { required: true })}
+                    {...register("gender")} // register ko spread karein
                     select
                     label="Gender"
                     size="small"
-                    required
                     value={currentGender || "male"}
-                    onChange={(e) => setValue("gender", e.target.value)}
+                    onChange={(e) => {
+                      setValue("gender", e.target.value); // state update
+                    }}
+                    SelectProps={{ native: true }}
+                    InputLabelProps={{ shrink: true }}
                   >
-                    <MenuItem value="male">Male</MenuItem>
-                    <MenuItem value="female">Female</MenuItem>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
                   </TextField>
                 </div>
               </div>
@@ -309,40 +344,38 @@ export default function EmployeeFormModal({
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField
-                  {...register("staffCategory", { required: true })}
+                  {...register("staffCategory")}
                   select
                   label="Staff Category"
                   size="small"
-                  required
                   value={staffCategory || "teacher"}
                   onChange={(e) => setValue("staffCategory", e.target.value)}
+                  SelectProps={{ native: true }}
+                  InputLabelProps={{ shrink: true }}
                 >
-                  <MenuItem value="teacher">Teacher</MenuItem>
-                  <MenuItem value="other">Other Staff</MenuItem>
+                  <option value="teacher">Teacher</option>
+                  <option value="other">Other Staff</option>
                 </TextField>
                 <TextField
-                  {...register("designation", { required: true })}
+                  {...register("designation")}
                   label="Designation"
                   size="small"
-                  required
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextField
-                {...register("salary", { required: true })}
+                {...register("salary")}
                 label="Monthly Salary"
                 type="number"
                 size="small"
-                required
               />
               <TextField
-                {...register("experience", { required: true })}
+                {...register("experience")}
                 label="Experience (Years)"
                 type="number"
                 size="small"
-                required
               />
             </div>
 
@@ -350,18 +383,16 @@ export default function EmployeeFormModal({
               className={`grid gap-4 ${staffCategory === "teacher" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
             >
               <TextField
-                {...register("qualification", { required: true })}
+                {...register("qualification")}
                 label="Qualification"
                 size="small"
-                required
               />
 
               {staffCategory === "teacher" && (
                 <TextField
-                  {...register("subject", { required: true })}
+                  {...register("subject")}
                   label="Subject"
                   size="small"
-                  required
                 />
               )}
             </div>
@@ -372,19 +403,17 @@ export default function EmployeeFormModal({
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField
-                  {...register("dateOfBirth", { required: true })}
+                  {...register("dateOfBirth")}
                   label="Date of Birth"
                   type="date"
                   size="small"
-                  required
                   InputLabelProps={{ shrink: true }}
                 />
                 <TextField
-                  {...register("joiningDate", { required: true })}
+                  {...register("joiningDate")}
                   label="Joining Date"
                   type="date"
                   size="small"
-                  required
                   InputLabelProps={{ shrink: true }}
                 />
               </div>
@@ -392,17 +421,18 @@ export default function EmployeeFormModal({
 
             <div className="w-full">
               <TextField
-                {...register("status", { required: true })}
+                {...register("status")}
                 select
                 label="Employment Status"
                 fullWidth
                 size="small"
-                required
                 value={currentStatus || "active"}
                 onChange={(e) => setValue("status", e.target.value)}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
               >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </TextField>
             </div>
 
@@ -418,32 +448,33 @@ export default function EmployeeFormModal({
                   {...register("inactiveDate", {
                     required: currentStatus === "inactive",
                   })}
-                  label="Leaving Date"
+                  label="Leaving Date *"
                   type="date"
                   size="small"
-                  required
                   InputLabelProps={{ shrink: true }}
+                  error={!!errors.inactiveDate}
+                  helperText={errors.inactiveDate?.message as string}
                 />
                 <TextField
                   {...register("inactiveReason", {
                     required: currentStatus === "inactive",
                   })}
-                  label="Reason of Leaving"
+                  label="Reason of Leaving *"
                   placeholder="e.g. Resigned / Personal"
                   size="small"
-                  required
+                  error={!!errors.inactiveReason}
+                  helperText={errors.inactiveReason?.message as string}
                 />
               </div>
             )}
 
             <TextField
-              {...register("address", { required: true })}
+              {...register("address")}
               label="Complete Address"
               multiline
               rows={2}
               fullWidth
               size="small"
-              required
             />
 
             <div
@@ -457,30 +488,36 @@ export default function EmployeeFormModal({
                 Emergency Contact Information
               </p>
               <div
-                className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-lg border border-dashed"
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-2 rounded-lg border border-dashed"
                 style={{
                   backgroundColor: "var(--card)",
                   borderColor: "var(--border)",
                 }}
               >
                 <TextField
-                  {...register("emergencyContactName", { required: true })}
+                  {...register("emergencyContactName")}
                   label="Name"
                   size="small"
-                  required
                 />
                 <TextField
-                  {...register("emergencyContactPhone", { required: true })}
+                  {...register("emergencyContactPhone")}
                   label="Phone"
                   size="small"
-                  required
                 />
+
                 <TextField
-                  {...register("emergencyContactRelation", { required: true })}
-                  label="Relation"
+                  {...register("emergencyContactRelation")}
+                  select
+                  label="Relationship"
                   size="small"
-                  required
-                />
+                  SelectProps={{ native: true }}
+                  InputLabelProps={{ shrink: true }}
+                >
+                  <option value="brother">Brother</option>
+                  <option value="sister">Sister</option>
+                  <option value="father">Father</option>
+                  <option value="mother">Mother</option>
+                </TextField>
               </div>
             </div>
           </div>
