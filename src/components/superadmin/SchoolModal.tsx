@@ -48,7 +48,8 @@ export default function SchoolFormModal({
         planId: "",
         customPrice: 0,
         expiryDate: "",
-        // subscriptionStatus yahan se khatam
+        joiningDate: "",
+        slug: "",
       }),
       [],
     ),
@@ -76,6 +77,10 @@ export default function SchoolFormModal({
         expiryDate: school.expiryDate
           ? new Date(school.expiryDate).toISOString().split("T")[0]
           : "",
+        joiningDate: school.joiningDate
+          ? new Date(school.joiningDate).toISOString().split("T")[0]
+          : "",
+        slug: school.slug || "",
       });
     } else {
       reset({
@@ -87,6 +92,8 @@ export default function SchoolFormModal({
         planId: "",
         customPrice: 0,
         expiryDate: "",
+        joiningDate: "",
+        slug: "",
       });
     }
   }, [school, isOpen, reset]);
@@ -140,44 +147,89 @@ export default function SchoolFormModal({
       </DialogTitle>
 
       <form onSubmit={handleSubmit(onFormSubmit)}>
-        <DialogContent dividers sx={{ p: 2 }}>
+        <DialogContent dividers sx={{ py: 1, px: 2 }}>
           <div className="flex flex-col gap-4">
-            {/* Logo Section remain same... */}
-            <div className="flex items-center gap-2 p-2 border rounded-2xl border-dashed bg-slate-50/50">
-              {/* ... (Same logo code as before) ... */}
-              <div className="w-20 h-20 rounded-2xl bg-white border flex items-center justify-center overflow-hidden">
-                {currentLogo ? (
-                  <img
-                    src={currentLogo}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <SchoolIcon sx={{ fontSize: 40, color: "#cbd5e1" }} />
-                )}
+            {/* ✅ Top Row: Image Left + Fields Right */}
+            <div className="flex flex-row gap-4 items-start">
+              {/* Left: Logo */}
+              <div className="flex-shrink-0 flex flex-col items-center">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-slate-300 bg-white overflow-hidden hover:border-sky-400">
+                    {currentLogo ? (
+                      <img
+                        src={currentLogo}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <label
+                        htmlFor="logo-up"
+                        className="flex flex-col items-center justify-center cursor-pointer w-full h-full"
+                      >
+                        <span className="text-3xl text-slate-400">+</span>
+                        <span className="text-[10px] text-slate-400">
+                          Add Photo
+                        </span>
+                      </label>
+                    )}
+                  </div>
+
+                  {currentLogo && (
+                    <>
+                      <label
+                        htmlFor="logo-up"
+                        className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                      >
+                        <span className="text-white text-xs font-medium">
+                          Change
+                        </span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setValue("logo", "")}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-all cursor-pointer shadow-sm z-10 text-xs"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] font-bold uppercase tracking-wider mt-2 text-slate-400">
+                  School Logo
+                </p>
+                <input
+                  type="file"
+                  className="hidden"
+                  id="logo-up"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                />
               </div>
-              <input
-                type="file"
-                className="hidden"
-                id="logo-up"
-                onChange={handleLogoUpload}
-              />
-              <label
-                htmlFor="logo-up"
-                className="bg-indigo-600 text-white p-1 rounded-md cursor-pointer"
-              >
-                <PayIcon sx={{ fontSize: 14 }} />
-              </label>
-              <div>
-                <p className="text-xs font-bold text-slate-700">
-                  Institution Identity
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  Square logo (PNG/JPG)
-                </p>
+
+              {/* Right: Phone + Status */}
+              <div className="flex flex-col gap-3 flex-1 min-w-0">
+                <TextField
+                  {...register("phone", { required: true })}
+                  label="Contact Number"
+                  size="small"
+                  fullWidth
+                  required
+                />
+                <TextField
+                  {...register("status")}
+                  select
+                  label="Operational Status"
+                  size="small"
+                  fullWidth
+                  value={currentStatus || "active"}
+                  onChange={(e) => setValue("status", e.target.value)}
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                </TextField>
               </div>
             </div>
 
-            {/* Basic Info */}
+            {/* ✅ Baaki fields neeche */}
             <TextField
               {...register("name", { required: true })}
               label="School Name"
@@ -185,25 +237,14 @@ export default function SchoolFormModal({
               size="small"
               required
             />
-            <div className="grid grid-cols-2 gap-4">
-              <TextField
-                {...register("phone", { required: true })}
-                label="Contact Number"
-                size="small"
-                required
-              />
-              <TextField
-                {...register("status")}
-                select
-                label="Operational Status"
-                size="small"
-                value={currentStatus || "active"}
-                onChange={(e) => setValue("status", e.target.value)}
-              >
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="inactive">Inactive</MenuItem>
-              </TextField>
-            </div>
+            <TextField
+              {...register("slug", { required: true })}
+              label="School Slug"
+              size="small"
+              fullWidth
+              required
+              placeholder="e.g. city-model-school"
+            />
             <TextField
               {...register("address", { required: true })}
               label="Complete Address"
@@ -214,8 +255,8 @@ export default function SchoolFormModal({
               required
             />
 
-            {/* Subscription Section - CLEANED */}
-            <div className="mt-4 p-4 border rounded-2xl bg-slate-50 space-y-4">
+            {/* Subscription Section */}
+            <div className=" p-2 border rounded-md bg-slate-50 space-y-2">
               <p className="text-xs font-bold text-slate-800 flex items-center gap-2">
                 <PayIcon sx={{ fontSize: 18, color: "#4f46e5" }} /> Plan &
                 Expiry
@@ -240,26 +281,32 @@ export default function SchoolFormModal({
 
                 <TextField
                   {...register("customPrice", { required: true })}
-                  label="Final Price ($)"
+                  label="Final Price (PKR)"
                   type="number"
                   size="small"
                   InputProps={{
                     startAdornment: (
-                      <InputAdornment position="start">$</InputAdornment>
+                      <InputAdornment position="start">PKR</InputAdornment>
                     ),
                   }}
                 />
 
-                {/* Expiry Date Full Width or nicely aligned */}
                 <TextField
                   {...register("expiryDate", { required: true })}
                   label="Expiry Date"
                   type="date"
                   size="small"
                   fullWidth
-                  className="md:col-span-2" // Isko full width kar diya taake subscriptionStatus ki jagah fill ho jaye
                   InputLabelProps={{ shrink: true }}
                   onClick={(e: any) => e.target.showPicker?.()}
+                />
+                <TextField
+                  {...register("joiningDate")}
+                  label="Joining Date"
+                  type="date"
+                  size="small"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
                 />
               </div>
             </div>

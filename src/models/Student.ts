@@ -40,7 +40,7 @@ const StudentSchema = new Schema<IStudent>(
     },
     grNumber: { type: Number },
     fullName: { type: String, required: true },
-    image: { type: String },
+    image: { type: String, default: "" },
     email: { type: String, unique: true },
     password: { type: String },
     gender: { type: String },

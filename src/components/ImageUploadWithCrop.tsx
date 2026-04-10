@@ -6,16 +6,30 @@ import { Point, Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogActions } from "@mui/material";
 
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 export default function ImageUploadWithCrop({
   onImageCropped,
+  schoolId,
+  folder,
 }: {
-  onImageCropped: (blob: Blob) => void;
+  onImageCropped: (url: string) => void;
+  schoolId: string;
+  folder: "students" | "employees" | "users";
 }) {
   const [image, setImage] = useState<string | null>(null);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -38,11 +52,32 @@ export default function ImageUploadWithCrop({
   const createCroppedImage = async () => {
     if (!image || !croppedAreaPixels) return;
     try {
-      const croppedImage = await getCroppedImg(image, croppedAreaPixels);
-      onImageCropped(croppedImage);
+      const croppedBlob = await getCroppedImg(image, croppedAreaPixels);
+      const base64Image = await blobToBase64(croppedBlob);
+
+      //  Pehle modal close karo — user wait nahi karega
       handleCloseModal();
+
+      //  Placeholder show karo jab tak upload ho
+      onImageCropped("loading"); // parent mein loading spinner dikhao
+
+      setIsUploading(true);
+
+      //  Background mein upload karo
+      const res = await fetch("/api/upload-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: base64Image, schoolId, folder }),
+      });
+      const { url } = await res.json();
+
+      //  URL parent ko bhejo
+      onImageCropped(url);
     } catch (e) {
       console.error(e);
+      onImageCropped(""); // error pe clear karo
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -55,7 +90,6 @@ export default function ImageUploadWithCrop({
 
   return (
     <>
-      {/* Upload Button with Hover */}
       <div className="flex flex-col items-center">
         <input
           type="file"
@@ -90,7 +124,6 @@ export default function ImageUploadWithCrop({
         </label>
       </div>
 
-      {/* Beautiful Crop Modal */}
       <Dialog
         open={isModalOpen}
         onClose={handleCloseModal}
@@ -105,7 +138,6 @@ export default function ImageUploadWithCrop({
           }}
         >
           <div className="flex flex-col gap-3">
-            {/* Modal Title */}
             <div className="text-center space-y-1">
               <h3
                 className="text-lg font-bold"
@@ -121,7 +153,6 @@ export default function ImageUploadWithCrop({
               </p>
             </div>
 
-            {/* Cropper Area */}
             <div
               className="relative w-full h-70 overflow-hidden rounded-xl shadow-lg transition-all"
               style={{
@@ -142,7 +173,6 @@ export default function ImageUploadWithCrop({
               />
             </div>
 
-            {/* Zoom Slider */}
             <div className="w-full space-y-1">
               <div className="flex justify-between items-center">
                 <p
@@ -177,7 +207,6 @@ export default function ImageUploadWithCrop({
           </div>
         </DialogContent>
 
-        {/* Modal Footer with Hover Buttons */}
         <DialogActions
           sx={{
             p: 1,
@@ -191,6 +220,7 @@ export default function ImageUploadWithCrop({
             type="button"
             variant="outline"
             onClick={handleCloseModal}
+            disabled={isUploading}
             className="flex-1 cursor-pointer transition-colors duration-300 hover:bg-red-50 hover:border-red-300 hover:text-red-500"
           >
             ✕ Cancel
@@ -198,9 +228,10 @@ export default function ImageUploadWithCrop({
           <Button
             type="button"
             onClick={createCroppedImage}
+            disabled={isUploading}
             className="flex-1 cursor-pointer transition-colors duration-300 hover:bg-sky-100 hover:border-sky-300 hover:text-sky-500"
           >
-            ✓ Apply Crop
+            {isUploading ? "Uploading..." : "✓ Apply Crop"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -216,8 +247,8 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  canvas.width = 300;
-  canvas.height = 300;
+  canvas.width = 400;
+  canvas.height = 400;
 
   if (!ctx) throw new Error("No 2d context");
 
@@ -229,8 +260,8 @@ async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
     pixelCrop.height,
     0,
     0,
-    300,
-    300,
+    400,
+    400,
   );
 
   return new Promise((resolve, reject) => {

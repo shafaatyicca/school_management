@@ -34,6 +34,7 @@ export default function EmployeeFormModal({
   onSubmit,
   employee,
   isLoading,
+  schoolId,
 }: Props) {
   const defaultValues = useMemo(
     () => ({
@@ -67,7 +68,7 @@ export default function EmployeeFormModal({
     reset,
     watch,
     setValue,
-    formState: { errors }, // Errors nikalne ke liye
+    formState: { errors },
   } = useForm({
     resolver: zodResolver(employeeValidationSchema),
     defaultValues: defaultValues,
@@ -80,12 +81,8 @@ export default function EmployeeFormModal({
   const currentImage = watch("image") as string;
 
   const handleImageDone = useCallback(
-    (blob: Blob) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => {
-        setValue("image", reader.result as string, { shouldDirty: true });
-      };
+    (base64: string) => {
+      setValue("image", base64, { shouldDirty: true });
     },
     [setValue],
   );
@@ -245,7 +242,36 @@ export default function EmployeeFormModal({
                     Profile Picture
                   </p>
 
-                  {currentImage ? (
+                  {currentImage === "loading" ? (
+                    // ✅ Uploading spinner
+                    <div
+                      className="w-30 h-30 rounded-full flex flex-col items-center justify-center"
+                      style={{ border: "4px solid var(--border)" }}
+                    >
+                      <svg
+                        className="animate-spin w-8 h-8 text-sky-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v8z"
+                        />
+                      </svg>
+                      <span className="text-[9px] mt-1 text-sky-500 font-medium">
+                        Uploading...
+                      </span>
+                    </div>
+                  ) : currentImage ? (
                     <div className="relative group flex flex-col items-center">
                       <img
                         src={currentImage}
@@ -271,7 +297,11 @@ export default function EmployeeFormModal({
                     </div>
                   ) : (
                     <div className="flex flex-col items-center">
-                      <ImageUploadWithCrop onImageCropped={handleImageDone} />
+                      <ImageUploadWithCrop
+                        onImageCropped={handleImageDone}
+                        schoolId={schoolId || ""}
+                        folder="employees"
+                      />
                     </div>
                   )}
 
@@ -548,7 +578,7 @@ export default function EmployeeFormModal({
           <Button
             type="submit"
             variant="contained"
-            disabled={isLoading}
+            disabled={isLoading || currentImage === "loading"}
             size="small"
             sx={{
               backgroundColor: "#1e293b",
@@ -558,11 +588,13 @@ export default function EmployeeFormModal({
               py: 0.5,
             }}
           >
-            {isLoading
-              ? "Processing..."
-              : employee
-                ? "Update Details"
-                : "Register"}
+            {currentImage === "loading"
+              ? "Wait for Image Uploading..."
+              : isLoading
+                ? "Processing..."
+                : employee
+                  ? "Update Details"
+                  : "+ Register"}
           </Button>
         </DialogActions>
       </form>

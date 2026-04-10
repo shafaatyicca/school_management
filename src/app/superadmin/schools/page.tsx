@@ -22,10 +22,16 @@ export default function SchoolsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userEditId, setUserEditId] = useState<string | null>(null);
+
+  // ✅ Naye fields add kiye
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
     password: "",
+    phone: "",
+    image: "",
+    role: "school_admin",
+    securityQuestion: { question: "", answer: "" },
   });
 
   const fetchSchools = async () => {
@@ -85,37 +91,40 @@ export default function SchoolsPage() {
     const res = await fetch("/api/superadmin/users", {
       method: userEditId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
+      // ✅ role hardcoded nahi — userForm se aayega
       body: JSON.stringify({
         ...userForm,
         id: userEditId,
         schoolId: expandedSchool,
-        role: "school_admin",
       }),
     });
     if (res.ok) {
       setIsUserModalOpen(false);
       if (expandedSchool) fetchUsers(expandedSchool);
       notify.success(
-        userEditId ? "Admin Updated!" : "Admin Added!",
+        userEditId ? "User Updated!" : "User Added!",
         userEditId
-          ? "Admin updated successfully"
-          : "New admin added successfully",
+          ? "User updated successfully"
+          : "New user added successfully",
       );
     } else {
-      notify.error("Failed!", "Could not save admin");
+      notify.error("Failed!", "Could not save user");
     }
   };
 
   const handleDeleteAdmin = async (userId: string) => {
     try {
-      const res = await fetch(`/api/superadmin/users?id=${userId}`, {
+      // ✅ Body se bheja
+      const res = await fetch("/api/superadmin/users", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId }),
       });
       if (res.ok) {
         if (expandedSchool) fetchUsers(expandedSchool);
-        notify.success("Deleted!", "Admin has been removed successfully");
+        notify.success("Deleted!", "User has been removed successfully");
       } else {
-        notify.error("Failed!", "Could not delete admin");
+        notify.error("Failed!", "Could not delete user");
       }
     } catch (err) {
       notify.error("Error!", "Something went wrong");
@@ -184,7 +193,15 @@ export default function SchoolsPage() {
                     users={schoolUsers}
                     onAddAdmin={() => {
                       setUserEditId(null);
-                      setUserForm({ name: "", email: "", password: "" });
+                      setUserForm({
+                        name: "",
+                        email: "",
+                        password: "",
+                        phone: "",
+                        image: "",
+                        role: "school_admin",
+                        securityQuestion: { question: "", answer: "" },
+                      });
                       setIsUserModalOpen(true);
                     }}
                     onEditAdmin={(u: any) => {
@@ -193,6 +210,13 @@ export default function SchoolsPage() {
                         name: u.name,
                         email: u.email,
                         password: "",
+                        phone: u.phone || "",
+                        image: u.image || "",
+                        role: u.role || "school_admin",
+                        securityQuestion: u.securityQuestion || {
+                          question: "",
+                          answer: "",
+                        },
                       });
                       setIsUserModalOpen(true);
                     }}
@@ -218,6 +242,7 @@ export default function SchoolsPage() {
         setFormData={setUserForm}
         onSubmit={handleUserSubmit}
         isEditing={!!userEditId}
+        schoolId={expandedSchool}
       />
     </div>
   );

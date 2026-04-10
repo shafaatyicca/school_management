@@ -70,8 +70,8 @@ const handler = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
+          image: user.image || "",
           schoolId: user.schoolId ? user.schoolId.toString() : null,
-          // Status bhejna zaroori hai modal trigger karne ke liye
         };
       },
     }),
@@ -81,6 +81,8 @@ const handler = NextAuth({
       if (user) {
         token.role = user.role;
         token.schoolId = user.schoolId;
+        token.image = user.image;
+        token.id = user.id;
       }
       return token;
     },
@@ -88,6 +90,8 @@ const handler = NextAuth({
       if (session.user) {
         session.user.role = token.role;
         session.user.schoolId = token.schoolId;
+        session.user.image = token.image;
+        session.user.id = token.id;
 
         // Dashboard modal ke liye humein school ka fresh status chahiye
         // Aap dashboard ke layout mein session se schoolId lekar

@@ -101,7 +101,6 @@ export default function Topbar() {
         <div className="relative group cursor-pointer hidden sm:block">
           <div className="absolute -inset-1 bg-gradient-to-r from-sky-600 to-cyan-600 rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
           <div className="relative flex h-15 w-15 items-center justify-center rounded-xl bg-card border border-border shadow-xl overflow-hidden">
-            {/* Agar School Logo hai to wo dikhaye, warna GraduationCap icon */}
             {schoolData?.logo ? (
               <img
                 src={schoolData.logo}
@@ -190,19 +189,25 @@ export default function Topbar() {
         {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-3 pl-1 pr-3 py-1 cursor-pointer bg-muted/50 hover:bg-muted transition-all rounded-xl border border-border group shadow-inner">
+            <div className="flex items-center gap-3 pl-1 pr-3 py-1 cursor-pointer bg-muted/50 hover:bg-muted transition-all rounded-md border border-border group shadow-inner">
               <div className="relative">
-                <div className="h-8 w-8 rounded-lg bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
-                  <User className="h-4 w-4 text-muted-foreground group-hover:text-sky-400" />
+                <div className="h-10 w-10 rounded-md bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
+                  {session?.user?.image ? (
+                    <img
+                      src={session.user.image}
+                      alt="Profile"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-muted-foreground group-hover:text-sky-400" />
+                  )}
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-background"></div>
               </div>
               <div className="text-left hidden sm:block">
-                {/* 3. Dynamic Name (Session se) */}
                 <p className="text-[11px] font-bold text-foreground leading-none tracking-wide">
                   {session?.user?.name || "User Name"}
                 </p>
-                {/* 4. Dynamic Role (Session se) */}
                 <p className="text-[9px] text-sky-400/80 font-bold mt-1 uppercase tracking-tighter">
                   {session?.user?.role?.replace("_", " ") || "Admin"}
                 </p>
@@ -211,12 +216,11 @@ export default function Topbar() {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            className="w-64 mt-2 bg-popover border-border shadow-2xl rounded-xl text-popover-foreground"
+            className="w-50 mt-1 bg-popover border-border shadow-2xl rounded-md text-popover-foreground"
             align="end"
           >
             <DropdownMenuLabel className="font-normal p-4 bg-muted/30">
               <div className="flex flex-col space-y-1">
-                {/* 5. Dropdown header Name & Email */}
                 <p className="text-sm font-bold text-foreground uppercase">
                   {session?.user?.name || "Admin User"}
                 </p>
@@ -226,23 +230,21 @@ export default function Topbar() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border" />
+
             <DropdownMenuGroup className="p-1">
               <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
                 <UserCircle className="h-4 w-4" />
                 <span className="text-sm">Update Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
-                <KeyRound className="h-4 w-4" />
-                <span className="text-sm">Change Password</span>
-              </DropdownMenuItem>
+
               <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
                 <Settings className="h-4 w-4" />
                 <span className="text-sm">Settings</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
+
             <DropdownMenuSeparator className="bg-border" />
 
-            {/* 6. Logout Functionality set kar di */}
             <DropdownMenuItem
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="flex items-center gap-3 p-3 m-1 rounded-lg cursor-pointer text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/20 focus:text-rose-400 font-bold transition-colors"

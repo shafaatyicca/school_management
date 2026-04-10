@@ -644,18 +644,18 @@ export default function StudentsPage() {
             >
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
               <div
-                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
+                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-md shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="relative">
                   <img
                     src={displayImg}
-                    className="w-full h-72 object-cover rounded-[2.2rem] shadow-inner border border-slate-100 dark:border-slate-800"
+                    className="w-full h-72 object-cover rounded-md shadow-inner border border-slate-100 dark:border-slate-800"
                     alt="Preview"
                   />
                   <button
                     onClick={() => setOpenPhotoId(null)}
-                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-500 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90 cursor-pointer"
+                    className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 shadow-xl rounded-full p-1.5 text-slate-300 hover:text-red-500 transition-all border border-slate-100 hover:rotate-90 cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>

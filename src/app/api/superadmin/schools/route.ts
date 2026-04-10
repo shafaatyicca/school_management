@@ -60,11 +60,13 @@ export async function POST(req: Request) {
       customPrice,
       expiryDate,
       status,
+      slug,
+      joiningDate,
     } = body;
 
-    if (!name || !planId || !expiryDate) {
+    if (!name || !planId || !expiryDate || !slug) {
       return NextResponse.json(
-        { error: "School name, Plan, and Expiry Date are required" },
+        { error: "School name, Plan, Expiry Date and Slug are required" },
         { status: 400 },
       );
     }
@@ -78,6 +80,8 @@ export async function POST(req: Request) {
       planId,
       customPrice: Number(customPrice) || 0,
       expiryDate: new Date(expiryDate),
+      slug,
+      joiningDate: joiningDate ? new Date(joiningDate) : undefined,
     });
 
     return NextResponse.json(newSchool, { status: 201 });

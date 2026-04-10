@@ -36,8 +36,6 @@ export default function StudentFormModal({
   isLoading,
   schoolId,
 }: any) {
-  // const { register, handleSubmit, reset, watch, setValue } = useForm();
-  // useForm ke sath types define karein (agar TS use kar rahe hain)
   const {
     register,
     handleSubmit,
@@ -68,12 +66,8 @@ export default function StudentFormModal({
   const currentImage = watch("image");
 
   const handleImageDone = useCallback(
-    (blob: Blob) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => {
-        setValue("image", reader.result as string, { shouldDirty: true });
-      };
+    (url: string) => {
+      setValue("image", url, { shouldDirty: true });
     },
     [setValue],
   );
@@ -89,7 +83,12 @@ export default function StudentFormModal({
 
         reset({
           ...student,
-          image: student.image || "",
+          image:
+            student.image && student.image.trim() !== ""
+              ? student.image
+              : student.gender === "Female"
+                ? "/studentfemale-avatar.jpg"
+                : "/studentmale-avatar.jpg",
           dateOfBirth: student.dateOfBirth
             ? new Date(student.dateOfBirth).toISOString().split("T")[0]
             : "",
@@ -108,7 +107,6 @@ export default function StudentFormModal({
           guardianPhone: student.guardianPhone || "",
           classId: student.classId?._id || student.classId,
           parentId: student.parentId?._id || student.parentId,
-          // Important: Parent fields ko reset karein taake edit mode mein purana "New Parent" data nazar na aaye
           parentData: {
             fullName: "",
             cnic: "",
@@ -160,9 +158,10 @@ export default function StudentFormModal({
   useEffect(() => {
     if (!studentGender) return;
     if (!student) return;
+
     const isAvatar =
-      currentImage === "/studentfemale-avatar.jpg" ||
-      currentImage === "/studentmale-avatar.jpg";
+      currentImage === "/studentmale-avatar.jpg" ||
+      currentImage === "/studentfemale-avatar.jpg";
 
     if (isAvatar) {
       setValue(
@@ -170,9 +169,10 @@ export default function StudentFormModal({
         studentGender === "Female"
           ? "/studentfemale-avatar.jpg"
           : "/studentmale-avatar.jpg",
+        { shouldDirty: true },
       );
     }
-  }, [studentGender]);
+  }, [studentGender, currentImage, student, setValue]);
 
   return (
     <Dialog
@@ -221,14 +221,27 @@ export default function StudentFormModal({
 
       <form
         onSubmit={handleSubmit((data) => {
-          // Image handling logic
-          if (!data.image || data.image.startsWith("/student")) {
-            data.image =
+          let finalImage = data.image;
+
+          if (
+            !finalImage ||
+            finalImage.trim() === "" ||
+            finalImage.startsWith("/student")
+          ) {
+            finalImage =
               data.gender === "Female"
                 ? "/studentfemale-avatar.jpg"
                 : "/studentmale-avatar.jpg";
           }
-          onSubmit({ ...data, isNewParent: student ? false : isNewParent });
+
+          const payload = {
+            ...data,
+            image: finalImage,
+            schoolId: schoolId,
+            isNewParent: student ? false : isNewParent,
+          };
+
+          onSubmit(payload);
           setIsNewParent(false);
         })}
       >
@@ -258,7 +271,35 @@ export default function StudentFormModal({
                 >
                   Profile Picture
                 </p>
-                {currentImage ? (
+                {currentImage === "loading" ? (
+                  <div
+                    className="w-24 h-24 rounded-full flex flex-col items-center justify-center"
+                    style={{ border: "4px solid var(--border)" }}
+                  >
+                    <svg
+                      className="animate-spin w-8 h-8 text-sky-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                    <span className="text-[9px] mt-1 text-sky-500 font-medium">
+                      Uploading...
+                    </span>
+                  </div>
+                ) : currentImage ? (
                   <div className="relative group flex flex-col items-center">
                     <img
                       src={currentImage}
@@ -277,14 +318,20 @@ export default function StudentFormModal({
                           backgroundColor: "rgba(239, 68, 68, 0.3)",
                         },
                       }}
-                      onClick={() => setValue("image", "")}
+                      onClick={() => {
+                        setValue("image", "");
+                      }}
                     >
                       Remove Photo
                     </Button>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center">
-                    <ImageUploadWithCrop onImageCropped={handleImageDone} />
+                    <ImageUploadWithCrop
+                      onImageCropped={handleImageDone}
+                      schoolId={schoolId || ""}
+                      folder="students"
+                    />
                   </div>
                 )}
                 <input type="hidden" {...register("image")} />
@@ -761,7 +808,7 @@ export default function StudentFormModal({
           <Button
             type="submit"
             variant="contained"
-            disabled={isLoading}
+            disabled={isLoading || currentImage === "loading"}
             size="small"
             sx={{
               backgroundColor: "#1e293b",
@@ -771,11 +818,13 @@ export default function StudentFormModal({
               py: 0.5,
             }}
           >
-            {isLoading
-              ? "Processing..."
-              : student
-                ? "Update Student"
-                : "Confirm Admission"}
+            {currentImage === "loading"
+              ? "Wait for Image Uploading..."
+              : isLoading
+                ? "Processing..."
+                : student
+                  ? "Update Student"
+                  : "Confirm Admission"}
           </Button>
         </DialogActions>
       </form>
