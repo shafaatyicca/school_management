@@ -1,7 +1,6 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import { Box, Chip } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
@@ -30,8 +29,11 @@ import {
 } from "lucide-react";
 
 export default function StudentsPage() {
-  const params = useParams();
-  const schoolId = params.schoolId as string;
+  const { data: session } = useSession();
+  const schoolId = session?.user?.schoolId;
+  const isSuperAdmin = session?.user?.role === "super_admin";
+  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
+  const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
 
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -43,23 +45,36 @@ export default function StudentsPage() {
   const [isParentLoading, setIsParentLoading] = useState(false);
 
   useEffect(() => {
-    if (schoolId) {
-      fetchData();
+    if (!isSuperAdmin) return;
+    const hostname = window.location.hostname;
+    const isSubdomain =
+      hostname.includes(".lvh.me") || hostname.includes(".localhost");
+    if (isSubdomain) {
+      const slug = hostname.split(".")[0];
+      fetch(`/api/superadmin/schools?slug=${slug}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?._id) setViewSchoolId(data._id);
+        });
     }
-  }, [schoolId]);
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (effectiveSchoolId) fetchData();
+  }, [effectiveSchoolId]);
 
   const fetchData = async () => {
-    if (!schoolId) return;
+    if (!effectiveSchoolId) return;
     setFetchLoading(true);
     try {
       const [stdRes, clsRes] = await Promise.all([
-        fetch(`/api/students?schoolId=${schoolId}`),
-        fetch(`/api/classes?schoolId=${schoolId}`),
+        fetch(`/api/students?schoolId=${effectiveSchoolId}`),
+        fetch(`/api/classes?schoolId=${effectiveSchoolId}`),
       ]);
       const stdData = await stdRes.json();
-      const clsData = await clsRes.json();
       setStudents(stdData);
-      setClasses(clsData);
+      const clsData = await clsRes.json();
+      setClasses(Array.isArray(clsData) ? clsData : []);
     } catch (error) {
       notify.error("Failed to fetch students data. Please try again.");
     } finally {
@@ -79,7 +94,7 @@ export default function StudentsPage() {
     setSelectedStudent,
     isLoading,
     handleFormSubmit,
-  } = useStudentModal(students, setStudents, schoolId);
+  } = useStudentModal(students, setStudents, effectiveSchoolId);
 
   const handleOpenStudentFromParent = (studentData: any) => {
     openStudentProfile(studentData);
@@ -94,19 +109,22 @@ export default function StudentsPage() {
   });
 
   const handleDelete = async () => {
-    if (!deleteDialog.id || !schoolId) return;
+    if (!deleteDialog.id || !effectiveSchoolId) return;
     try {
-      const res = await fetch(`/api/students?schoolId=${schoolId}`, {
+      const res = await fetch(`/api/students`, {
         method: "DELETE",
-        body: JSON.stringify({ id: deleteDialog.id }),
+        body: JSON.stringify({
+          id: deleteDialog.id,
+          schoolId: effectiveSchoolId,
+        }),
         headers: { "Content-Type": "application/json" },
       });
 
       if (res.ok) {
-        notify.success("Student deleted successfully"); // Success Notification
+        notify.success("Student deleted successfully");
         fetchData();
       } else {
-        notify.error("Failed to delete student"); // Error Notification
+        notify.error("Failed to delete student");
       }
       setDeleteDialog({ open: false, id: null });
     } catch (error) {
@@ -559,7 +577,7 @@ export default function StudentsPage() {
         student={selectedStudent}
         classes={classes}
         isLoading={isLoading}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
       />
       <StudentProfileModal
         isOpen={isViewModalOpen}
@@ -576,24 +594,24 @@ export default function StudentsPage() {
           setViewingParent(parent);
           setIsParentFormOpen(true);
         }}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
       />
       <ParentFormModal
         isOpen={isParentFormOpen}
         onClose={() => setIsParentFormOpen(false)}
         parent={viewingParent}
         isLoading={isParentLoading}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
         onSubmit={async (data: any) => {
           setIsParentLoading(true);
           try {
-            const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
+            const res = await fetch(`/api/parents`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 id: viewingParent._id,
                 ...data,
-                schoolId,
+                schoolId: effectiveSchoolId,
               }),
             });
             if (res.ok) {

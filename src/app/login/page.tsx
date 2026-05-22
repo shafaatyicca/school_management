@@ -36,11 +36,37 @@ export default function LoginPage() {
         }
         setLoading(false);
       } else {
-        // 1. Success message show karein
         notify.success("Welcome!", "Login Successfully.");
 
-        router.push("/");
-        router.refresh();
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+
+        const isLocal =
+          window.location.hostname.includes("lvh.me") ||
+          window.location.hostname.includes("localhost");
+        const protocol = isLocal ? "http" : "https";
+
+        const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "lvh.me:3000";
+
+        if (
+          session?.user?.role === "super_admin" ||
+          session?.user?.role === "super-admin"
+        ) {
+          // Ye line Incognito fix karegi
+          const currentOrigin = window.location.origin;
+          window.location.href = `${currentOrigin}/superadmin`;
+        } else if (session?.user?.schoolSlug) {
+          const slug = session.user.schoolSlug;
+          const currentHostname = window.location.hostname;
+
+          if (currentHostname.startsWith(`${slug}.`)) {
+            router.push("/");
+          } else {
+            window.location.href = `${protocol}://${slug}.${mainDomain}`;
+          }
+        } else {
+          router.push("/");
+        }
       }
     } catch (err) {
       notify.error("System Error", "System mein koi masla hua hai.");
@@ -170,7 +196,7 @@ export default function LoginPage() {
 
           {/* Card — fixed width, centered */}
           <div
-            className="w-full rounded-3xl p-8"
+            className="w-full rounded-3xl p-4"
             style={{
               maxWidth: "450px",
               backdropFilter: "blur(28px)",
@@ -207,9 +233,9 @@ export default function LoginPage() {
 
             {/* Title */}
             <div className="text-center">
-              <h1 className="text-3xl text-white mb-3">Welcome Back</h1>
+              <h1 className="text-3xl text-white mb-2">Welcome Back</h1>
               <p
-                className="text-[14px] font-medium mb-6"
+                className="text-[14px] font-medium mb-4"
                 style={{ color: "#fb923c" }}
               >
                 Please login to your School Account
@@ -263,7 +289,7 @@ export default function LoginPage() {
               </div>
 
               {/* Password */}
-              <div className="flex flex-col gap-1.5 mb-4">
+              <div className="flex flex-col gap-1.5 mb-2">
                 <label
                   className="text-[12px] uppercase tracking-widest mb-2"
                   style={{ color: "#fb923c" }}

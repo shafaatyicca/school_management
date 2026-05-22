@@ -31,9 +31,9 @@ export function useEmployeeModal(
 
       const method = selectedEmployee ? "PUT" : "POST";
       const payload = selectedEmployee
-        ? { id: selectedEmployee._id, ...data, schoolId }
-        : { ...data, schoolId };
-      const res = await fetch(`/api/employees?schoolId=${schoolId}`, {
+        ? { id: selectedEmployee._id, ...data }
+        : { ...data };
+      const res = await fetch(`/api/employees`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -55,9 +55,7 @@ export function useEmployeeModal(
           ),
         );
         // Profile update — selectedEmployee se compare karo
-        setViewingStaff((prev: any) =>
-          prev?._id?.toString() === id ? updatedEmployee : prev,
-        );
+        setViewingStaff(updatedEmployee);
         notify.success("Employee details updated");
       } else {
         setEmployees((prev) => [updatedEmployee, ...prev]);

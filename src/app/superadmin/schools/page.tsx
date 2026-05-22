@@ -3,8 +3,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Search, Plus } from "lucide-react";
 import { notify } from "@/lib/notify";
-
-// Components
 import { AdminList } from "@/components/superadmin/UserList";
 import SchoolFormModal from "@/components/superadmin/SchoolModal";
 import { UserModal } from "@/components/superadmin/UserModal";
@@ -23,7 +21,6 @@ export default function SchoolsPage() {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userEditId, setUserEditId] = useState<string | null>(null);
 
-  // ✅ Naye fields add kiye
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
@@ -91,7 +88,6 @@ export default function SchoolsPage() {
     const res = await fetch("/api/superadmin/users", {
       method: userEditId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      // ✅ role hardcoded nahi — userForm se aayega
       body: JSON.stringify({
         ...userForm,
         id: userEditId,
@@ -114,7 +110,6 @@ export default function SchoolsPage() {
 
   const handleDeleteAdmin = async (userId: string) => {
     try {
-      // ✅ Body se bheja
       const res = await fetch("/api/superadmin/users", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -185,7 +180,16 @@ export default function SchoolsPage() {
                   setExpandedSchool(nextId);
                   if (nextId) fetchUsers(id);
                 }}
-                onSwitch={(id: string) => router.push(`/${id}`)}
+                onSwitch={(school: any) => {
+                  console.log("School Data:", school);
+                  const slug = school.slug;
+                  if (!slug) {
+                    alert("Slug missing");
+                    return;
+                  }
+
+                  window.location.href = `http://${slug}.lvh.me:3000`;
+                }}
               />
               {expandedSchool === school._id && (
                 <div className="mt-2 ml-4 animate-in slide-in-from-top-2 duration-200">

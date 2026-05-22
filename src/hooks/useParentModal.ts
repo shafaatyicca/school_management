@@ -47,9 +47,7 @@ export function useParentModal(
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          selectedParent
-            ? { id: selectedParent._id, ...data, schoolId }
-            : { ...data, schoolId },
+          selectedParent ? { id: selectedParent._id, ...data } : { ...data },
         ),
       });
 
@@ -73,10 +71,10 @@ export function useParentModal(
         );
 
         // Update Profile Live
-        setSelectedParent({
+        setSelectedParent((prev: any) => ({
           ...updatedParent,
-          students: selectedParent.students,
-        });
+          students: prev?.students || [],
+        }));
         notify.success("Parent details updated successfully");
       } else {
         // Add New Parent Top of Table

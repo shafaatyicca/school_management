@@ -145,11 +145,11 @@ const SchoolCard = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onSwitch(school._id);
+                onSwitch(school);
               }}
               className="flex-1 md:w-full lg:w-auto bg-slate-900 text-white p-2 rounded-md text-[11px] font-bold flex items-center justify-center gap-1 hover:bg-indigo-600 transition-all shadow-sm whitespace-nowrap cursor-pointer"
             >
-              <ExternalLink size={14} className="shrink-0" />{" "}
+              <ExternalLink size={14} className="shrink-0" />
               <span>Dashboard</span>
             </button>
           </div>

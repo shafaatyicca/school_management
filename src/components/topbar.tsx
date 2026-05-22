@@ -60,7 +60,24 @@ export default function Topbar() {
           console.error("Error fetching school data:", err);
         }
       } else {
-        setSchoolData({ name: "SYSTEM CONTROL", logo: "" });
+        const hostname = window.location.hostname;
+        const isSubdomain =
+          hostname.includes(".lvh.me") || hostname.includes(".localhost");
+        const slug = hostname.split(".")[0];
+
+        if (isSubdomain && slug) {
+          try {
+            const res = await fetch(`/api/superadmin/schools?slug=${slug}`);
+            if (res.ok) {
+              const data = await res.json();
+              setSchoolData(data);
+            }
+          } catch (err) {
+            console.error("Error fetching school by slug:", err);
+          }
+        } else {
+          setSchoolData({ name: "SYSTEM CONTROL", logo: "" });
+        }
       }
     };
 
@@ -142,7 +159,9 @@ export default function Topbar() {
           /* PROFESSIONAL SUPER ADMIN INDICATOR */
           <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1.5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 animate-in fade-in zoom-in duration-500">
             <button
-              onClick={() => router.push("/superadmin")}
+              onClick={() =>
+                window.location.replace("http://lvh.me:3000/superadmin")
+              }
               className="flex items-center gap-1.5 text-[10px] font-bold dark: text-slate-100 text-slate-500 hover:text-indigo-600 transition-colors group cursor-pointer"
             >
               <ArrowLeft

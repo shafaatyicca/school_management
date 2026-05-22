@@ -152,6 +152,7 @@ export default function EmployeeFormModal({
         ...data,
         salary: Number(data.salary),
         experience: Number(data.experience),
+        schoolId: schoolId,
         emergencyContact: {
           name: data.emergencyContactName,
           phone: data.emergencyContactPhone,

@@ -2,66 +2,76 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 
-export const proxy = async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = await getToken({ req });
   const { pathname } = req.nextUrl;
+  const hostname = req.headers.get("host") || "";
 
   if (
     pathname.includes(".") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/api/auth")
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/favicon.ico")
   ) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/auth")) {
-    return NextResponse.next();
-  }
+  const currentHost = hostname
+    .replace(".lvh.me:3000", "")
+    .replace(".localhost:3000", "")
+    .replace("localhost:3000", "")
+    .replace("lvh.me:3000", "");
+
+  const isMainDomain =
+    hostname === "localhost:3000" || hostname === "lvh.me:3000";
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/login", req.url));
+    if (!pathname.startsWith("/login")) {
+      return NextResponse.redirect(new URL("/login", `http://localhost:3000`));
+    }
+    return NextResponse.next();
   }
 
   const role = token.role;
-  const userSchoolId = token.schoolId;
+  const userSchoolSlug = token.schoolSlug;
 
-  const pathSegments = pathname.split("/");
-  const urlSchoolId = pathSegments[1];
-
-  if (role === "super_admin") {
+  if (role === "super_admin" || role === "super-admin") {
     return NextResponse.next();
   }
 
   if (role === "school_admin") {
     if (pathname.startsWith("/superadmin")) {
-      return NextResponse.redirect(new URL(`/${userSchoolId}`, req.url));
+      return NextResponse.redirect(
+        new URL(`http://${userSchoolSlug}.lvh.me:3000/`),
+      );
     }
-    if (
-      urlSchoolId &&
-      urlSchoolId !== userSchoolId &&
-      urlSchoolId !== "superadmin" &&
-      urlSchoolId !== "api"
-    ) {
-      return NextResponse.redirect(new URL(`/${userSchoolId}`, req.url));
+
+    if (!isMainDomain && currentHost !== userSchoolSlug) {
+      return NextResponse.redirect(
+        new URL(`http://${userSchoolSlug}.lvh.me:3000${pathname}`, req.url),
+      );
+    }
+
+    if (isMainDomain && userSchoolSlug) {
+      return NextResponse.redirect(
+        new URL(`http://${userSchoolSlug}.lvh.me:3000${pathname}`, req.url),
+      );
     }
   }
 
-  return NextResponse.next();
-};
+  let cleanPath = pathname;
+  if (pathname.startsWith("/dashboard")) {
+    cleanPath = pathname.replace("/dashboard", "") || "/";
+  }
 
-// Ye middleware kin paths par apply hoga
+  return NextResponse.rewrite(new URL(cleanPath, req.url));
+}
+
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - login (login page)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     "/((?!login|api/auth|_next/static|_next/image|favicon.ico|.*\\.(?:jpg|jpeg|gif|png|svg|ico)$|.*\\.js$|.*\\.css$).*)",
   ],
 };

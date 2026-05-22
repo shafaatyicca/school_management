@@ -33,4 +33,4 @@ export async function GET(req: Request) {
 }
 
 // if you want to remove orphan images from cloudinary, you can hit url with the help of this Line
-// http://localhost:3000/api/cleanup-images?secret=myschool123
+// http://lvh.me:3000/api/cleanup-images?secret=myschool123

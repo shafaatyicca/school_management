@@ -208,7 +208,7 @@ export default function AllInvoicesPage() {
   };
 
   return (
-    <div className=" space-y-2 max-w-[1600px] mx-auto pb-48">
+    <div className="space-y-2 max-w-[1600px] mx-auto pb-48 overflow-x-hidden">
       {/* Top Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-2 rounded-md border shadow-sm">
         <div className="flex items-center gap-3 flex-1">
@@ -305,12 +305,15 @@ export default function AllInvoicesPage() {
           border: "1px solid #e2e8f0",
           boxShadow: "none",
           overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
         }}
       >
-        <Table sx={{ minWidth: 1100 }} size="small" aria-label="invoices table">
-          <TableHead sx={{ bgcolor: "#f8fafc" }}>
+        <Table sx={{ minWidth: 900 }} size="small" aria-label="invoices table">
+          <TableHead sx={{ bgcolor: "#f8fafc", py: 0.3 }}>
             <TableRow
-              sx={{ "& th": { borderBottom: "1px solid #e2e8f0", py: 0.5 } }}
+              sx={{
+                "& th": { borderBottom: "1px solid #e2e8f0", py: 0.2, px: 0.8 },
+              }}
             >
               <TableCell padding="checkbox" align="center">
                 <Checkbox
@@ -331,7 +334,6 @@ export default function AllInvoicesPage() {
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 INV #
@@ -341,7 +343,6 @@ export default function AllInvoicesPage() {
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 SCHOOL
@@ -351,73 +352,66 @@ export default function AllInvoicesPage() {
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 MONTH
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 PLAN FEE
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 FEEDING
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
-                  fontWeight: "black",
+                  fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 TOTAL
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 DISCOUNT
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#10b981",
-                  letterSpacing: "0.1em",
                 }}
               >
                 PAID
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#e11d48",
-                  letterSpacing: "0.1em",
                 }}
               >
                 REMAINING
@@ -428,18 +422,16 @@ export default function AllInvoicesPage() {
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 STATUS
               </TableCell>
               <TableCell
-                align="right"
+                align="center"
                 sx={{
                   fontSize: "10px",
                   fontWeight: "bold",
                   color: "#64748b",
-                  letterSpacing: "0.1em",
                 }}
               >
                 ACTIONS
@@ -481,6 +473,7 @@ export default function AllInvoicesPage() {
                   sx={{
                     "&:hover": { bgcolor: "#f8fafc" },
                     transition: "colors 0.2s",
+                    "& td": { py: 0.3, px: 0.8 },
                   }}
                 >
                   <TableCell padding="checkbox" align="center">
@@ -503,30 +496,30 @@ export default function AllInvoicesPage() {
                   <TableCell
                     sx={{
                       color: "#4f46e5",
-                      fontSize: "12px",
+                      fontSize: "10px",
                     }}
                   >
                     {inv.invoiceNumber}
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: 600, color: "#334155", fontSize: "12px" }}
+                    sx={{ fontWeight: 600, color: "#334155", fontSize: "10px" }}
                   >
                     {inv.schoolId?.name || "N/A"}
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: 500, color: "#64748b", fontSize: "12px" }}
+                    sx={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}
                   >
                     {inv.billingMonth}
                   </TableCell>
                   <TableCell
-                    align="right"
-                    sx={{ fontWeight: 500, color: "#475569", fontSize: "12px" }}
+                    align="center"
+                    sx={{ fontWeight: 500, color: "#475569", fontSize: "10px" }}
                   >
                     {inv.planAmount?.toLocaleString()}
                   </TableCell>
                   <TableCell
-                    align="right"
-                    sx={{ color: "#6366f1", fontWeight: 500, fontSize: "12px" }}
+                    align="center"
+                    sx={{ color: "#6366f1", fontWeight: 500, fontSize: "10px" }}
                   >
                     {(
                       inv.feedingSplit?.month1 ||
@@ -535,33 +528,33 @@ export default function AllInvoicesPage() {
                     ).toLocaleString()}
                   </TableCell>
                   <TableCell
-                    align="right"
-                    sx={{ fontWeight: 700, color: "#0f172a", fontSize: "12px" }}
+                    align="center"
+                    sx={{ fontWeight: 700, color: "#0f172a", fontSize: "10px" }}
                   >
                     {inv.finalAmount?.toLocaleString()}
                   </TableCell>
                   <TableCell
-                    align="right"
-                    sx={{ color: "#fb923c", fontWeight: 500, fontSize: "12px" }}
+                    align="center"
+                    sx={{ color: "#fb923c", fontWeight: 500, fontSize: "10px" }}
                   >
                     {(inv.discount || 0).toLocaleString()}
                   </TableCell>
                   <TableCell
-                    align="right"
+                    align="center"
                     sx={{
                       fontWeight: "bold",
                       color: "#059669",
                       bgcolor: "rgba(16, 185, 129, 0.05)",
-                      fontSize: "12px",
+                      fontSize: "10px",
                     }}
                   >
                     {(inv.amountPaid || 0).toLocaleString()}
                   </TableCell>
                   <TableCell
-                    align="right"
+                    align="center"
                     sx={{
                       fontWeight: "bold",
-                      fontSize: "12px",
+                      fontSize: "10px",
                       color: inv.status === "paid" ? "#cbd5e1" : "#e11d48",
                       bgcolor:
                         inv.status === "paid"
@@ -647,7 +640,14 @@ export default function AllInvoicesPage() {
             sx={{ bgcolor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}
           >
             <TableRow
-              sx={{ "& td": { fontWeight: "bold", py: 2, fontSize: "13px" } }}
+              sx={{
+                "& td": {
+                  fontWeight: "bold",
+                  py: 0.3,
+                  px: 0.8,
+                  fontSize: "10px",
+                },
+              }}
             >
               <TableCell
                 colSpan={4}

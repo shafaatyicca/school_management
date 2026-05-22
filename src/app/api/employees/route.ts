@@ -2,28 +2,45 @@ import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Employee from "@/models/Employee";
 import cloudinary, { deleteImage } from "@/lib/cloudinary-server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// GET → list employees (Filtered by schoolId)
+// GET → list employees (Securely filtered by session schoolId)
 export async function GET(req: Request) {
   try {
     await connectDB();
-    const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get("schoolId");
-    const filter = schoolId ? { schoolId } : {};
-    const employees = await Employee.find(filter as any)
+
+    const session = await getServerSession(authOptions);
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const urlSchoolId = new URL(req.url).searchParams.get("schoolId");
+    const schoolId = isSuperAdmin ? urlSchoolId : session?.user?.schoolId;
+
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const employees = await Employee.find({ schoolId } as any)
       .sort({ createdAt: -1 })
       .lean();
+
     return NextResponse.json(employees);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// POST → add employee
+// POST → add employee (Session based)
 export async function POST(req: Request) {
   try {
     await connectDB();
+    const session = await getServerSession(authOptions);
     const body = await req.json();
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin ? body.schoolId : session?.user?.schoolId;
+
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
 
     if (!body.fullName) {
       return NextResponse.json(
@@ -32,17 +49,12 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!body.schoolId) {
-      return NextResponse.json(
-        { message: "School ID is required" },
-        { status: 400 },
-      );
-    }
-
-    const employee = new Employee(body);
+    // SchoolId hamesha session se override hogi (Security)
+    const employeeData = { ...body, schoolId };
+    const employee = new Employee(employeeData);
     await employee.save();
 
-    //  Tag remove karo
+    // ✅ Cloudinary Tag Removal Logic (Intact)
     if (employee.image && employee.image.includes("cloudinary")) {
       const decodedUrl = decodeURIComponent(employee.image);
       const publicId = decodedUrl
@@ -61,12 +73,20 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT → update employee
+// PUT → update employee (Secure update)
 export async function PUT(req: Request) {
   try {
     await connectDB();
+    const session = await getServerSession(authOptions);
     const { id, ...updateData } = await req.json();
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin
+      ? updateData.schoolId
+      : session?.user?.schoolId;
 
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
     if (!id) {
       return NextResponse.json(
         { message: "Employee ID is required" },
@@ -74,30 +94,31 @@ export async function PUT(req: Request) {
       );
     }
 
+    // ✅ Aapki original Status Logic (Intact)
     if (updateData.status === "active") {
       updateData.inactiveDate = null;
       updateData.inactiveReason = "";
     }
 
-    const updated = await Employee.findByIdAndUpdate(
-      id,
+    // Security: findOneAndUpdate with schoolId
+    const updated = await Employee.findOneAndUpdate(
+      { _id: id, schoolId } as any,
       { $set: updateData },
       {
         new: true,
         runValidators: true,
         lean: true,
-        includeResultMetadata: true,
       },
     );
 
     if (!updated) {
       return NextResponse.json(
-        { message: "Employee not found" },
+        { message: "Employee not found or access denied" },
         { status: 404 },
       );
     }
 
-    //  Tag remove karo
+    // ✅ Cloudinary Tag Removal Logic (Intact)
     if (
       (updated as any).image &&
       (updated as any).image.includes("cloudinary")
@@ -119,11 +140,18 @@ export async function PUT(req: Request) {
   }
 }
 
-// DELETE → delete employee
+// DELETE → delete employee (With security check)
 export async function DELETE(req: Request) {
   try {
     await connectDB();
-    const { id } = await req.json();
+    const session = await getServerSession(authOptions);
+    const { id, schoolId: bodySchoolId } = await req.json();
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin ? bodySchoolId : session?.user?.schoolId;
+
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
 
     if (!id) {
       return NextResponse.json(
@@ -132,18 +160,19 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const employee = await Employee.findById(id);
+    // Security check: pehle confirm karo ke employee usi school ka hai
+    const employee = await Employee.findOne({ _id: id, schoolId } as any);
     if (!employee) {
       return NextResponse.json(
-        { message: "Employee not found" },
+        { message: "Employee not found in your school" },
         { status: 404 },
       );
     }
 
-    //  Pehle DB se delete karo
-    await Employee.findByIdAndDelete(id);
+    // ✅ DB se delete karein
+    await Employee.deleteOne({ _id: id, schoolId });
 
-    //  Background mein Cloudinary se delete karo
+    // ✅ Cloudinary Cleanup (Intact)
     if (employee.image && employee.image.includes("cloudinary")) {
       deleteImage(employee.image).catch((err) =>
         console.error("Cloudinary delete failed:", err),

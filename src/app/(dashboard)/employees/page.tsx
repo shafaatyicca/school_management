@@ -10,7 +10,6 @@ import { FileSpreadsheet, FileText, Printer, X } from "lucide-react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
 import { notify } from "@/lib/notify";
 import {
   MaterialReactTable,
@@ -22,8 +21,12 @@ import { calculateTenure, formatDate } from "@/lib/tenureUtils";
 import { useEmployeeModal } from "@/hooks/useEmployeeModal";
 
 export default function EmployeesPage() {
-  const params = useParams();
-  const schoolId = params.schoolId as string;
+  const { data: session } = useSession();
+  const schoolId = session?.user?.schoolId;
+  const isSuperAdmin = session?.user?.role === "super_admin";
+  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
+  const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
   const [employees, setEmployees] = useState<IEmployee[]>([]);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -37,17 +40,32 @@ export default function EmployeesPage() {
   });
 
   useEffect(() => {
-    if (schoolId) {
-      fetchEmployees();
+    if (!isSuperAdmin) return;
+    const hostname = window.location.hostname;
+    const isSubdomain =
+      hostname.includes(".lvh.me") || hostname.includes(".localhost");
+    if (isSubdomain) {
+      const slug = hostname.split(".")[0];
+      fetch(`/api/superadmin/schools?slug=${slug}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?._id) setViewSchoolId(data._id);
+        });
     }
-  }, [schoolId]);
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (effectiveSchoolId) fetchEmployees();
+  }, [effectiveSchoolId]);
 
   const fetchEmployees = async () => {
-    if (!schoolId) return;
+    if (!effectiveSchoolId) return;
     setFetchLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/employees?schoolId=${schoolId}`);
+      const response = await fetch(
+        `/api/employees?schoolId=${effectiveSchoolId}`,
+      );
       if (!response.ok) throw new Error("Failed to fetch");
       const data = await response.json();
       setEmployees(data);
@@ -60,12 +78,15 @@ export default function EmployeesPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteDialog.id || !schoolId) return;
+    if (!deleteDialog.id || !effectiveSchoolId) return;
     try {
-      const response = await fetch(`/api/employees?schoolId=${schoolId}`, {
+      const response = await fetch(`/api/employees`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: deleteDialog.id }),
+        body: JSON.stringify({
+          id: deleteDialog.id,
+          schoolId: effectiveSchoolId,
+        }),
       });
       if (!response.ok) throw new Error("Failed to delete");
       setEmployees((prev) => prev.filter((emp) => emp._id !== deleteDialog.id));
@@ -89,7 +110,7 @@ export default function EmployeesPage() {
     setSelectedEmployee,
     isLoading,
     handleFormSubmit,
-  } = useEmployeeModal(employees, setEmployees, schoolId);
+  } = useEmployeeModal(employees, setEmployees, effectiveSchoolId);
 
   // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
@@ -446,7 +467,7 @@ export default function EmployeesPage() {
         onSubmit={handleFormSubmit}
         employee={selectedEmployee}
         isLoading={isLoading}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}

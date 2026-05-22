@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useState, useEffect, useMemo } from "react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import {
@@ -23,8 +23,12 @@ import {
 } from "material-react-table";
 
 export default function ParentsPage() {
-  const params = useParams();
-  const schoolId = params.schoolId as string;
+  const { data: session } = useSession();
+  const schoolId = session?.user?.schoolId;
+  const isSuperAdmin = session?.user?.role === "super_admin";
+  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
+  const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
   const [parents, setParents] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -34,22 +38,32 @@ export default function ParentsPage() {
   } | null>(null);
 
   useEffect(() => {
-    fetchParents();
-  }, [schoolId]);
+    if (!isSuperAdmin) return;
+    const hostname = window.location.hostname;
+    const isSubdomain =
+      hostname.includes(".lvh.me") || hostname.includes(".localhost");
+    if (isSubdomain) {
+      const slug = hostname.split(".")[0];
+      fetch(`/api/superadmin/schools?slug=${slug}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?._id) setViewSchoolId(data._id);
+        });
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (effectiveSchoolId) fetchParents();
+  }, [effectiveSchoolId]);
 
   const fetchParents = async () => {
-    // 1. Pehle loader start karein
     setFetchLoading(true);
-
     try {
-      // 2. SchoolId check karein
-      if (!schoolId) {
-        console.error("School ID missing from URL");
+      if (!effectiveSchoolId) {
         setFetchLoading(false);
         return;
       }
-
-      const res = await fetch(`/api/parents?schoolId=${schoolId}`);
+      const res = await fetch(`/api/parents?schoolId=${effectiveSchoolId}`);
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -74,9 +88,12 @@ export default function ParentsPage() {
     if (!parentToDelete) return;
 
     try {
-      const res = await fetch(`/api/parents?schoolId=${schoolId}`, {
+      const res = await fetch(`/api/parents`, {
         method: "DELETE",
-        body: JSON.stringify({ id: parentToDelete.id }),
+        body: JSON.stringify({
+          id: parentToDelete.id,
+          schoolId: effectiveSchoolId,
+        }),
         headers: { "Content-Type": "application/json" },
       });
 
@@ -98,7 +115,7 @@ export default function ParentsPage() {
     handleSubmit,
     openEditParent,
     selectedParent,
-  } = useParentModal(parents, setParents, schoolId);
+  } = useParentModal(parents, setParents, effectiveSchoolId);
 
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
@@ -317,7 +334,7 @@ export default function ParentsPage() {
         parent={selectedParent}
         isLoading={isLoading}
         onSubmit={handleSubmit}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialogOpen}

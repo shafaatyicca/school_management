@@ -9,9 +9,21 @@ export async function GET(req: Request) {
     await connectDB();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const slug = searchParams.get("slug"); // ← NEW: slug param add kiya
 
     if (id) {
       const school = await SchoolModel.findById(id).populate("planId");
+      if (!school)
+        return NextResponse.json(
+          { error: "School not found" },
+          { status: 404 },
+        );
+      return NextResponse.json(school);
+    }
+
+    // ← NEW: Slug se single school fetch karo (super admin dashboard view k liye)
+    if (slug) {
+      const school = await SchoolModel.findOne({ slug }).populate("planId");
       if (!school)
         return NextResponse.json(
           { error: "School not found" },
@@ -34,7 +46,7 @@ export async function GET(req: Request) {
 
       if (today > expiry && school.status === "active") {
         await SchoolModel.findByIdAndUpdate(school._id, { status: "inactive" });
-        school.status = "inactive"; // Local update for immediate UI reflection
+        school.status = "inactive";
       }
     }
     // -------------------------------------------------------
@@ -45,12 +57,11 @@ export async function GET(req: Request) {
   }
 }
 
-// 2. CREATE NEW SCHOOL
+// 2. CREATE NEW SCHOOL (koi change nahi)
 export async function POST(req: Request) {
   try {
     await connectDB();
     const body = await req.json();
-
     const {
       name,
       address,
@@ -90,7 +101,7 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. UPDATE SCHOOL
+// 3. UPDATE SCHOOL (koi change nahi)
 export async function PUT(req: Request) {
   try {
     await connectDB();
@@ -100,7 +111,6 @@ export async function PUT(req: Request) {
     if (!id)
       return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-    // Purana school data nikalien taake date compare kar saken
     const oldSchool = await SchoolModel.findById(id);
     if (!oldSchool)
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -109,19 +119,13 @@ export async function PUT(req: Request) {
       const newExpiry = new Date(updateData.expiryDate);
       const oldExpiry = new Date(oldSchool.expiryDate);
       const today = new Date();
-
       today.setHours(0, 0, 0, 0);
       newExpiry.setHours(0, 0, 0, 0);
       oldExpiry.setHours(0, 0, 0, 0);
 
-      // --- FIX LOGIC ---
-      // 1. Agar Admin ne khud "active/inactive" dropdown chhera hai, to wahi chalne do
-      // 2. Lekin agar Admin ne sirf DATE barhayi hai (New > Old), to auto-active kar do
       if (newExpiry > oldExpiry && newExpiry >= today) {
         updateData.status = "active";
-      }
-      // 3. Agar Admin ne date peeche kar di (Expire kar diya), to auto-inactive kar do
-      else if (newExpiry < today) {
+      } else if (newExpiry < today) {
         updateData.status = "inactive";
       }
     }
@@ -138,7 +142,7 @@ export async function PUT(req: Request) {
   }
 }
 
-// 4. DELETE SCHOOL
+// 4. DELETE SCHOOL (koi change nahi)
 export async function DELETE(req: Request) {
   try {
     await connectDB();

@@ -21,6 +21,23 @@ export default function SuperAdminLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+
+  const handleCleanup = async () => {
+    if (!confirm("Cloudinary se pending images delete karo?")) return;
+    setCleanupLoading(true);
+    try {
+      const res = await fetch(
+        `/api/cleanup-images?secret=${process.env.NEXT_PUBLIC_CLEANUP_SECRET}`,
+      );
+      const data = await res.json();
+      alert(data.message);
+    } catch (err) {
+      alert("Cleanup failed");
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
   const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -68,20 +85,20 @@ export default function SuperAdminLayout({
     <div className="min-h-screen bg-[#f8fafc] flex font-sans text-slate-900">
       {/* SIDEBAR */}
       <aside
-        className={`${isSidebarOpen ? "w-64" : "w-20"} bg-slate-900 transition-all duration-300 fixed h-full z-50 shadow-2xl`}
+        className={`${isSidebarOpen ? "w-52" : "w-14"} bg-slate-900 transition-all duration-300 fixed h-full z-50 shadow-2xl flex flex-col`}
       >
-        <div className="p-4 flex items-center gap-3 text-white border-b border-slate-800">
-          <div className="bg-indigo-600 p-2 rounded-md">
-            <Settings2 size={20} />
+        <div className="p-3 flex items-center gap-3 text-white border-b border-slate-800">
+          <div className="bg-indigo-600 p-1.5 rounded-md shrink-0">
+            <Settings2 size={16} />
           </div>
           {isSidebarOpen && (
-            <span className="text-md uppercase font-bold tracking-tight">
+            <span className="text-sm uppercase font-bold tracking-tight">
               EduControl
             </span>
           )}
         </div>
 
-        <nav className="mt-6 px-2 space-y-2">
+        <nav className="mt-4 px-1.5 space-y-1 flex-1">
           {menuItems.map((item) => {
             const isActive =
               item.path === "/superadmin"
@@ -89,28 +106,62 @@ export default function SuperAdminLayout({
                 : pathname.startsWith(item.path);
 
             return (
-              <button
-                key={item.id}
-                onClick={() => router.push(item.path)}
-                className={`w-full flex items-center gap-3 p-2 rounded-md transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-lg"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                }`}
-              >
-                <item.icon size={20} />
-                {isSidebarOpen && (
-                  <span className="text-sm font-medium">{item.label}</span>
+              <div key={item.id} className="relative group">
+                <button
+                  onClick={() => router.push(item.path)}
+                  className={`w-full flex items-center gap-2.5 p-2 rounded-md transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-lg"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <item.icon size={16} className="shrink-0" />
+                  {isSidebarOpen && (
+                    <span className="text-xs font-medium">{item.label}</span>
+                  )}
+                </button>
+                {/* Collapsed hover tooltip */}
+                {!isSidebarOpen && (
+                  <div className="absolute left-14 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    {item.label}
+                  </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </nav>
+
+        {/* Cleanup Button */}
+        <div className="px-1.5 pb-4">
+          <div className="relative group">
+            <button
+              onClick={handleCleanup}
+              disabled={cleanupLoading}
+              className="w-full flex items-center gap-2.5 p-2 rounded-md text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 transition-all cursor-pointer"
+            >
+              {cleanupLoading ? (
+                <Loader2 size={16} className="shrink-0 animate-spin" />
+              ) : (
+                <Settings2 size={16} className="shrink-0" />
+              )}
+              {isSidebarOpen && (
+                <span className="text-xs font-medium">
+                  {cleanupLoading ? "Cleaning..." : "Cleanup Images"}
+                </span>
+              )}
+            </button>
+            {!isSidebarOpen && (
+              <div className="absolute left-14 top-1/2 -translate-y-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                Cleanup Images
+              </div>
+            )}
+          </div>
+        </div>
       </aside>
 
       {/* MAIN AREA */}
       <main
-        className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "ml-64" : "ml-20"}`}
+        className={`flex-1 transition-all duration-300 ${isSidebarOpen ? "ml-52" : "ml-14"}`}
       >
         <header className="bg-white/70 backdrop-blur-md border-b sticky top-0 z-40 px-4 py-2 flex justify-between items-center shadow-sm">
           <div className="flex items-center gap-4">

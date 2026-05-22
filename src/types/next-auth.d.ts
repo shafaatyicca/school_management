@@ -9,12 +9,14 @@ declare module "next-auth" {
       image?: string | null;
       role?: string;
       schoolId?: string | null;
+      schoolSlug?: string | null;
     };
   }
 
   interface User {
     role?: string;
     schoolId?: string | null;
+    schoolSlug?: string | null;
   }
 }
 
@@ -22,5 +24,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     role?: string;
     schoolId?: string | null;
+    schoolSlug?: string | null;
   }
 }

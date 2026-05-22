@@ -28,9 +28,9 @@ export function useStudentModal(
 
       const method = selectedStudent ? "PUT" : "POST";
       const payload = selectedStudent
-        ? { id: selectedStudent._id, ...data, schoolId }
-        : { ...data, schoolId };
-      const res = await fetch(`/api/students?schoolId=${schoolId}`, {
+        ? { id: selectedStudent._id, ...data }
+        : { ...data };
+      const res = await fetch(`/api/students`, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -50,9 +50,7 @@ export function useStudentModal(
             std._id?.toString() === id ? updatedStudent : std,
           ),
         );
-        setViewingStudent((prev: any) =>
-          prev?._id?.toString() === id ? updatedStudent : prev,
-        );
+        setViewingStudent(updatedStudent);
         notify.success("Student updated successfully");
       } else {
         setStudents((prev) => [updatedStudent, ...prev]);

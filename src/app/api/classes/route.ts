@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ClassModel } from "@/models/Class";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
 
-// 1. GET → List classes (Filtered by schoolId)
+// 1. GET → List classes
 export async function GET(req: Request) {
   try {
     await connectDB();
-    const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get("schoolId");
+    const session = await getServerSession(authOptions);
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const urlSchoolId = new URL(req.url).searchParams.get("schoolId");
+    const schoolId = isSuperAdmin ? urlSchoolId : session?.user?.schoolId;
 
-    // Filter lagaya taake sirf us school ki classes milein
-    const filter = schoolId ? { schoolId } : {};
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
 
-    const classes = await ClassModel.find(filter).sort({ order: 1, name: 1 });
+    const filter = { schoolId } as any;
+    const classes = await ClassModel.find(filter)
+      .sort({ order: 1, name: 1 })
+      .lean();
     return NextResponse.json(classes);
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });
@@ -23,12 +31,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await connectDB();
+    const session = await getServerSession(authOptions);
     const body = await req.json();
-    const { name, sections, order, schoolId } = body; // schoolId receive kiya
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin ? body.schoolId : session?.user?.schoolId;
 
-    if (!name || !schoolId) {
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { name, sections, order } = body;
+
+    if (!name) {
       return NextResponse.json(
-        { message: "Class name and School ID are required" },
+        { message: "Class name is required" },
         { status: 400 },
       );
     }
@@ -37,7 +53,7 @@ export async function POST(req: Request) {
       name,
       sections: sections || [],
       order: order || 0,
-      schoolId, // Database mein save kiya
+      schoolId,
     });
 
     return NextResponse.json(newClass, { status: 201 });
@@ -50,21 +66,27 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     await connectDB();
+    const session = await getServerSession(authOptions);
     const body = await req.json();
-    const { id, name, sections, order, schoolId } = body;
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin ? body.schoolId : session?.user?.schoolId;
 
-    const updated = await ClassModel.findByIdAndUpdate(
-      id,
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id, name, sections, order } = body;
+
+    const updated = await ClassModel.findOneAndUpdate(
+      { _id: id, schoolId } as any,
       {
         name,
         sections: sections || [],
         order: order,
-        schoolId, // Safety ke liye schoolId update/keep rakhein
       },
       {
         new: true,
         lean: true,
-        includeResultMetadata: true,
       },
     );
 
@@ -74,14 +96,23 @@ export async function PUT(req: Request) {
   }
 }
 
-// 4. PATCH → Bulk Order (Drag & Drop sorting ke liye)
+// 4. PATCH → Bulk Order
 export async function PATCH(req: Request) {
   try {
     await connectDB();
-    const { items } = await req.json();
+    const session = await getServerSession(authOptions);
+    const { items, schoolId: bodySchoolId } = await req.json();
+    const isSuperAdmin = session?.user?.role === "super_admin";
+    const schoolId = isSuperAdmin ? bodySchoolId : session?.user?.schoolId;
+
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
 
     const updatePromises = items.map((item: any) =>
-      ClassModel.findByIdAndUpdate(item.id, { order: item.order }),
+      ClassModel.findOneAndUpdate({ _id: item.id, schoolId } as any, {
+        order: item.order,
+      }),
     );
 
     await Promise.all(updatePromises);
@@ -98,13 +129,32 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     await connectDB();
+    const session = await getServerSession(authOptions);
+    const isSuperAdmin = session?.user?.role === "super_admin";
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const urlSchoolId = searchParams.get("schoolId");
+    const schoolId = isSuperAdmin ? urlSchoolId : session?.user?.schoolId;
 
-    if (!id)
-      return NextResponse.json({ error: "ID required" }, { status: 400 });
+    if (!id || !schoolId) {
+      return NextResponse.json(
+        { error: "ID and Session required" },
+        { status: 400 },
+      );
+    }
 
-    await ClassModel.findByIdAndDelete(id);
+    const deleted = await ClassModel.findOneAndDelete({
+      _id: id,
+      schoolId,
+    } as any);
+
+    if (!deleted) {
+      return NextResponse.json(
+        { error: "Class not found or unauthorized" },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({ message: "Deleted successfully" });
   } catch (error: any) {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

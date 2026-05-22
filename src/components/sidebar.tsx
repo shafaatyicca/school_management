@@ -29,15 +29,11 @@ export default function Sidebar() {
   const sidebarWidth = isCollapsed ? "lg:w-[70px]" : "lg:w-[220px]";
 
   const menu = [
-    { name: "Dashboard", href: `/${schoolId}`, icon: LayoutDashboard },
-    { name: "Classes", href: `/${schoolId}/classes`, icon: BookOpen },
-    { name: "Students", href: `/${schoolId}/students`, icon: GraduationCap },
-    {
-      name: "Employees",
-      href: `/${schoolId}/employees`,
-      icon: BriefcaseBusiness,
-    },
-    { name: "Parents", href: `/${schoolId}/parents`, icon: UsersRound },
+    { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Classes", href: "/classes", icon: BookOpen },
+    { name: "Students", href: "/students", icon: GraduationCap },
+    { name: "Employees", href: "/employees", icon: BriefcaseBusiness },
+    { name: "Parents", href: "/parents", icon: UsersRound },
   ];
 
   return (

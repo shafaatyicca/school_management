@@ -15,12 +15,13 @@ import {
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 
-export default function ClassPage({
-  params,
-}: {
-  params: Promise<{ schoolId: string }>;
-}) {
-  const { schoolId } = React.use(params);
+export default function ClassPage() {
+  const { data: session, status } = useSession();
+  const schoolId = session?.user?.schoolId;
+  const isSuperAdmin = session?.user?.role === "super_admin";
+  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
+  const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
   const [classes, setClasses] = useState<any[]>([]);
   const [isOrderMode, setIsOrderMode] = useState(false);
   const [orderMap, setOrderMap] = useState<{ [key: string]: number }>({});
@@ -28,10 +29,10 @@ export default function ClassPage({
   const [loading, setLoading] = useState(false);
 
   const fetchClasses = async () => {
-    if (!schoolId) return;
-    setLoading(true); // Loader start
+    if (!effectiveSchoolId) return;
+    setLoading(true);
     try {
-      const res = await fetch(`/api/classes?schoolId=${schoolId}`);
+      const res = await fetch(`/api/classes?schoolId=${effectiveSchoolId}`);
       const data = await res.json();
       setClasses(
         data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
@@ -47,10 +48,23 @@ export default function ClassPage({
   };
 
   useEffect(() => {
-    if (schoolId) {
-      fetchClasses();
+    if (!isSuperAdmin) return;
+    const hostname = window.location.hostname;
+    const isSubdomain =
+      hostname.includes(".lvh.me") || hostname.includes(".localhost");
+    if (isSubdomain) {
+      const slug = hostname.split(".")[0];
+      fetch(`/api/superadmin/schools?slug=${slug}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?._id) setViewSchoolId(data._id);
+        });
     }
-  }, [schoolId]);
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (effectiveSchoolId) fetchClasses();
+  }, [effectiveSchoolId]);
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -61,10 +75,10 @@ export default function ClassPage({
   });
 
   const handleDelete = async () => {
-    if (!deleteDialog.id) return; // Check karein id hai ya nahi
+    if (!deleteDialog.id) return;
     try {
       const res = await fetch(
-        `/api/classes?id=${deleteDialog.id}&schoolId=${schoolId}`,
+        `/api/classes?id=${deleteDialog.id}&schoolId=${effectiveSchoolId}`,
         {
           method: "DELETE",
         },
@@ -87,7 +101,7 @@ export default function ClassPage({
     await fetch("/api/classes", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, schoolId }),
+      body: JSON.stringify({ items, schoolId: effectiveSchoolId }),
     });
     setIsOrderMode(false);
     setLoading(false);
@@ -158,6 +172,21 @@ export default function ClassPage({
                   });
                 }
               }}
+              onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => {
+                if (e.key === "Tab") {
+                  e.preventDefault();
+                  const inputs = document.querySelectorAll<HTMLInputElement>(
+                    "input[inputmode='numeric']",
+                  );
+                  const index = Array.from(inputs).indexOf(e.currentTarget);
+                  const next = inputs[index + 1];
+                  if (next) {
+                    next.focus();
+                    next.select();
+                  }
+                }
+              }}
             />
           ) : (
             <div className="flex items-center justify-center w-full">
@@ -175,34 +204,38 @@ export default function ClassPage({
     columns,
     data: classes,
     state: { showProgressBars: loading },
-    enableDensityToggle: false, // Density toggle disable
-    enableColumnActions: false, // 3 dots menu disable
-    enableRowActions: !isOrderMode,
+    enableDensityToggle: false,
+    enableColumnActions: false,
+    // enableRowActions: !isOrderMode,
+    enableRowActions: isSuperAdmin,
     positionActionsColumn: "last",
     initialState: {
       density: "compact",
       pagination: { pageSize: 15, pageIndex: 0 },
     },
-    renderRowActions: ({ row }) => (
-      <div className="flex gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-          onClick={() => setModal({ open: true, data: row.original })}
-        >
-          <Pencil className="w-4 h-4 text-sky-500" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-          onClick={() => setDeleteDialog({ open: true, id: row.original._id })}
-        >
-          <Trash2 className="w-4 h-4 text-red-500" />
-        </Button>
-      </div>
-    ),
+    renderRowActions: ({ row }) =>
+      isSuperAdmin ? (
+        <div className="flex gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => setModal({ open: true, data: row.original })}
+          >
+            <Pencil className="w-4 h-4 text-sky-500" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+            onClick={() =>
+              setDeleteDialog({ open: true, id: row.original._id })
+            }
+          >
+            <Trash2 className="w-4 h-4 text-red-500" />
+          </Button>
+        </div>
+      ) : null,
 
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
@@ -302,8 +335,10 @@ export default function ClassPage({
     <div className="space-y-4">
       <PageHeader
         title="Class Manager"
-        buttonLabel="Add Class"
-        onButtonClick={() => setModal({ open: true, data: null })}
+        buttonLabel={isSuperAdmin ? "Add Class" : undefined}
+        onButtonClick={
+          isSuperAdmin ? () => setModal({ open: true, data: null }) : undefined
+        }
         icon={<BookOpen className="w-4 h-4" />}
       />
       <div className="rounded-xl border bg-background shadow-sm overflow-hidden">
@@ -314,7 +349,7 @@ export default function ClassPage({
         onClose={() => setModal({ open: false, data: null })}
         editClass={modal.data}
         onSuccess={fetchClasses}
-        schoolId={schoolId}
+        schoolId={effectiveSchoolId}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}
