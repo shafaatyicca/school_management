@@ -44,7 +44,7 @@ export default function LoginPage() {
         const isLocal =
           window.location.hostname.includes("lvh.me") ||
           window.location.hostname.includes("localhost");
-        const protocol = isLocal ? "http" : "https";
+        const protocol = window.location.protocol.replace(":", "");
 
         const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "lvh.me:3000";
 
