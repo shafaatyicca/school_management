@@ -22,15 +22,23 @@ export async function proxy(req: NextRequest) {
     .replace("localhost:3000", "")
     .replace("lvh.me:3000", "");
 
+  const isLocal = hostname.includes("lvh.me") || hostname.includes("localhost");
+  const protocol = isLocal ? "http" : "https";
+  const mainDomain = process.env.MAIN_DOMAIN || "lvh.me:3000";
+
   const isMainDomain =
-    hostname === "localhost:3000" || hostname === "lvh.me:3000";
+    hostname === "localhost:3000" ||
+    hostname === "lvh.me:3000" ||
+    hostname === mainDomain;
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     if (!pathname.startsWith("/login")) {
-      return NextResponse.redirect(new URL("/login", `http://localhost:3000`));
+      return NextResponse.redirect(
+        new URL("/login", `${protocol}://${hostname}`),
+      );
     }
     return NextResponse.next();
   }
@@ -45,19 +53,19 @@ export async function proxy(req: NextRequest) {
   if (role === "school_admin") {
     if (pathname.startsWith("/superadmin")) {
       return NextResponse.redirect(
-        new URL(`http://${userSchoolSlug}.lvh.me:3000/`),
+        new URL(`${protocol}://${userSchoolSlug}.${mainDomain}/`),
       );
     }
 
     if (!isMainDomain && currentHost !== userSchoolSlug) {
       return NextResponse.redirect(
-        new URL(`http://${userSchoolSlug}.lvh.me:3000${pathname}`, req.url),
+        new URL(`${protocol}://${userSchoolSlug}.${mainDomain}${pathname}`),
       );
     }
 
     if (isMainDomain && userSchoolSlug) {
       return NextResponse.redirect(
-        new URL(`http://${userSchoolSlug}.lvh.me:3000${pathname}`, req.url),
+        new URL(`${protocol}://${userSchoolSlug}.${mainDomain}${pathname}`),
       );
     }
   }
