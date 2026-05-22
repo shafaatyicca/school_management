@@ -91,7 +91,9 @@ export const authOptions: NextAuthOptions = {
         sameSite: "lax",
         path: "/",
         domain:
-          process.env.NODE_ENV === "development" ? ".lvh.me" : ".mcs.edu.pk",
+          process.env.NODE_ENV === "development"
+            ? ".lvh.me"
+            : process.env.COOKIE_DOMAIN || undefined,
         secure: process.env.NODE_ENV === "production",
       },
     },
