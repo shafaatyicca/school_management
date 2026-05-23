@@ -6,6 +6,7 @@ export async function proxy(req: NextRequest) {
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
+    cookieName: "next-auth.session-token",
   });
   const { pathname } = req.nextUrl;
   const hostname = req.headers.get("host") || "";
@@ -49,7 +50,7 @@ export async function proxy(req: NextRequest) {
   const role = token.role;
   const userSchoolSlug = token.schoolSlug;
 
-  if (role === "super_admin" || role === "super-admin") {
+  if (role === "super_admin") {
     return NextResponse.next();
   }
 
