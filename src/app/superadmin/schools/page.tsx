@@ -188,7 +188,13 @@ export default function SchoolsPage() {
                     return;
                   }
 
-                  window.location.href = `http://${slug}.lvh.me:3000`;
+                  const mainDomain =
+                    process.env.NEXT_PUBLIC_MAIN_DOMAIN || "lvh.me:3000";
+                  const isLocal =
+                    window.location.hostname.includes("lvh.me") ||
+                    window.location.hostname.includes("localhost");
+                  const protocol = isLocal ? "http" : "https";
+                  window.location.href = `${protocol}://${slug}.${mainDomain}`;
                 }}
               />
               {expandedSchool === school._id && (
