@@ -52,7 +52,6 @@ export default function LoginPage() {
           session?.user?.role === "super_admin" ||
           session?.user?.role === "super-admin"
         ) {
-          // Ye line Incognito fix karegi
           const currentOrigin = window.location.origin;
           window.location.href = `${currentOrigin}/superadmin`;
         } else if (session?.user?.schoolSlug) {
