@@ -55,10 +55,18 @@ export async function POST(req: Request) {
         const lastInv = await SchoolInvoiceModel.findOne({
           schoolId: school._id,
         }).sort({ createdAt: -1 });
-        const feedingArrears = Number(lastInv?.feedingSplit?.month2) || 0;
+        const lastInvMonth2 = Number(lastInv?.feedingSplit?.month2) || 0;
+        const alreadyCarriedForward =
+          lastInvMonth2 > 0
+            ? await SchoolInvoiceModel.findOne({
+                schoolId: school._id,
+                "feedingSplit.month1": { $gt: 0 },
+                createdAt: { $gt: lastInv.createdAt },
+              })
+            : true;
 
+        const feedingArrears = !alreadyCarriedForward ? lastInvMonth2 : 0;
         const totalAmount = planFee + feedingArrears;
-
         const counter = await GlobalCounterModel.findOneAndUpdate(
           { id: "school_invoice" },
           { $inc: { seq: 1 } },
@@ -131,7 +139,9 @@ export async function POST(req: Request) {
       dueDate: new Date(dueDate),
       status: "pending",
     });
-
+    await SchoolModel.findByIdAndUpdate(schoolId, {
+      expiryDate: new Date(dueDate),
+    });
     return NextResponse.json(newInvoice, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -202,6 +212,11 @@ export async function PUT(req: Request) {
         },
         { new: true },
       );
+      if (updatedData.dueDate) {
+        await SchoolModel.findByIdAndUpdate(invoice.schoolId, {
+          expiryDate: new Date(updatedData.dueDate),
+        });
+      }
       return NextResponse.json(edited);
     }
   } catch (error: any) {

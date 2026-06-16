@@ -149,7 +149,6 @@ export default function SchoolFormModal({
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <DialogContent dividers sx={{ py: 1, px: 2 }}>
           <div className="flex flex-col gap-4">
-            {/* ✅ Top Row: Image Left + Fields Right */}
             <div className="flex flex-row gap-4 items-start">
               {/* Left: Logo */}
               <div className="flex-shrink-0 flex flex-col items-center">
@@ -229,7 +228,6 @@ export default function SchoolFormModal({
               </div>
             </div>
 
-            {/* ✅ Baaki fields neeche */}
             <TextField
               {...register("name", { required: true })}
               label="School Name"
@@ -298,7 +296,6 @@ export default function SchoolFormModal({
                   size="small"
                   fullWidth
                   InputLabelProps={{ shrink: true }}
-                  onClick={(e: any) => e.target.showPicker?.()}
                 />
                 <TextField
                   {...register("joiningDate")}

@@ -3,6 +3,10 @@ import React, { useEffect, useState, useMemo } from "react";
 import PaymentModal from "@/components/superadmin/PaymentModal";
 import InvoiceModal from "@/components/superadmin/InvoiceModal";
 import { Select, MenuItem, FormControl, OutlinedInput } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { notify } from "@/lib/notify";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import {
@@ -48,6 +52,7 @@ export default function AllInvoicesPage() {
 
   // Bulk Form State
   const [bulkData, setBulkData] = useState({ month: "", dueDate: "" });
+  const [bulkBillingDate, setBulkBillingDate] = useState<Dayjs | null>(null);
 
   const fetchInvoices = async () => {
     try {
@@ -280,7 +285,7 @@ export default function AllInvoicesPage() {
             onClick={handleBulkDelete}
             className={`px-2 py-2.5 rounded-md text-xs flex items-center gap-2 transition-all border ${
               selectedInvoices.length > 0
-                ? "bg-rose-50 text-slate-600 border-rose-100 hover:bg-rose-600 hover:text-rose-600 cursor-pointer"
+                ? "bg-rose-50 text-slate-600 border-rose-100 hover:bg-rose-600 hover:text-white cursor-pointer"
                 : "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
             }`}
           >
@@ -773,15 +778,81 @@ export default function AllInvoicesPage() {
                 <label className="text-[12px] text-slate-800 ml-1 uppercase">
                   Billing Month
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. March 2026"
-                  className="mt-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/5 transition-all font-medium text-slate-700"
-                  value={bulkData.month}
-                  onChange={(e) =>
-                    setBulkData({ ...bulkData, month: e.target.value })
-                  }
-                />
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DatePicker
+                    views={["year", "month"]}
+                    openTo="month"
+                    defaultValue={dayjs()}
+                    value={bulkBillingDate}
+                    onChange={(date) => {
+                      setBulkBillingDate(date);
+                      if (date) {
+                        const month = date
+                          .toDate()
+                          .toLocaleString("en-US", { month: "long" });
+                        const year = date.year();
+                        setBulkData({ ...bulkData, month: `${month} ${year}` });
+                      }
+                    }}
+                    slotProps={{
+                      textField: {
+                        size: "small",
+                        fullWidth: true,
+                      },
+                      openPickerButton: {
+                        size: "small",
+                        sx: {
+                          padding: "2px",
+                          "& svg": { fontSize: "18px" },
+                        },
+                      },
+                      popper: {
+                        sx: {
+                          "& .MuiDateCalendar-root": {
+                            width: "236px",
+                            height: "auto",
+                            minHeight: "unset",
+                          },
+                          "& .MuiMonthCalendar-root": {
+                            width: "236px",
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gap: "4px",
+                            padding: "8px",
+                          },
+                          "& .MuiPickersMonth-root": {
+                            flexBasis: "unset",
+                          },
+                          "& .MuiPickersMonth-monthButton": {
+                            fontSize: "12px",
+                            height: "30px",
+                            width: "100%",
+                            borderRadius: "8px",
+                            fontWeight: 500,
+                            color: "#475569",
+                            "&:hover": {
+                              backgroundColor: "#1e293b",
+                              color: "#ffffff",
+                            },
+                          },
+                          "& .MuiPickersMonth-monthButton.Mui-selected": {
+                            backgroundColor: "#1e293b",
+                            color: "#ffffff",
+                            "&:hover": { backgroundColor: "#334155" },
+                          },
+                          "& .MuiPickersCalendarHeader-root": {
+                            paddingLeft: "12px",
+                            paddingRight: "4px",
+                            marginBottom: "4px",
+                          },
+                          "& .MuiYearCalendar-root": {
+                            width: "236px",
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </LocalizationProvider>
               </div>
 
               <div className="space-y-1.5 mt-4">

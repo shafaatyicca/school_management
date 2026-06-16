@@ -1,5 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { notify } from "@/lib/notify";
 import { useForm } from "react-hook-form";
 import {
@@ -27,6 +31,7 @@ export default function InvoiceModal({
   const { register, handleSubmit, reset, watch, setValue } = useForm();
   const [lastMonthBalance, setLastMonthBalance] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [billingDate, setBillingDate] = useState<Dayjs | null>(null);
 
   const getTodayDate = () => {
     const now = new Date();
@@ -42,15 +47,21 @@ export default function InvoiceModal({
 
   useEffect(() => {
     if (isOpen && !initialData && Array.isArray(allInvoices)) {
-      const pendingInv = [...allInvoices]
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        .find((inv) => inv.feedingSplit?.month2 > 0);
+      const sorted = [...allInvoices].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      const latestInv = sorted[0];
+      if (latestInv?.feedingSplit?.month2 > 0) {
+        const invoiceAfterLatest = sorted.find(
+          (inv: any) => new Date(inv.createdAt) > new Date(latestInv.createdAt),
+        );
 
-      if (pendingInv) {
-        setLastMonthBalance(pendingInv.feedingSplit.month2);
+        if (!invoiceAfterLatest) {
+          setLastMonthBalance(latestInv.feedingSplit.month2);
+        } else {
+          setLastMonthBalance(0);
+        }
       } else {
         setLastMonthBalance(0);
       }
@@ -81,6 +92,11 @@ export default function InvoiceModal({
             ? new Date(initialData.dueDate).toISOString().split("T")[0]
             : getTodayDate(),
         });
+        if (initialData.billingMonth) {
+          setBillingDate(
+            dayjs(`01 ${initialData.billingMonth}`, "DD MMMM YYYY"),
+          );
+        }
         setLastMonthBalance(0);
       } else {
         reset({
@@ -91,6 +107,7 @@ export default function InvoiceModal({
           billingMonth: "",
           dueDate: getTodayDate(),
         });
+        setBillingDate(null);
       }
     }
   }, [isOpen, initialData, schoolPrice, reset]);
@@ -159,15 +176,88 @@ export default function InvoiceModal({
                 </div>
               </div>
             )}
-
             <div className="grid grid-cols-2 gap-4">
-              <TextField
-                {...register("billingMonth", { required: true })}
-                label="Billing Month"
-                size="small"
-                placeholder="e.g., April"
-                required
-              />
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DatePicker
+                  label="Billing Month"
+                  views={["year", "month"]}
+                  openTo="month"
+                  defaultValue={dayjs()}
+                  value={billingDate}
+                  onChange={(date) => {
+                    setBillingDate(date);
+                    if (date) {
+                      const month = date
+                        .toDate()
+                        .toLocaleString("en-US", { month: "long" });
+                      const year = date.year();
+                      setValue("billingMonth", `${month} ${year}`);
+                    }
+                  }}
+                  slotProps={{
+                    textField: {
+                      size: "small",
+                      fullWidth: true,
+                      required: true,
+                    },
+                    openPickerButton: {
+                      size: "small",
+                      sx: {
+                        padding: "2px",
+                        "& svg": {
+                          fontSize: "18px",
+                        },
+                      },
+                    },
+                    popper: {
+                      sx: {
+                        "& .MuiDateCalendar-root": {
+                          width: "236px",
+                          height: "auto",
+                          minHeight: "unset",
+                        },
+                        "& .MuiMonthCalendar-root": {
+                          width: "236px",
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, 1fr)",
+                          gap: "4px",
+                          padding: "8px",
+                        },
+                        "& .MuiPickersMonth-root": {
+                          flexBasis: "unset",
+                        },
+                        "& .MuiPickersMonth-monthButton": {
+                          fontSize: "12px",
+                          height: "30px",
+                          width: "100%",
+                          borderRadius: "8px",
+                          fontWeight: 500,
+                          color: "#475569",
+                          "&:hover": {
+                            backgroundColor: "#1e293b",
+                            color: "#ffffff",
+                          },
+                        },
+                        "& .MuiPickersMonth-monthButton.Mui-selected": {
+                          backgroundColor: "#1e293b",
+                          color: "#ffffff",
+                          "&:hover": {
+                            backgroundColor: "#334155",
+                          },
+                        },
+                        "& .MuiPickersCalendarHeader-root": {
+                          paddingLeft: "12px",
+                          paddingRight: "4px",
+                          marginBottom: "4px",
+                        },
+                        "& .MuiYearCalendar-root": {
+                          width: "236px",
+                        },
+                      },
+                    },
+                  }}
+                />
+              </LocalizationProvider>
               <TextField
                 {...register("dueDate", { required: true })}
                 label="Due Date"

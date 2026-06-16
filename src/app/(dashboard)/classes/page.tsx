@@ -7,6 +7,8 @@ import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import { Button } from "@/components/ui/button";
 import ClassFormModal from "@/components/ClassFormModal";
 import PageHeader from "@/components/PageHeader";
+import SetFeeModal from "@/components/SetClassFeeModal";
+import SetOrderModal from "@/components/SetClassOrderModal";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -25,8 +27,12 @@ export default function ClassPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [isOrderMode, setIsOrderMode] = useState(false);
   const [orderMap, setOrderMap] = useState<{ [key: string]: number }>({});
+  const [feeMap, setFeeMap] = useState<{ [key: string]: number }>({});
+  const [isFeeMode, setIsFeeMode] = useState(false);
   const [modal, setModal] = useState({ open: false, data: null });
   const [loading, setLoading] = useState(false);
+  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   const fetchClasses = async () => {
     if (!effectiveSchoolId) return;
@@ -37,9 +43,14 @@ export default function ClassPage() {
       setClasses(
         data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
       );
-      const map: any = {};
-      data.forEach((c: any) => (map[c._id] = c.order || 0));
-      setOrderMap(map);
+      const oMap: any = {};
+      const fMap: any = {};
+      data.forEach((c: any) => {
+        oMap[c._id] = c.order || 0;
+        fMap[c._id] = c.classFee || 0;
+      });
+      setOrderMap(oMap);
+      setFeeMap(fMap);
     } catch (error) {
       console.error("Error fetching classes:", error);
     } finally {
@@ -92,22 +103,41 @@ export default function ClassPage() {
     }
   };
 
-  const handleBulkSave = async () => {
+  const handleBulkSave = async (mode: "order" | "fee") => {
     setLoading(true);
-    const items = Object.entries(orderMap).map(([id, order]) => ({
-      id,
-      order,
-    }));
-    await fetch("/api/classes", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, schoolId: effectiveSchoolId }),
-    });
-    setIsOrderMode(false);
-    setLoading(false);
-    fetchClasses();
-  };
 
+    // Sirf wahi data payload mein bhejein jiski zaroorat hai
+    const items = classes.map((cls) => {
+      if (mode === "order") {
+        return {
+          id: cls._id,
+          order: orderMap[cls._id] ?? 0,
+        };
+      } else {
+        return {
+          id: cls._id,
+          classFee: feeMap[cls._id] ?? 0,
+        };
+      }
+    });
+
+    try {
+      await fetch("/api/classes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, schoolId: effectiveSchoolId, mode }), // mode ko sath bheja
+      });
+
+      if (mode === "order") setIsOrderMode(false);
+      if (mode === "fee") setIsFeeMode(false);
+
+      fetchClasses();
+    } catch (error) {
+      console.error(`Bulk update failed for ${mode}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
       {
@@ -121,7 +151,7 @@ export default function ClassPage() {
         header: "Class Name",
         size: 150,
         Cell: ({ cell }) => (
-          <span className=" text-slate-700 dark:text-slate-200">
+          <span className="text-slate-700 dark:text-slate-200 font-medium">
             {cell.getValue<string>()}
           </span>
         ),
@@ -144,60 +174,33 @@ export default function ClassPage() {
         ),
       },
       {
+        accessorKey: "classFee",
+        header: "Class Fee",
+        size: 140,
+        Cell: ({ row }) => (
+          <div className="flex items-center justify-start w-full pl-1">
+            <span className="text-sm text-slate-700 dark:text-slate-300">
+              {row.original.classFee
+                ? row.original.classFee.toLocaleString()
+                : "0"}
+            </span>
+          </div>
+        ),
+      },
+      {
         accessorKey: "order",
         header: "Sort Order",
-        size: 80,
-        Cell: ({ row }) =>
-          isOrderMode ? (
-            <input
-              type="text"
-              inputMode="numeric"
-              className="w-10 h-8 rounded border border-slate-300 bg-white px-1 text-center font-bold text-sm text-slate-700 outline-none transition-all 
-                 /* Dark Mode Styling */
-                 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 
-                 /* Dark Mode Focus */
-                 dark:focus:border-blue-400 dark:focus:ring-blue-900/40 dark:focus:bg-slate-800"
-              value={
-                orderMap[row.original._id] === 0
-                  ? ""
-                  : orderMap[row.original._id]
-              }
-              placeholder="0"
-              onChange={(e) => {
-                const val = e.target.value;
-                if (/^\d*$/.test(val)) {
-                  setOrderMap({
-                    ...orderMap,
-                    [row.original._id]: val === "" ? 0 : parseInt(val),
-                  });
-                }
-              }}
-              onFocus={(e) => e.target.select()}
-              onKeyDown={(e) => {
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  const inputs = document.querySelectorAll<HTMLInputElement>(
-                    "input[inputmode='numeric']",
-                  );
-                  const index = Array.from(inputs).indexOf(e.currentTarget);
-                  const next = inputs[index + 1];
-                  if (next) {
-                    next.focus();
-                    next.select();
-                  }
-                }
-              }}
-            />
-          ) : (
-            <div className="flex items-center justify-center w-full">
-              <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
-                {row.original.order || 0}
-              </span>
-            </div>
-          ),
+        size: 90,
+        Cell: ({ row }) => (
+          <div className="flex items-center justify-center w-full">
+            <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
+              {row.original.order || 0}
+            </span>
+          </div>
+        ),
       },
     ],
-    [isOrderMode, orderMap],
+    [],
   );
 
   const table = useMaterialReactTable({
@@ -239,73 +242,58 @@ export default function ClassPage() {
 
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
-        {!isOrderMode ? (
-          <>
-            <Button
-              onClick={() => setIsOrderMode(true)}
-              variant="outline"
-              size="sm"
-              className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer h-8"
-            >
-              <ArrowDown10 className="h-4 w-4 mr-1" /> Set Orders
-            </Button>
+        {/* 1. Set Orders Button - Ab click hote hi Popup open karega */}
+        <Button
+          onClick={() => setIsOrderModalOpen(true)}
+          variant="outline"
+          size="sm"
+          className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer h-8"
+        >
+          <ArrowDown10 className="h-4 w-4 mr-1" /> Set Orders
+        </Button>
 
-            {/* Divider Line */}
-            <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
-
-            {/* Excel Button */}
-            <Button
-              onClick={() =>
-                handleExportRows(table, "excel", "Classes List Report")
-              }
-              variant="outline"
-              size="sm"
-              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
-            >
-              <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-            </Button>
-
-            {/* PDF Button */}
-            <Button
-              onClick={() =>
-                handleExportRows(table, "pdf", "Classes List Report")
-              }
-              variant="outline"
-              size="sm"
-              className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
-            >
-              <FileText className="h-4 w-4 mr-1" /> PDF
-            </Button>
-
-            {/* Print Button */}
-            <Button
-              onClick={() => handlePrintTable(table, "Classes List Report")}
-              variant="outline"
-              size="sm"
-              className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
-            >
-              <Printer className="h-4 w-4 mr-1" /> Print
-            </Button>
-          </>
-        ) : (
-          <div className="flex gap-2">
-            <Button
-              onClick={handleBulkSave}
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 cursor-pointer h-8 text-white font-bold"
-            >
-              <Save className="h-4 w-4 mr-1" /> Save Order
-            </Button>
-            <Button
-              onClick={() => setIsOrderMode(false)}
-              size="sm"
-              variant="ghost"
-              className="cursor-pointer hover:bg-red-50 text-red-600 border border-red-100 h-8"
-            >
-              <X className="h-4 w-4 mr-1" /> Cancel
-            </Button>
-          </div>
+        {/* 2. Set Class Fee Button - Only Super Admin aur click par Popup open hoga */}
+        {isSuperAdmin && (
+          <Button
+            onClick={() => setIsFeeModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 cursor-pointer h-8"
+          >
+            <Save className="h-4 w-4 mr-1" /> Set Class Fee
+          </Button>
         )}
+
+        {/* Divider Line */}
+        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+
+        {/* Export Buttons */}
+        <Button
+          onClick={() =>
+            handleExportRows(table, "excel", "Classes List Report")
+          }
+          variant="outline"
+          size="sm"
+          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
+        >
+          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+        </Button>
+        <Button
+          onClick={() => handleExportRows(table, "pdf", "Classes List Report")}
+          variant="outline"
+          size="sm"
+          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
+        >
+          <FileText className="h-4 w-4 mr-1" /> PDF
+        </Button>
+        <Button
+          onClick={() => handlePrintTable(table, "Classes List Report")}
+          variant="outline"
+          size="sm"
+          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
+        >
+          <Printer className="h-4 w-4 mr-1" /> Print
+        </Button>
       </div>
     ),
     muiTablePaperProps: {
@@ -350,6 +338,30 @@ export default function ClassPage() {
         editClass={modal.data}
         onSuccess={fetchClasses}
         schoolId={effectiveSchoolId}
+      />
+      <SetFeeModal
+        isOpen={isFeeModalOpen}
+        onClose={() => setIsFeeModalOpen(false)}
+        classes={classes}
+        feeMap={feeMap}
+        setFeeMap={setFeeMap}
+        onSave={async () => {
+          await handleBulkSave("fee");
+          setIsFeeModalOpen(false);
+        }}
+        loading={loading}
+      />
+      <SetOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        classes={classes}
+        orderMap={orderMap}
+        setOrderMap={setOrderMap}
+        onSave={async () => {
+          await handleBulkSave("order");
+          setIsOrderModalOpen(false);
+        }}
+        loading={loading}
       />
       <DeleteConfirmDialog
         open={deleteDialog.open}

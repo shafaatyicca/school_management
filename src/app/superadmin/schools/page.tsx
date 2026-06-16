@@ -7,12 +7,12 @@ import { AdminList } from "@/components/superadmin/UserList";
 import SchoolFormModal from "@/components/superadmin/SchoolModal";
 import { UserModal } from "@/components/superadmin/UserModal";
 import SchoolCard from "@/components/superadmin/SchoolCard";
+import { fa } from "zod/v4/locales";
 
 export default function SchoolsPage() {
   const router = useRouter();
   const [schools, setSchools] = useState<any[]>([]);
   const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSchool, setExpandedSchool] = useState<string | null>(null);
   const [schoolUsers, setSchoolUsers] = useState([]);
@@ -20,6 +20,8 @@ export default function SchoolsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userEditId, setUserEditId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(false);
 
   const [userForm, setUserForm] = useState({
     name: "",
@@ -31,24 +33,26 @@ export default function SchoolsPage() {
     securityQuestion: { question: "", answer: "" },
   });
 
-  const fetchSchools = async () => {
+  const fetchInitialData = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
+
     try {
-      setLoading(true);
-      const res = await fetch("/api/superadmin/schools");
-      const data = await res.json();
-      setSchools(Array.isArray(data) ? data : []);
+      const [schoolsRes, plansRes] = await Promise.all([
+        fetch("/api/superadmin/schools"),
+        fetch("/api/superadmin/plans"),
+      ]);
+
+      const schoolsData = await schoolsRes.json();
+      const plansData = await plansRes.json();
+
+      setSchools(Array.isArray(schoolsData) ? schoolsData : []);
+      setPlans(Array.isArray(plansData) ? plansData : []);
     } catch (err) {
       setSchools([]);
-      notify.error("Error!", "Failed to load schools");
+      notify.error("Error!", "Failed to load data");
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
-  };
-
-  const fetchPlans = async () => {
-    const res = await fetch("/api/superadmin/plans");
-    const data = await res.json();
-    if (Array.isArray(data)) setPlans(data);
   };
 
   const fetchUsers = async (schoolId: string) => {
@@ -58,8 +62,18 @@ export default function SchoolsPage() {
   };
 
   useEffect(() => {
-    fetchSchools();
-    fetchPlans();
+    const load = async () => {
+      if (!initialLoad) {
+        setLoading(true);
+        await fetchInitialData(false);
+        setLoading(false);
+        setInitialLoad(true);
+      } else {
+        await fetchInitialData(false);
+      }
+    };
+
+    load();
   }, []);
 
   const handleSchoolSubmit = async (data: any) => {
@@ -71,7 +85,7 @@ export default function SchoolsPage() {
     if (res.ok) {
       setIsSchoolModalOpen(false);
       setEditId(null);
-      fetchSchools();
+      fetchInitialData(false);
       notify.success(
         editId ? "School Updated!" : "School Added!",
         editId
@@ -174,7 +188,7 @@ export default function SchoolsPage() {
                   setEditId(s._id);
                   setIsSchoolModalOpen(true);
                 }}
-                onRefresh={fetchSchools}
+                onRefresh={fetchInitialData}
                 onExpand={(id: string) => {
                   const nextId = expandedSchool === id ? null : id;
                   setExpandedSchool(nextId);

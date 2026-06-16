@@ -25,7 +25,7 @@ export default function DeleteConfirmDialog({
 }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-500 dark:bg-slate-900">
+      <AlertDialogContent className="rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-500 dark:bg-slate-900 z-[9999]">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100">
             Are you absolutely sure?

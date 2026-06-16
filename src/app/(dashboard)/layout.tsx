@@ -21,7 +21,6 @@ export default function DashboardLayout({
     }
   }, [status, router]);
 
-  // FIXED: Full-page loader with high z-index to cover Sidebar/Topbar
   if (status === "loading") {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white dark:bg-slate-950">

@@ -33,8 +33,13 @@ export default function DashboardPage() {
     status: "active",
   });
   const [isInactive, setIsInactive] = useState(false);
+  const [paymentWarning, setPaymentWarning] = useState<{
+    show: boolean;
+    daysLeft: number;
+    invoice: any;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null); // ← NEW
+  const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -133,41 +138,61 @@ export default function DashboardPage() {
     if (effectiveSchoolId) fetchData();
   }, [effectiveSchoolId]); // ← effectiveSchoolId use ho raha hai
 
-  // ── Dashboard Stats ─────────────────────────────────────────────
   useEffect(() => {
     const fetchDashboardStats = async () => {
-      if (status === "loading" || !effectiveSchoolId) return; // ← effectiveSchoolId
+      if (status === "loading" || !effectiveSchoolId) return;
 
       try {
-        // ← Hamesha effectiveSchoolId pass karo
-        const statsUrl = `/api/schoolStats?schoolId=${effectiveSchoolId}`;
-
-        const res = await fetch(statsUrl);
-        const statsData = await res.json();
+        const [statsRes, invRes] = await Promise.all([
+          fetch(`/api/schoolStats?schoolId=${effectiveSchoolId}`),
+          fetch(`/api/superadmin/invoices?schoolId=${effectiveSchoolId}`),
+        ]);
+        const statsData = await statsRes.json();
+        const invoices = await invRes.json();
         setStats(statsData);
 
-        const invUrl = `/api/superadmin/invoices?schoolId=${effectiveSchoolId}`; // ← effectiveSchoolId
-
-        const invRes = await fetch(invUrl);
-        const invoices = await invRes.json();
-
-        const hasOverdueInvoice =
-          Array.isArray(invoices) &&
-          invoices.some(
-            (inv: any) =>
-              inv.status.toLowerCase() === "pending" &&
-              new Date(inv.dueDate) < new Date(),
-          );
-
-        // ← Sirf school_admin ya admin ko block karo, super_admin ko nahi
         const isSchoolAdminRole =
           session?.user?.role === "admin" ||
           session?.user?.role === "school_admin";
-        const isSchoolInactive = statsData.status === "inactive";
-        const shouldBlock =
-          (isSchoolInactive || hasOverdueInvoice) && isSchoolAdminRole;
 
-        setIsInactive(shouldBlock);
+        if (!isSchoolAdminRole || !Array.isArray(invoices)) return;
+
+        const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
+
+        const pendingInvoices = invoices.filter(
+          (inv: any) => inv.status.toLowerCase() === "pending",
+        );
+
+        if (pendingInvoices.length === 0) return;
+
+        const latestPending = pendingInvoices.reduce((latest: any, inv: any) =>
+          new Date(inv.dueDate) > new Date(latest.dueDate) ? inv : latest,
+        );
+
+        const toKarachiMidnight = (d: Date) => {
+          const s = d.toLocaleString("en-US", { timeZone: "Asia/Karachi" });
+          const p = new Date(s);
+          p.setHours(0, 0, 0, 0);
+          return p;
+        };
+        const nowPKT = toKarachiMidnight(new Date());
+        const latestDuePKT = toKarachiMidnight(new Date(latestPending.dueDate));
+
+        // Suspend: due date aaj ya pehle
+        if (latestDuePKT <= nowPKT) {
+          setIsInactive(true);
+          return;
+        }
+
+        // Warning: 5 din ya kam bache
+        const diff = latestDuePKT.getTime() - nowPKT.getTime();
+        if (diff > 0 && diff <= FIVE_DAYS_MS) {
+          const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
+          const dismissedKey = `warning_dismissed_${latestPending._id}_${latestPending.dueDate}`;
+          if (!sessionStorage.getItem(dismissedKey)) {
+            setPaymentWarning({ show: true, daysLeft, invoice: latestPending });
+          }
+        }
       } catch (err) {
         console.error("Stats fetch error:", err);
       } finally {
@@ -176,7 +201,7 @@ export default function DashboardPage() {
     };
 
     fetchDashboardStats();
-  }, [effectiveSchoolId, session, status]); // ← effectiveSchoolId
+  }, [effectiveSchoolId, session, status]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure?")) return;
@@ -393,7 +418,78 @@ export default function DashboardPage() {
         editData={editingTodo}
         schoolId={effectiveSchoolId} // ← effectiveSchoolId
       />
+      {/* ↓ YEH NAYA WARNING MODAL ADD KARO */}
+      {paymentWarning?.show && !isInactive && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
+          <div className="bg-white dark:bg-card p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-4 border-amber-500 animate-in zoom-in duration-300">
+            <div className="bg-amber-100 dark:bg-amber-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShieldCheck className="text-amber-500 dark:text-amber-400 w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">
+              Payment Due Soon
+            </h2>
+            <p className="text-slate-500 dark:text-muted-foreground text-sm mb-4 leading-relaxed">
+              Aapka payment{" "}
+              <strong className="text-amber-600">
+                {paymentWarning.daysLeft} din
+              </strong>{" "}
+              mein due hai. Baraaye meharbani waqt par payment karein warna
+              account suspend ho jayega.
+            </p>
 
+            {/* Invoice detail */}
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 mb-6 text-left space-y-1.5">
+              {paymentWarning.invoice?.invoiceNumber && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Invoice #</span>
+                  <span className="font-medium text-slate-700 dark:text-white">
+                    {paymentWarning.invoice.invoiceNumber}
+                  </span>
+                </div>
+              )}
+              {paymentWarning.invoice?.amount && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Amount</span>
+                  <span className="font-medium text-slate-700 dark:text-white">
+                    Rs. {Number(paymentWarning.invoice.amount).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs">
+                <span className="text-slate-500">Due Date</span>
+                <span className="font-medium text-amber-600">
+                  {new Date(paymentWarning.invoice.dueDate).toLocaleDateString(
+                    "en-PK",
+                    { day: "numeric", month: "long", year: "numeric" },
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => {
+                sessionStorage.setItem(
+                  `warning_dismissed_${paymentWarning.invoice._id}_${paymentWarning.invoice.dueDate}`,
+                  "true",
+                );
+                setPaymentWarning(null);
+              }}
+              sx={{
+                borderRadius: "12px",
+                py: 1.2,
+                textTransform: "none",
+                color: "#64748b",
+                borderColor: "#e2e8f0",
+                "&:hover": { bgcolor: "#f8fafc" },
+              }}
+            >
+              Theek hai, yaad hai mujhe
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Inactive Account Modal */}
       {isInactive && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4">

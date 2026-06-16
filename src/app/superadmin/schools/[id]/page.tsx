@@ -163,7 +163,6 @@ export default function SchoolBillingPage() {
           <Plus size={15} /> New Invoice
         </button>
       </div>
-
       <div className="bg-white border rounded-md overflow-hidden shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-widest border-b">

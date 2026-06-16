@@ -8,6 +8,7 @@ interface PageHeaderProps {
   buttonLabel?: string;
   onButtonClick?: () => void;
   icon?: ReactNode;
+  rightContent?: ReactNode;
 }
 
 export default function PageHeader({
@@ -15,6 +16,7 @@ export default function PageHeader({
   buttonLabel,
   onButtonClick,
   icon,
+  rightContent,
 }: PageHeaderProps) {
   return (
     <div className=" w-full ">
@@ -37,6 +39,7 @@ export default function PageHeader({
           </div>
 
           {/* Right Side: Action Button */}
+          {rightContent}
           {buttonLabel && (
             <button
               onClick={onButtonClick}

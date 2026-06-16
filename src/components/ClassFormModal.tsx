@@ -31,7 +31,14 @@ export default function ClassFormModal({
   isLoading,
   schoolId,
 }: Props) {
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: {
+      name: "",
+      sections: "",
+      classFee: 0,
+      order: 0,
+    },
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,9 +47,10 @@ export default function ClassFormModal({
         name: editClass.name,
         sections: editClass.sections.join(", "),
         order: editClass.order || 0,
+        classFee: editClass.classFee || 0,
       });
     } else {
-      reset({ name: "", sections: "", order: 0 });
+      reset({ name: "", sections: "", order: 0, classFee: 0 });
     }
   }, [editClass, isOpen, reset]);
 
@@ -59,6 +67,7 @@ export default function ClassFormModal({
       name: data.name,
       sections: sectionsArray,
       order: Number(data.order),
+      classFee: Number(data.classFee || 0),
       schoolId: schoolId,
     };
 
@@ -144,6 +153,19 @@ export default function ClassFormModal({
               helperText="Separate multiple sections with a comma"
             />
 
+            <TextField
+              {...register("classFee", { required: true })}
+              label="Class Fee (PKR)"
+              type="number"
+              fullWidth
+              size="small"
+              required
+              sx={{
+                "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button":
+                  { display: "none" },
+                "& input": { MozAppearance: "textfield" },
+              }}
+            />
             <TextField
               {...register("order")}
               label="Sort Order"
