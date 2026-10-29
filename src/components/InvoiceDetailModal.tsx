@@ -215,14 +215,14 @@ export default function InvoiceDetailModal({
                 </div>
                 <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                   <div
-  className="h-full rounded-full transition-all duration-500"
-  style={{
-    width: `${invoice.netPayable > 0
-      ? Math.min(100, Math.round((invoice.paidAmount / invoice.netPayable) * 100))
-      : 0}%`,
-    backgroundColor: invoice.status === "paid" ? "#22c55e" : "#f59e0b" // Green agar Paid, Amber agar Partial
-  }}
-/>
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${invoice.netPayable > 0
+                        ? Math.min(100, Math.round((invoice.paidAmount / invoice.netPayable) * 100))
+                        : 0}%`,
+                      backgroundColor: invoice.status === "paid" ? "#22c55e" : "#f59e0b" // Green agar Paid, Amber agar Partial
+                    }}
+                  />
                 </div>
               </div>
 

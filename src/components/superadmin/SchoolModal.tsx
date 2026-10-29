@@ -272,7 +272,7 @@ export default function SchoolFormModal({
                 >
                   {plans.map((p) => (
                     <MenuItem key={p._id} value={p._id}>
-                      {p.name} — ${p.price}
+                      {p.name} — {p.price}
                     </MenuItem>
                   ))}
                 </TextField>

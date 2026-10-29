@@ -510,13 +510,13 @@ export default function EmployeesPage() {
               <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
 
               <div
-                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-[2.5rem] shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
+                className="relative z-10 bg-white dark:bg-slate-900 p-1.5 rounded-md shadow-2xl border border-white/20 animate-in zoom-in duration-300 w-72"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="relative">
                   <img
                     src={displayImg}
-                    className="w-full h-72 object-cover rounded-[2.2rem] shadow-inner border border-slate-100 dark:border-slate-800"
+                    className="w-full h-72 object-cover rounded-md shadow-inner border border-slate-100 dark:border-slate-800"
                     alt="Preview"
                   />
 
@@ -529,7 +529,7 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="py-4 px-2 text-center">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
+                  <p className="text-[10px] text-slate-400 uppercase  mb-1">
                     Staff Preview
                   </p>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">

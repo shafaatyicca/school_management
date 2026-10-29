@@ -17,6 +17,8 @@ import {
   X,
   Search,
   ChevronDown,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import {
   Table,
@@ -30,6 +32,7 @@ import {
   IconButton,
   Chip,
   Box,
+  TablePagination,
 } from "@mui/material";
 
 export default function AllInvoicesPage() {
@@ -38,6 +41,8 @@ export default function AllInvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState<number | "all">(10);
 
   // Modals States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -75,17 +80,27 @@ export default function AllInvoicesPage() {
     return invoices.filter((inv) => {
       const name = inv.schoolId?.name || "";
       const invNum = inv.invoiceNumber || "";
+      const billingMonth = inv.billingMonth || "";
       const matchSearch =
         name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invNum.toLowerCase().includes(searchTerm.toLowerCase());
+        invNum.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        billingMonth.toLowerCase().includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === "all" || inv.status === statusFilter;
       return matchSearch && matchStatus;
     });
   }, [invoices, searchTerm, statusFilter]);
 
+  const paginatedData = useMemo(() => {
+    if (rowsPerPage === "all") return filtered;
+    return filtered.slice(
+      page * Number(rowsPerPage),
+      page * Number(rowsPerPage) + Number(rowsPerPage),
+    );
+  }, [filtered, page, rowsPerPage]);
+
   // --- FOOTER TOTALS CALCULATION ---
   const totals = useMemo(() => {
-    return filtered.reduce(
+    return paginatedData.reduce(
       (acc, inv) => ({
         plan: acc.plan + (inv.planAmount || 0),
         feeding:
@@ -98,7 +113,7 @@ export default function AllInvoicesPage() {
       }),
       { plan: 0, feeding: 0, discount: 0, total: 0, paid: 0, pending: 0 },
     );
-  }, [filtered]);
+  }, [paginatedData]);
 
   // --- ACTIONS (LOGIC UNCHANGED) ---
   const handleInvoiceEditSubmit = async (formData: any) => {
@@ -219,13 +234,13 @@ export default function AllInvoicesPage() {
         <div className="flex items-center gap-3 flex-1">
           <div className="relative flex-1 max-w-md">
             <Search
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
               size={18}
             />
             <input
               type="text"
-              placeholder="Search school or invoice..."
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-md text-sm font-medium outline-none focus:border-indigo-400 focus:bg-white transition-all"
+              placeholder="Search by School Name, Invoice Number, & Billing Months"
+              className="w-full pl-8 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-md text-sm font-medium outline-none focus:border-indigo-400 focus:bg-white transition-all"
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
@@ -272,9 +287,15 @@ export default function AllInvoicesPage() {
                 />
               }
             >
-              <MenuItem value="all">All Status</MenuItem>
-              <MenuItem value="paid">Paid</MenuItem>
-              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem sx={{ fontSize: "12px" }} value="all">
+                All Status
+              </MenuItem>
+              <MenuItem sx={{ fontSize: "12px" }} value="paid">
+                Paid
+              </MenuItem>
+              <MenuItem sx={{ fontSize: "12px" }} value="pending">
+                Pending
+              </MenuItem>
             </Select>
           </FormControl>
         </div>
@@ -471,7 +492,7 @@ export default function AllInvoicesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((inv) => (
+              paginatedData.map((inv) => (
                 <TableRow
                   key={inv._id}
                   hover
@@ -577,7 +598,7 @@ export default function AllInvoicesPage() {
                       label={inv.status}
                       size="small"
                       sx={{
-                        fontSize: "10px",
+                        fontSize: "9px",
                         fontWeight: "bold",
                         textTransform: "uppercase",
                         borderRadius: "10px",
@@ -617,7 +638,7 @@ export default function AllInvoicesPage() {
                           "&:hover": { bgcolor: "#eff6ff" },
                         }}
                       >
-                        <Edit3 size={16} />
+                        <Edit3 size={14} />
                       </IconButton>
                       <IconButton
                         size="small"
@@ -631,7 +652,7 @@ export default function AllInvoicesPage() {
                           "&:hover": { bgcolor: "#fff1f2" },
                         }}
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </IconButton>
                     </Box>
                   </TableCell>
@@ -648,51 +669,103 @@ export default function AllInvoicesPage() {
               sx={{
                 "& td": {
                   fontWeight: "bold",
-                  py: 0.3,
+                  py: 0.5,
                   px: 0.8,
                   fontSize: "10px",
                 },
               }}
             >
-              <TableCell
-                colSpan={4}
-                align="right"
-                sx={{
-                  color: "#94a3b8",
-                  fontSize: "10px !important",
-                  letterSpacing: "0.1em",
-                }}
-              >
-                GRAND TOTALS:
+              {/* Left Side: Rows per page + Count text */}
+              <TableCell colSpan={4} align="left">
+                <div className="flex items-center gap-3 text-[11px] font-normal text-slate-600">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">
+                      Rows Per Page:
+                    </span>
+                    <select
+                      value={rowsPerPage}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRowsPerPage(val === "all" ? "all" : Number(val));
+                        setPage(0);
+                      }}
+                      className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white outline-none cursor-pointer font-medium"
+                    >
+                      {[10, 25, 50, 75, 100, "all"].map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt === "all" ? "All" : opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="whitespace-nowrap text-slate-500 font-medium">
+                    {filtered.length === 0
+                      ? "0 records"
+                      : rowsPerPage === "all"
+                        ? `1–${filtered.length} of ${filtered.length}`
+                        : `${page * Number(rowsPerPage) + 1}–${Math.min((page + 1) * Number(rowsPerPage), filtered.length)} of ${filtered.length}`}
+                  </span>
+                </div>
               </TableCell>
-              <TableCell align="right">
+
+              {/* Grand Totals Columns */}
+              <TableCell align="center">
                 {totals.plan.toLocaleString()}
               </TableCell>
-              <TableCell align="right" sx={{ color: "#6366f1" }}>
+              <TableCell align="center" sx={{ color: "#6366f1" }}>
                 {totals.feeding.toLocaleString()}
               </TableCell>
-              <TableCell align="right" sx={{ color: "#0f172a" }}>
+              <TableCell align="center" sx={{ color: "#0f172a" }}>
                 {totals.total.toLocaleString()}
               </TableCell>
-              <TableCell align="right" sx={{ color: "#fb923c" }}>
+              <TableCell align="center" sx={{ color: "#fb923c" }}>
                 {totals.discount.toLocaleString()}
               </TableCell>
-              <TableCell align="right" sx={{ color: "#10b981" }}>
+              <TableCell align="center" sx={{ color: "#10b981" }}>
                 {totals.paid.toLocaleString()}
               </TableCell>
-              <TableCell align="right" sx={{ color: "#e11d48" }}>
+              <TableCell align="center" sx={{ color: "#e11d48" }}>
                 {totals.pending.toLocaleString()}
               </TableCell>
+
+              {/* Status Column space */}
               <TableCell
-                colSpan={2}
-                sx={{
-                  fontSize: "10px !important",
-                  color: "#94a3b8",
-                  fontStyle: "italic",
-                  fontWeight: "normal !important",
-                }}
+                align="center"
+                sx={{ color: "#94a3b8", fontStyle: "italic" }}
               >
-                Filtered summary
+                Summary
+              </TableCell>
+
+              {/* Right Side: Only Pagination Arrow Buttons */}
+              <TableCell align="right">
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={rowsPerPage === "all" || page === 0}
+                    className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() =>
+                      setPage((p) =>
+                        Math.min(
+                          Math.ceil(filtered.length / Number(rowsPerPage)) - 1,
+                          p + 1,
+                        ),
+                      )
+                    }
+                    disabled={
+                      rowsPerPage === "all" ||
+                      page >=
+                        Math.ceil(filtered.length / Number(rowsPerPage)) - 1 ||
+                      filtered.length === 0
+                    }
+                    className="p-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-sm"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               </TableCell>
             </TableRow>
           </TableHead>
