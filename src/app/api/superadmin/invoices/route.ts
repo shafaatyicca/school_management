@@ -12,10 +12,9 @@ export async function GET(req: Request) {
     const schoolId = searchParams.get("schoolId");
     let query = schoolId ? { schoolId } : {};
 
-    const invoices = await SchoolInvoiceModel.find(query)
-      .populate("schoolId", "name")
+      const invoices = await SchoolInvoiceModel.find(query)
+      .populate("schoolId", "name address phone")
       .sort({ createdAt: -1 });
-
     return NextResponse.json(invoices);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

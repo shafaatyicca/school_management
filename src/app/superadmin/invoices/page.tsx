@@ -9,6 +9,8 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import { notify } from "@/lib/notify";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import SchoolInvoicePreviewModal from "@/components/superadmin/SchoolInvoicePreviewModal";
+import BulkSchoolInvoiceModal from "@/components/superadmin/BulkSchoolInvoiceModal";
 import {
   Zap,
   Trash2,
@@ -19,6 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronLeft,
+  Eye,
 } from "lucide-react";
 import {
   Table,
@@ -43,6 +46,7 @@ export default function AllInvoicesPage() {
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState<number | "all">(10);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   // Modals States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -528,7 +532,18 @@ export default function AllInvoicesPage() {
                     {inv.invoiceNumber}
                   </TableCell>
                   <TableCell
-                    sx={{ fontWeight: 600, color: "#334155", fontSize: "10px" }}
+                    sx={{
+                      fontWeight: 600,
+                      color: "#4f46e5",
+                      fontSize: "10px",
+                      cursor: "pointer",
+                      "&:hover": { textDecoration: "underline" },
+                    }}
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setIsViewModalOpen(true);
+                    }}
+                    title="Click to view invoice preview"
                   >
                     {inv.schoolId?.name || "N/A"}
                   </TableCell>
@@ -611,49 +626,79 @@ export default function AllInvoicesPage() {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                      {inv.status !== "paid" && (
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setIsPaymentModalOpen(true);
-                          }}
-                          sx={{
-                            color: "#10b981",
-                            "&:hover": { bgcolor: "#ecfdf5" },
-                          }}
-                        >
-                          <CreditCard size={16} />
-                        </IconButton>
-                      )}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: 0.5,
+                      }}
+                    >
+                      {/* View Button - Always visible & centered */}
                       <IconButton
                         size="small"
                         onClick={() => {
                           setSelectedInvoice(inv);
-                          setIsInvoiceModalOpen(true);
+                          setIsViewModalOpen(true);
                         }}
                         sx={{
-                          color: "#2563eb",
-                          "&:hover": { bgcolor: "#eff6ff" },
+                          color: "#64748b",
+                          "&:hover": { bgcolor: "#f1f5f9" },
                         }}
+                        title="View / Print Invoice"
                       >
-                        <Edit3 size={14} />
+                        <Eye size={15} />
                       </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setDeletingId(inv._id);
-                          setDeletingName(inv.invoiceNumber || "this invoice");
-                          setDeleteDialogOpen(true);
-                        }}
-                        sx={{
-                          color: "#e11d48",
-                          "&:hover": { bgcolor: "#fff1f2" },
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </IconButton>
+
+                      {/* Paid na hone par baaki buttons show honge */}
+                      {inv.status !== "paid" && (
+                        <>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setIsPaymentModalOpen(true);
+                            }}
+                            sx={{
+                              color: "#10b981",
+                              "&:hover": { bgcolor: "#ecfdf5" },
+                            }}
+                            title="Record Payment"
+                          >
+                            <CreditCard size={15} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setIsInvoiceModalOpen(true);
+                            }}
+                            sx={{
+                              color: "#2563eb",
+                              "&:hover": { bgcolor: "#eff6ff" },
+                            }}
+                            title="Edit Invoice"
+                          >
+                            <Edit3 size={14} />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setDeletingId(inv._id);
+                              setDeletingName(
+                                inv.invoiceNumber || "this invoice",
+                              );
+                              setDeleteDialogOpen(true);
+                            }}
+                            sx={{
+                              color: "#e11d48",
+                              "&:hover": { bgcolor: "#fff1f2" },
+                            }}
+                            title="Delete Invoice"
+                          >
+                            <Trash2 size={14} />
+                          </IconButton>
+                        </>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -803,6 +848,28 @@ export default function AllInvoicesPage() {
           }}
         />
       )}
+      {selectedInvoice && (
+        <SchoolInvoicePreviewModal
+          isOpen={isViewModalOpen}
+          onClose={() => {
+            setIsViewModalOpen(false);
+            setSelectedInvoice(null);
+          }}
+          invoice={selectedInvoice}
+          school={selectedInvoice.schoolId}
+        />
+      )}
+
+      <BulkSchoolInvoiceModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        bulkData={bulkData}
+        setBulkData={setBulkData}
+        bulkBillingDate={bulkBillingDate}
+        setBulkBillingDate={setBulkBillingDate}
+        onSubmit={handleBulkGenerate}
+        isProcessing={isProcessing}
+      />
 
       <DeleteConfirmDialog
         open={deleteDialogOpen}
@@ -817,150 +884,6 @@ export default function AllInvoicesPage() {
         onConfirm={confirmBulkDelete}
         itemName={`${selectedInvoices.length} selected invoices`}
       />
-
-      {/* Bulk Generate Modal */}
-      {isBulkModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[1000] p-4 transition-all duration-300">
-          <div className="bg-white rounded-md p-4 w-full max-w-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-100 relative overflow-hidden">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-xl  text-slate-800 flex items-center gap-2">
-                  <Zap
-                    className="text-indigo-600 drop-shadow-sm"
-                    size={22}
-                    fill="currentColor"
-                  />
-                  Bulk Generate
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsBulkModalOpen(false)}
-                className="p-2 hover:bg-slate-50 rounded-xl transition-colors group"
-              >
-                <X
-                  className="text-slate-400 group-hover:text-rose-500 transition-colors cursor-pointer"
-                  size={20}
-                />
-              </button>
-            </div>
-
-            {/* Form Fields */}
-            <div className="space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-[12px] text-slate-800 ml-1 uppercase">
-                  Billing Month
-                </label>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DatePicker
-                    views={["year", "month"]}
-                    openTo="month"
-                    defaultValue={dayjs()}
-                    value={bulkBillingDate}
-                    onChange={(date) => {
-                      setBulkBillingDate(date);
-                      if (date) {
-                        const month = date
-                          .toDate()
-                          .toLocaleString("en-US", { month: "long" });
-                        const year = date.year();
-                        setBulkData({ ...bulkData, month: `${month} ${year}` });
-                      }
-                    }}
-                    slotProps={{
-                      textField: {
-                        size: "small",
-                        fullWidth: true,
-                      },
-                      openPickerButton: {
-                        size: "small",
-                        sx: {
-                          padding: "2px",
-                          "& svg": { fontSize: "18px" },
-                        },
-                      },
-                      popper: {
-                        sx: {
-                          "& .MuiDateCalendar-root": {
-                            width: "236px",
-                            height: "auto",
-                            minHeight: "unset",
-                          },
-                          "& .MuiMonthCalendar-root": {
-                            width: "236px",
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gap: "4px",
-                            padding: "8px",
-                          },
-                          "& .MuiPickersMonth-root": {
-                            flexBasis: "unset",
-                          },
-                          "& .MuiPickersMonth-monthButton": {
-                            fontSize: "12px",
-                            height: "30px",
-                            width: "100%",
-                            borderRadius: "8px",
-                            fontWeight: 500,
-                            color: "#475569",
-                            "&:hover": {
-                              backgroundColor: "#1e293b",
-                              color: "#ffffff",
-                            },
-                          },
-                          "& .MuiPickersMonth-monthButton.Mui-selected": {
-                            backgroundColor: "#1e293b",
-                            color: "#ffffff",
-                            "&:hover": { backgroundColor: "#334155" },
-                          },
-                          "& .MuiPickersCalendarHeader-root": {
-                            paddingLeft: "12px",
-                            paddingRight: "4px",
-                            marginBottom: "4px",
-                          },
-                          "& .MuiYearCalendar-root": {
-                            width: "236px",
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </LocalizationProvider>
-              </div>
-
-              <div className="space-y-1.5 mt-4">
-                <label className="text-[12px] text-slate-800 ml-1 uppercase">
-                  Due Date
-                </label>
-                <input
-                  type="date"
-                  className="mt-2 w-full p-3 bg-slate-50 border border-slate-200 rounded-md outline-none focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/5 transition-all font-medium text-slate-700 cursor-pointer"
-                  value={bulkData.dueDate}
-                  onChange={(e) =>
-                    setBulkData({ ...bulkData, dueDate: e.target.value })
-                  }
-                />
-              </div>
-
-              {/* Generate Button */}
-              <button
-                disabled={isProcessing}
-                onClick={handleBulkGenerate}
-                className="w-full mt-4 py-4 bg-slate-900 text-white rounded-md text-sm hover:bg-indigo-600 hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed group cursor-pointer"
-              >
-                {isProcessing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    PROCESSING...
-                  </span>
-                ) : (
-                  "GENERATE INVOICES"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

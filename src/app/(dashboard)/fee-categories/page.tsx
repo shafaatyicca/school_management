@@ -24,6 +24,12 @@ import {
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 
+type CategoryFormValues = {
+  name: string;
+  isMonthly: boolean;
+  maxBaseFee: number;
+};
+
 export default function FeeCategoryPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
@@ -42,9 +48,6 @@ export default function FeeCategoryPage() {
     open: false,
     data: null,
   });
-  const [name, setName] = useState("");
-  const [isMonthly, setIsMonthly] = useState(false);
-  const [maxBaseFee, setMaxBaseFee] = useState<number | "">("");
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -93,23 +96,9 @@ export default function FeeCategoryPage() {
     if (effectiveSchoolId) fetchCategories();
   }, [effectiveSchoolId]);
 
-  // Sync Form States for Add/Edit Modal
-  useEffect(() => {
-    if (formModal.data) {
-      setName(formModal.data.name || "");
-      setIsMonthly(formModal.data.isMonthly || false);
-      setMaxBaseFee(formModal.data.maxBaseFee || "");
-    } else {
-      setName("");
-      setIsMonthly(false);
-      setMaxBaseFee("");
-    }
-  }, [formModal.data, formModal.open]);
-
   // Handle Save (POST / PUT)
-  const handleSaveCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !effectiveSchoolId) return;
+  const handleSaveCategory = async (values: CategoryFormValues) => {
+    if (!values.name.trim() || !effectiveSchoolId) return;
 
     setLoading(true);
     const isEditing = !!formModal.data;
@@ -119,15 +108,15 @@ export default function FeeCategoryPage() {
     const payload = isEditing
       ? {
           id: formModal.data._id,
-          name,
-          isMonthly,
-          maxBaseFee: Number(maxBaseFee || 0),
+          name: values.name,
+          isMonthly: values.isMonthly,
+          maxBaseFee: values.maxBaseFee,
           schoolId: effectiveSchoolId,
         }
       : {
-          name,
-          isMonthly,
-          maxBaseFee: Number(maxBaseFee || 0),
+          name: values.name,
+          isMonthly: values.isMonthly,
+          maxBaseFee: values.maxBaseFee,
           schoolId: effectiveSchoolId,
         };
 
@@ -311,111 +300,14 @@ export default function FeeCategoryPage() {
         <MaterialReactTable table={table} />
       </div>
 
-      {/* ================= INLINE ADD / EDIT MODAL ================= */}
-      <Dialog
+      {/* ================= ADD / EDIT MODAL ================= */}
+      <CategoryFormModal
         open={formModal.open}
+        data={formModal.data}
+        loading={loading}
         onClose={() => setFormModal({ open: false, data: null })}
-        maxWidth="xs"
-        fullWidth
-        TransitionComponent={Zoom}
-        transitionDuration={200}
-        BackdropProps={{
-          sx: {
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            backdropFilter: "blur(2px)",
-          },
-        }}
-        PaperProps={{
-          className:
-            "bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-300 dark:border-slate-800",
-          style: { margin: "16px" },
-        }}
-      >
-        <DialogTitle className="border-b border-slate-200 dark:border-slate-800 p-4">
-          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
-            {formModal.data ? "Edit Fee Category" : "Create New Fee Category"}
-          </span>
-        </DialogTitle>
-
-        <form onSubmit={handleSaveCategory}>
-          <DialogContent className="space-y-4 p-6 bg-white dark:bg-slate-900">
-            <TextField
-              label="Category Name (e.g., Hostel Fee, Exam Fee)"
-              fullWidth
-              variant="outlined"
-              size="small"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              InputLabelProps={{
-                className: "text-xs font-medium dark:text-slate-400",
-              }}
-              inputProps={{
-                className: "text-sm text-slate-800 dark:text-slate-100",
-              }}
-            />
-
-            <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <CalendarCheck className="w-4 h-4 text-blue-500" /> Is this
-                billed every month?
-              </span>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={isMonthly}
-                    onChange={(e) => setIsMonthly(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label=""
-                className="m-0"
-              />
-            </div>
-
-            <TextField
-              label="Max Base Fee / Standard Amount (Optional)"
-              fullWidth
-              variant="outlined"
-              size="small"
-              type="number"
-              placeholder="e.g. 5000"
-              value={maxBaseFee}
-              onChange={(e) =>
-                setMaxBaseFee(
-                  e.target.value === "" ? "" : Number(e.target.value),
-                )
-              }
-              InputLabelProps={{
-                className: "text-xs font-medium dark:text-slate-400",
-              }}
-              inputProps={{
-                className: "text-sm text-slate-800 dark:text-slate-100",
-                min: 0,
-              }}
-            />
-          </DialogContent>
-
-          <DialogActions className="border-t border-slate-200 dark:border-slate-800 p-3 gap-2">
-            <Button
-              type="button"
-              onClick={() => setFormModal({ open: false, data: null })}
-              disabled={loading}
-              variant="ghost"
-              className="h-9 cursor-pointer text-xs font-semibold"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading || !name.trim()}
-              className="h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
-            >
-              {loading ? "Saving..." : formModal.data ? "Update" : "Save"}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+        onSave={handleSaveCategory}
+      />
 
       <DeleteConfirmDialog
         open={deleteDialog.open}
@@ -424,5 +316,154 @@ export default function FeeCategoryPage() {
         itemName="Fee Category"
       />
     </div>
+  );
+}
+
+/* ================= SEPARATE FORM MODAL (local state = no table re-render) ================= */
+function CategoryFormModal({
+  open,
+  data,
+  loading,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  data: any | null;
+  loading: boolean;
+  onClose: () => void;
+  onSave: (values: CategoryFormValues) => void;
+}) {
+  const [name, setName] = useState("");
+  const [isMonthly, setIsMonthly] = useState(false);
+  const [maxBaseFee, setMaxBaseFee] = useState<number | "">("");
+
+  // Sync Form States when modal opens
+  useEffect(() => {
+    if (!open) return;
+    if (data) {
+      setName(data.name || "");
+      setIsMonthly(data.isMonthly || false);
+      setMaxBaseFee(data.maxBaseFee || "");
+    } else {
+      setName("");
+      setIsMonthly(false);
+      setMaxBaseFee("");
+    }
+  }, [data, open]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      isMonthly,
+      maxBaseFee: Number(maxBaseFee || 0),
+    });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      TransitionComponent={Zoom}
+      transitionDuration={200}
+      BackdropProps={{
+        sx: {
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(2px)",
+        },
+      }}
+      PaperProps={{
+        className:
+          "bg-white dark:bg-slate-900 rounded-md shadow-lg border border-slate-300 dark:border-slate-800",
+        style: { margin: "16px" },
+      }}
+    >
+      <DialogTitle className="border-b border-slate-200 dark:border-slate-800 p-4">
+        <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+          {data ? "Edit Fee Category" : "Create New Fee Category"}
+        </span>
+      </DialogTitle>
+
+      <form onSubmit={handleSubmit}>
+        <DialogContent className="space-y-4 p-6 bg-white dark:bg-slate-900">
+          <TextField
+            label="Category Name (e.g., Hostel Fee, Exam Fee)"
+            fullWidth
+            variant="outlined"
+            size="small"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            InputLabelProps={{
+              className: "text-xs font-medium dark:text-slate-400",
+            }}
+            inputProps={{
+              className: "text-sm text-slate-800 dark:text-slate-100",
+            }}
+          />
+
+          <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <CalendarCheck className="w-4 h-4 text-blue-500" /> Is this
+              billed every month?
+            </span>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isMonthly}
+                  onChange={(e) => setIsMonthly(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label=""
+              className="m-0"
+            />
+          </div>
+
+          <TextField
+            label="Max Base Fee / Standard Amount (Optional)"
+            fullWidth
+            variant="outlined"
+            size="small"
+            type="number"
+            placeholder="e.g. 5000"
+            value={maxBaseFee}
+            onChange={(e) =>
+              setMaxBaseFee(
+                e.target.value === "" ? "" : Number(e.target.value),
+              )
+            }
+            InputLabelProps={{
+              className: "text-xs font-medium dark:text-slate-400",
+            }}
+            inputProps={{
+              className: "text-sm text-slate-800 dark:text-slate-100",
+              min: 0,
+            }}
+          />
+        </DialogContent>
+
+        <DialogActions className="border-t border-slate-200 dark:border-slate-800 p-3 gap-2">
+          <Button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            variant="ghost"
+            className="h-9 cursor-pointer text-xs font-semibold"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={loading || !name.trim()}
+            className="h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
+          >
+            {loading ? "Saving..." : data ? "Update" : "Save"}
+          </Button>
+        </DialogActions>
+      </form>
+    </Dialog>
   );
 }
