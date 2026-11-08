@@ -256,7 +256,10 @@ export default function Topbar() {
                 <span className="text-sm">Update Profile</span>
               </DropdownMenuItem>
 
-              <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors">
+              <DropdownMenuItem
+                onClick={() => router.push("/settings")}
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-accent focus:bg-sky-500/10 focus:text-sky-400 transition-colors"
+              >
                 <Settings className="h-4 w-4" />
                 <span className="text-sm">Settings</span>
               </DropdownMenuItem>

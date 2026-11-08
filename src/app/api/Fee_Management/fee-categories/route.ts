@@ -10,10 +10,7 @@ const updateDiscountsForCategory = async (
   categoryId: string,
   newMaxBaseFee: number,
   schoolId: string,
-  categoryName: string,
 ) => {
-  if (categoryName === "Tuition Fee") return;
-
   const discounts = await FeeDiscount.find({
     feeCategoryId: categoryId,
   } as any);
@@ -31,7 +28,6 @@ const updateDiscountsForCategory = async (
           $set: {
             baseFee: newMaxBaseFee,
             discountValue: Math.max(0, newDiscountValue),
-            
           },
         },
       },
@@ -40,6 +36,16 @@ const updateDiscountsForCategory = async (
 
   await (FeeDiscount as any).bulkWrite(bulkOps);
 };
+
+// Duplicate "class_fee" category ka error message
+const duplicateClassFeeResponse = () =>
+  NextResponse.json(
+    {
+      message:
+        "Is school mein pehle se ek category Class Fee se linked hai. Ek school mein sirf ek ho sakti hai.",
+    },
+    { status: 409 },
+  );
 
 // 1. GET → Fetch Categories (Dono Admins ke liye open hai)
 export async function GET(req: Request) {
@@ -93,7 +99,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { name, isMonthly, maxBaseFee } = body;
+    const { name, isMonthly, maxBaseFee, feeSource } = body;
     if (!name) {
       return NextResponse.json(
         { message: "Category name is required" },
@@ -101,15 +107,20 @@ export async function POST(req: Request) {
       );
     }
 
+    const isClassFee = feeSource === "class_fee";
+
     const newCategory = await FeeCategoryModel.create({
       name,
-      isMonthly: Boolean(isMonthly),
-      maxBaseFee: Number(maxBaseFee || 0),
+      feeSource: isClassFee ? "class_fee" : "fixed",
+      // Class fee wali category hamesha monthly aur amount 0
+      isMonthly: isClassFee ? true : Boolean(isMonthly),
+      maxBaseFee: isClassFee ? 0 : Number(maxBaseFee || 0),
       schoolId,
     });
 
     return NextResponse.json(newCategory, { status: 201 });
   } catch (error: any) {
+    if (error?.code === 11000) return duplicateClassFeeResponse();
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }
@@ -129,7 +140,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { id, schoolId, name, isMonthly, maxBaseFee } = body;
+    const { id, schoolId, name, isMonthly, maxBaseFee, feeSource } = body;
 
     if (!id || !schoolId) {
       return NextResponse.json(
@@ -138,17 +149,20 @@ export async function PUT(req: Request) {
       );
     }
 
-    const updated = await FeeCategoryModel.findOneAndUpdate(
-  { _id: id, schoolId } as any,
-  {
-    $set: {
-      name,
-      isMonthly: Boolean(isMonthly),
-      maxBaseFee: Number(maxBaseFee || 0),
-    },
-  },
-  { new: true, lean: true },
-);
+    const isClassFee = feeSource === "class_fee";
+
+    const updated = await (FeeCategoryModel as any).findOneAndUpdate(
+      { _id: id, schoolId } as any,
+      {
+        $set: {
+          name,
+          feeSource: isClassFee ? "class_fee" : "fixed",
+          isMonthly: isClassFee ? true : Boolean(isMonthly),
+          maxBaseFee: isClassFee ? 0 : Number(maxBaseFee || 0),
+        },
+      },
+      { new: true, lean: true, runValidators: true },
+    );
 
     if (!updated) {
       return NextResponse.json(
@@ -156,11 +170,16 @@ export async function PUT(req: Request) {
         { status: 404 },
       );
     }
-    if (maxBaseFee !== undefined) {
-  await updateDiscountsForCategory(id, Number(maxBaseFee), schoolId, name);
-}
+
+    // Sirf fixed category ke discounts update honge.
+    // Class fee wali category ke discounts student ki locked fee par chalte hain.
+    if (!isClassFee && maxBaseFee !== undefined) {
+      await updateDiscountsForCategory(id, Number(maxBaseFee), schoolId);
+    }
+
     return NextResponse.json(updated);
   } catch (error: any) {
+    if (error?.code === 11000) return duplicateClassFeeResponse();
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

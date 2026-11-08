@@ -7,7 +7,7 @@ import EmployeeFormModal from "@/components/EmployeeFormModal";
 import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
 import { FileSpreadsheet, FileText, Printer, X } from "lucide-react";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 import { notify } from "@/lib/notify";
@@ -31,6 +31,7 @@ export default function EmployeesPage() {
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     id: string | number | null;
@@ -57,6 +58,23 @@ export default function EmployeesPage() {
   useEffect(() => {
     if (effectiveSchoolId) fetchEmployees();
   }, [effectiveSchoolId]);
+
+  useEffect(() => {
+  if (!effectiveSchoolId) return;
+  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d && setSchoolInfo(d))
+    .catch(() => {});
+}, [effectiveSchoolId]);
+
+// Export header: school only
+const exportHeader: ExportHeader = {
+  school: {
+    name: schoolInfo?.name,
+    address: schoolInfo?.address,
+    logo: schoolInfo?.logo,
+  },
+};
 
   const fetchEmployees = async () => {
     if (!effectiveSchoolId) return;
@@ -391,7 +409,7 @@ export default function EmployeesPage() {
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
         <Button
-          onClick={() => handleExportRows(table, "excel", "Employees List")}
+          onClick={() => handleExportRows(table, "excel", "Employees List", exportHeader)}
           variant="outline"
           size="sm"
           className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 h-8 cursor-pointer"
@@ -400,7 +418,7 @@ export default function EmployeesPage() {
         </Button>
 
         <Button
-          onClick={() => handleExportRows(table, "pdf", "Employees List")}
+          onClick={() => handleExportRows(table, "pdf", "Employees List", exportHeader)}
           variant="outline"
           size="sm"
           className="text-rose-600 border-rose-200 hover:bg-rose-50 h-8 cursor-pointer"
@@ -409,7 +427,7 @@ export default function EmployeesPage() {
         </Button>
 
         <Button
-          onClick={() => handlePrintTable(table, "Employees List")}
+          onClick={() => handlePrintTable(table, "Employees List", exportHeader)}
           variant="outline"
           size="sm"
           className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"

@@ -29,6 +29,7 @@ export default function DiscountAddModal({
   const isEditMode = !!editDiscount;
 
   const [categories,      setCategories]      = useState<any[]>([]);
+  const [discountMap,     setDiscountMap]     = useState<Record<string, any>>({});
   const [selectedBaseFee, setSelectedBaseFee] = useState(0);
   const [feeCategoryId,   setFeeCategoryId]   = useState("");
   const [discountType,    setDiscountType]    = useState("fixed");
@@ -36,47 +37,74 @@ export default function DiscountAddModal({
   const [remarks,         setRemarks]         = useState("");
   const [loading,         setLoading]         = useState(false);
 
-  // Categories fetch
+  // Category ka base fee: locked record → class fee → category fee
+  const getBaseFee = (catId: string, map: Record<string, any>) => {
+    const record = map[catId];
+    if (record) return record.baseFee || 0;
+    const cat = categories.find((c) => c._id === catId);
+    return cat?.feeSource === "class_fee" ? classFee : cat?.maxBaseFee || 0;
+  };
+
+  // Categories + student ke existing records fetch
   useEffect(() => {
     if (!isOpen || !schoolId) return;
-    fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}`)
-      .then((r) => r.json())
-      .then((data) => setCategories(data))
+    Promise.all([
+      fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}`).then((r) => r.json()),
+      studentId
+        ? fetch(`/api/Fee_Management/discounts?studentId=${studentId}`).then((r) => r.json())
+        : Promise.resolve([]),
+    ])
+      .then(([cats, discs]) => {
+        const map: Record<string, any> = {};
+        (Array.isArray(discs) ? discs : []).forEach((d: any) => {
+          const id = d.feeCategoryId?._id || d.feeCategoryId;
+          if (id) map[String(id)] = d;
+        });
+        setCategories(Array.isArray(cats) ? cats : []);
+        setDiscountMap(map);
+      })
       .catch(() => notify.error("Failed to load categories"));
-  }, [isOpen, schoolId]);
+  }, [isOpen, schoolId, studentId]);
 
   // Edit data fill
- useEffect(() => {
-  if (!isOpen) return;
-  if (isEditMode && editDiscount && categories.length > 0) {
-    setFeeCategoryId(editDiscount.feeCategoryId?._id || "");
-    const baseFee = editDiscount.baseFee || classFee;
-    const netFee  = editDiscount.customNetFee || 0;
-    const fallbackValue = baseFee - netFee; // fixed discount calculate karo
-    setDiscountType(editDiscount.discountType || "fixed");
-    setDiscountValue(editDiscount.discountValue ?? fallbackValue);
-    setRemarks(editDiscount.remarks || "");
-    setSelectedBaseFee(baseFee);
-    setRemarks(editDiscount.remarks || "");
-    setSelectedBaseFee(editDiscount.baseFee || classFee);
-  } else if (!isEditMode) {
-    setFeeCategoryId("");
-    setDiscountType("fixed");
-    setDiscountValue("");
-    setRemarks("");
-    setSelectedBaseFee(0);
-  }
-}, [isOpen, editDiscount, categories]);
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditMode && editDiscount && categories.length > 0) {
+      const baseFee = editDiscount.baseFee || 0;
+      const netFee  = editDiscount.customNetFee ?? baseFee;
+      setFeeCategoryId(editDiscount.feeCategoryId?._id || "");
+      setSelectedBaseFee(baseFee);
+      setDiscountType(editDiscount.discountType || "fixed");
+      setDiscountValue(editDiscount.discountValue ?? baseFee - netFee);
+      setRemarks(editDiscount.remarks || "");
+    } else if (!isEditMode) {
+      setFeeCategoryId("");
+      setDiscountType("fixed");
+      setDiscountValue("");
+      setRemarks("");
+      setSelectedBaseFee(0);
+    }
+  }, [isOpen, editDiscount, categories]);
 
   const handleCategoryChange = (catId: string) => {
     setFeeCategoryId(catId);
-    const cat = categories.find((c) => c._id === catId);
-    setSelectedBaseFee(cat?.maxBaseFee || classFee);
+    if (!catId) {
+      setSelectedBaseFee(0);
+      return;
+    }
+    setSelectedBaseFee(getBaseFee(catId, discountMap));
+
+    // Record pehle se hai to us ki values bhar do
+    const record = discountMap[catId];
+    if (record && !isEditMode) {
+      setDiscountType(record.discountType || "fixed");
+      setDiscountValue(record.discountValue ? record.discountValue : "");
+    }
   };
 
   const calculateNetFee = () => {
     const val = Number(discountValue) || 0;
-    const base = selectedBaseFee || classFee;
+    const base = selectedBaseFee;
     if (discountType === "fixed") return Math.max(0, base - val);
     return Math.max(0, base - (base * val) / 100);
   };
@@ -89,7 +117,7 @@ export default function DiscountAddModal({
     setLoading(true);
     const payload = {
       studentId, schoolId, feeCategoryId,
-      baseFee: selectedBaseFee || classFee,
+      baseFee: selectedBaseFee,
       customNetFee: calculateNetFee(),
       discountType,
       discountValue: Number(discountValue),
@@ -118,7 +146,7 @@ export default function DiscountAddModal({
   };
 
   const netFee = calculateNetFee();
-  const discountAmt = (selectedBaseFee || classFee) - netFee;
+  const discountAmt = selectedBaseFee - netFee;
 
   return (
     <Dialog
@@ -152,7 +180,6 @@ export default function DiscountAddModal({
             <p className="font-bold text-foreground text-sm leading-none">
               {isEditMode ? "Edit Discount" : "Apply Discount"}
             </p>
-            
           </div>
         </div>
         <IconButton
@@ -217,7 +244,7 @@ export default function DiscountAddModal({
             />
           </div>
 
-           <ToggleButtonGroup
+          <ToggleButtonGroup
             value={discountType}
             exclusive
             onChange={(_, val) => { if (val) setDiscountType(val); }}
@@ -244,7 +271,6 @@ export default function DiscountAddModal({
             <ToggleButton value="percentage">Percentage %</ToggleButton>
           </ToggleButtonGroup>
 
-         
           <TextField
             label="Discount Remarks"
             size="small"
@@ -275,7 +301,7 @@ export default function DiscountAddModal({
                 <div className="flex justify-between text-xs">
                   <span style={{ color: "var(--muted-foreground)" }}>Maximum Fee</span>
                   <span className="font-semibold text-foreground">
-                    {(selectedBaseFee || classFee).toLocaleString()}
+                    {selectedBaseFee.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
@@ -296,7 +322,6 @@ export default function DiscountAddModal({
               </div>
             </div>
           )}
-
         </div>
       </DialogContent>
 
@@ -327,7 +352,7 @@ export default function DiscountAddModal({
           disabled={loading}
           size="small"
           sx={{
-            backgroundColor: "#1e293b", 
+            backgroundColor: "#1e293b",
             "&:hover": { backgroundColor: "#334155" },
             textTransform: "none",
             px: 2,

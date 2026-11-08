@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ArrowDown10, Save, X, BookOpen, Pencil, Trash2 } from "lucide-react";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
 import { Button } from "@/components/ui/button";
 import ClassFormModal from "@/components/ClassFormModal";
 import PageHeader from "@/components/PageHeader";
@@ -33,6 +33,7 @@ export default function ClassPage() {
   const [loading, setLoading] = useState(false);
   const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
 
   const fetchClasses = async () => {
     if (!effectiveSchoolId) return;
@@ -76,6 +77,23 @@ export default function ClassPage() {
   useEffect(() => {
     if (effectiveSchoolId) fetchClasses();
   }, [effectiveSchoolId]);
+
+  useEffect(() => {
+  if (!effectiveSchoolId) return;
+  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d && setSchoolInfo(d))
+    .catch(() => {});
+}, [effectiveSchoolId]);
+
+// Export header: school only (no student info on this page)
+const exportHeader: ExportHeader = {
+  school: {
+    name: schoolInfo?.name,
+    address: schoolInfo?.address,
+    logo: schoolInfo?.logo,
+  },
+};
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -192,12 +210,12 @@ export default function ClassPage() {
         header: "Sort Order",
         size: 90,
         Cell: ({ row }) => (
-          <div className="flex items-center justify-center w-full">
-            <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
-              {row.original.order || 0}
-            </span>
-          </div>
-        ),
+  <div className="flex items-center justify-start w-full pl-1">
+    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
+      {row.original.order || 0}
+    </span>
+  </div>
+),
       },
     ],
     [],
@@ -270,7 +288,7 @@ export default function ClassPage() {
         {/* Export Buttons */}
         <Button
           onClick={() =>
-            handleExportRows(table, "excel", "Classes List Report")
+            handleExportRows(table, "excel", "Classes List Report", exportHeader)
           }
           variant="outline"
           size="sm"
@@ -279,7 +297,7 @@ export default function ClassPage() {
           <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
         </Button>
         <Button
-          onClick={() => handleExportRows(table, "pdf", "Classes List Report")}
+          onClick={() => handleExportRows(table, "pdf", "Classes List Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
@@ -287,7 +305,7 @@ export default function ClassPage() {
           <FileText className="h-4 w-4 mr-1" /> PDF
         </Button>
         <Button
-          onClick={() => handlePrintTable(table, "Classes List Report")}
+          onClick={() => handlePrintTable(table, "Classes List Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"

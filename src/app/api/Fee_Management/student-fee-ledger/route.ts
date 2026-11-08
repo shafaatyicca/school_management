@@ -66,14 +66,15 @@ export async function GET(req: Request) {
     const studentDiscounts = await FeeDiscount.find({
       studentId: matchedStudent._id,
       schoolId: schoolId,
-    }as any).populate("feeCategoryId", "name");
+    } as any).populate("feeCategoryId", "name feeSource");
 
-    const baseFee = (matchedStudent.classId as any)?.classFee || 0;
-    const totalDiscount = studentDiscounts.reduce(
-      (sum, d) => sum + (baseFee - d.customNetFee),
-      0,
+    // Tuition (Class Fee) ka locked record — student ki fee isi se
+    const classFee = (matchedStudent.classId as any)?.classFee || 0;
+    const tuitionRecord: any = studentDiscounts.find(
+      (d: any) => d.feeCategoryId?.feeSource === "class_fee",
     );
-    const netPayable = baseFee - totalDiscount;
+    const baseFee = tuitionRecord?.baseFee ?? classFee;
+    const netPayable = tuitionRecord ? tuitionRecord.customNetFee : classFee;
 
     // Fetch Data
     const invoices = await StudentFeeInvoice.find({
@@ -100,13 +101,13 @@ export async function GET(req: Request) {
           baseFee: baseFee,
           netPayable: netPayable,
           isDummy: true,
-        }
+        },
       ]);
     }
     const responseData = invoices.map((inv) => ({
       ...inv.toObject(),
       studentId: {
-        ...(inv.studentId  as any).toObject(),
+        ...(inv.studentId as any).toObject(),
         discounts: studentDiscounts,
         netPayable: netPayable,
       },

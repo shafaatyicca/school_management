@@ -1,50 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { ClassModel } from "@/models/Class";
-import { FeeDiscount } from "@/models/FeeDiscount";
-import Student from "@/models/Student";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import { FeeCategoryModel } from "@/models/FeeCategory";
-
-// ── Helper: Class fee change hone pe discounts update karo ──────
-const updateDiscountsForClass = async (classId: string, newClassFee: number, schoolId: string) => {
-  const students = await Student.find({ classId } as any).select("_id");
-  const studentIds = students.map((s: any) => s._id);
-  if (studentIds.length === 0) return;
-
- const tuitionCategory = await FeeCategoryModel.findOne({ 
-  schoolId, 
-  name: "Tuition Fee" 
-} as any);
-
-if (!tuitionCategory) return;
-
-const discounts = await FeeDiscount.find({ 
-  studentId: { $in: studentIds },
-  feeCategoryId: tuitionCategory._id,
-} as any);
-
-  if (discounts.length === 0) return;
-  const bulkOps = discounts.map((discount: any) => {
-    const oldNet = discount.customNetFee;
-    const newDiscountValue = newClassFee - oldNet;
-
-    return {
-      updateOne: {
-        filter: { _id: discount._id },
-        update: {
-          $set: {
-            baseFee: newClassFee,
-            discountValue: Math.max(0, newDiscountValue),
-          },
-        },
-      },
-    };
-  });
-
-  await (FeeDiscount as any).bulkWrite(bulkOps);
-};
+import { syncTuitionWithClassFee } from "@/lib/feeLock";
 
 export async function GET(req: Request) {
   try {
@@ -62,7 +21,7 @@ export async function GET(req: Request) {
     }
 
     const filter = { schoolId } as any;
-    const classes = await ClassModel.find(filter)
+    const classes = await (ClassModel as any).find(filter)
       .sort({ order: 1, name: 1 })
       .lean();
     return NextResponse.json(classes);
@@ -141,7 +100,12 @@ export async function PUT(req: Request) {
       );
     }
 
-    const updated = await ClassModel.findOneAndUpdate(
+    // ✅ Update se PEHLE purani fee padho
+    const oldClass: any = await ClassModel.findOne({ _id: id, schoolId } as any)
+      .select("classFee")
+      .lean();
+
+    const updated: any = await ClassModel.findOneAndUpdate(
       { _id: id, schoolId } as any,
       {
         $set: {
@@ -157,9 +121,13 @@ export async function PUT(req: Request) {
     if (!updated) {
       return NextResponse.json({ message: "Class not found" }, { status: 404 });
     }
-    // Class fee change hone pe discounts update karo
-    if (classFee !== undefined) {
-      await updateDiscountsForClass(id, Number(classFee), schoolId);
+
+    // ✅ Fee badli ho to students ke tuition records sync karo
+    // (net wahi rahegi, farq discount ban jayega)
+    const oldFee = Number(oldClass?.classFee) || 0;
+    const newFee = Number(updated.classFee) || 0;
+    if (oldClass && oldFee !== newFee) {
+      await syncTuitionWithClassFee(String(id), oldFee, newFee);
     }
 
     return NextResponse.json(updated);
@@ -189,6 +157,22 @@ export async function PATCH(req: Request) {
         { status: 400 },
       );
     }
+
+    // ✅ Fee badal sakti hai (mode "fee" ya dono) → update se PEHLE purani fees padho
+    const feeChanging = mode !== "order";
+    const oldFees = new Map<string, number>();
+    if (feeChanging) {
+      const oldClasses: any[] = await ClassModel.find({
+        _id: { $in: items.map((i: any) => i.id) },
+        schoolId,
+      } as any)
+        .select("classFee")
+        .lean();
+      oldClasses.forEach((c) =>
+        oldFees.set(String(c._id), Number(c.classFee) || 0),
+      );
+    }
+
     const operations = items.map((item: any) => {
       const updateFields: any = {};
       if (mode === "order") {
@@ -210,14 +194,20 @@ export async function PATCH(req: Request) {
 
     // POORE DATABASE KO SIRF 1 REQUEST JAYEGI! 🚀
     await (ClassModel as any).bulkWrite(operations);
-    // Fee mode mein discounts update karo
-    if (mode === "fee") {
+
+    // ✅ Jin classes ki fee badli, un ke students sync karo
+    if (feeChanging) {
       for (const item of items) {
-        if (item.classFee !== undefined) {
-          await updateDiscountsForClass(item.id, Number(item.classFee), schoolId);
+        const id = String(item.id);
+        if (!oldFees.has(id)) continue; // class is school ki nahi thi
+        const oldFee = oldFees.get(id) || 0;
+        const newFee = Number(item.classFee || 0);
+        if (oldFee !== newFee) {
+          await syncTuitionWithClassFee(id, oldFee, newFee);
         }
       }
     }
+
     return NextResponse.json({ message: "Classes updated successfully" });
   } catch (error: any) {
     return NextResponse.json(

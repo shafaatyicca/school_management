@@ -3,11 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { notify } from "@/lib/notify";
-import {
-  RefreshCw,
-  AlertCircle,
-  User,
-} from "lucide-react";
+import { AlertCircle, User } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import DiscountAddModal from "@/components/DiscountAddModal";
 import InvoiceGenerateModal from "@/components/InvoiceGenerateModal";
@@ -15,6 +11,8 @@ import ViewSingleDiscountModal from "@/components/ViewSingleDiscountModal";
 import StudentInvoiceTable from "@/components/StudentInvoiceTable";
 import TakePaymentModal from "@/components/TakePaymentModal";
 import InvoiceDetailModal from "@/components/InvoiceDetailModal";
+import StudentSearchBox from "@/components/StudentSearchBox";
+import RecentPaymentsModal from "@/components/RecentPaymentsModal";
 
 export default function StudentFeeLedgerPage() {
   const { data: session } = useSession();
@@ -22,7 +20,6 @@ export default function StudentFeeLedgerPage() {
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
-  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -33,6 +30,9 @@ export default function StudentFeeLedgerPage() {
   const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
   const [payInvoice, setPayInvoice] = useState<any>(null);
   const [detailInvoice, setDetailInvoice] = useState<any>(null);
+  const [editInvoice, setEditInvoice] = useState<any>(null);
+  const [isRecentOpen, setIsRecentOpen] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -49,12 +49,21 @@ export default function StudentFeeLedgerPage() {
     }
   }, [isSuperAdmin]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+  if (!effectiveSchoolId) return;
+  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d && setSchoolInfo(d))
+    .catch(() => {});
+}, [effectiveSchoolId]);
+
+  // Student load karo — query = naam, GR# ya student ki _id (dropdown se)
+  const loadStudent = async (query: string) => {
+    if (!query) return;
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/Fee_Management/student-fee-ledger?studentId=${encodeURIComponent(searchQuery.trim())}&schoolId=${effectiveSchoolId}`,
+        `/api/Fee_Management/student-fee-ledger?studentId=${encodeURIComponent(query)}&schoolId=${effectiveSchoolId}`,
       );
       const data = await response.json();
       const match = Array.isArray(data) ? data[0] : null;
@@ -62,7 +71,7 @@ export default function StudentFeeLedgerPage() {
         const student = match.studentId._doc || match.studentId;
         setStudentInfo({
           ...match.studentId,
-           _id: student._id,
+          _id: student._id,
           imageUrl: match.studentId.image,
           className: match.studentId.classId?.name || "N/A",
           classFee: match.studentId.classId?.classFee || 0,
@@ -71,12 +80,12 @@ export default function StudentFeeLedgerPage() {
           netPayable: match.netPayable || 0,
         });
         setDiscounts(match.studentId.discounts || []);
-        notify.success("Student profile loaded");
+        notify.success("Student Fee Ledger loaded");
         if (match.studentId?._id) {
-        fetch(`/api/Fee_Management/discounts?studentId=${match.studentId._id}`)
-          .then((r) => r.json())
-          .then((data) => setDiscounts(Array.isArray(data) ? data : []));
-      }
+          fetch(`/api/Fee_Management/discounts?studentId=${match.studentId._id}`)
+            .then((r) => r.json())
+            .then((data) => setDiscounts(Array.isArray(data) ? data : []));
+        }
       } else {
         setStudentInfo(null);
         notify.error("No student found");
@@ -88,38 +97,23 @@ export default function StudentFeeLedgerPage() {
     }
   };
   const fetchDiscounts = (studentId: string) => {
-  if (!studentId) return;
-  fetch(`/api/Fee_Management/discounts?studentId=${studentId}`)
-    .then((r) => r.json())
-    .then((data) => setDiscounts(Array.isArray(data) ? data : []));
-};
+    if (!studentId) return;
+    fetch(`/api/Fee_Management/discounts?studentId=${studentId}`)
+      .then((r) => r.json())
+      .then((data) => setDiscounts(Array.isArray(data) ? data : []));
+  };
   return (
     <div className="space-y-6">
       {/* Header Row */}
       <PageHeader
         title="Student Fee Ledger"
         rightContent={
-          <form onSubmit={handleSearch} className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search Name or GR#..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 w-64 rounded border border-slate-700 bg-slate-900 px-2 text-xs text-white focus:outline-none"
-            />
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="h-7 rounded bg-blue-600 px-3 text-[10px] font-bold uppercase text-white hover:bg-blue-500 disabled:opacity-50"
-            >
-              {loading ? (
-                <RefreshCw className="h-3 w-3 animate-spin" />
-              ) : (
-                "Search"
-              )}
-            </button>
-          </form>
+          <StudentSearchBox
+            schoolId={effectiveSchoolId}
+            loading={loading}
+            onSelect={(s) => loadStudent(s._id)}
+            onSearch={(q) => loadStudent(q)}
+          />
         }
       />
 
@@ -146,13 +140,16 @@ export default function StudentFeeLedgerPage() {
                       Final Reminder Letter
                     </button>
 
-                    <button className="rounded bg-sky-500 px-3 py-1 text-xs text-white hover:bg-sky-600">
+                    <button
+                      onClick={() => setIsRecentOpen(true)}
+                      className="rounded bg-sky-500 px-3 py-1 text-xs text-white cursor-pointer hover:bg-sky-600"
+                    >
                       Recent Payments
                     </button>
                   </div>
                 </div>
 
-                {/* Body Content */}
+                {/* Body Contnt */}
                 <div className="flex items-center p-0">
                   {/* Image */}
                   <div className="p-2.5">
@@ -253,7 +250,7 @@ export default function StudentFeeLedgerPage() {
                       Add
                     </button>
 
-                    <button className="rounded bg-blue-600/20 px-2 py-1 text-xs text-black cursor-pointer" 
+                    <button className="rounded bg-blue-600/20 dark:text-white px-2 py-1 text-xs text-black cursor-pointer" 
                       onClick={() => setIsViewDiscountOpen(true)}>
                       View Discounts
                     </button>
@@ -262,19 +259,19 @@ export default function StudentFeeLedgerPage() {
 
                 <table className="w-full text-xs">
                   <tbody>
-                      {discounts.map((item: any) => (
+                    {discounts.map((item: any) => (
                       <tr key={item._id} className="border-t">
                         <td className="p-1 flex items-center  gap-1">
                           <span>{item.feeCategoryId?.name}</span>
                         </td>
                         <td className="p-1 text-center text-blue-600">
-                          {item.baseFee || studentInfo.classFee}
+                          {item.baseFee ?? 0}
                         </td>
                         <td className="p-1 text-center text-pink-600">
-                          {(item.baseFee || studentInfo.classFee) - item.customNetFee}
+                          {(item.baseFee ?? 0) - (item.customNetFee ?? 0)}
                         </td>
                         <td className="p-1 text-center text-green-600">
-                          {item.customNetFee}
+                          {item.customNetFee ?? 0}
                         </td>
                       </tr>
                     ))}
@@ -291,31 +288,32 @@ export default function StudentFeeLedgerPage() {
                       </tr>
                     ))}
 
-                      {/* TOTAL Row */}
-                      <tr className="border-t bg-slate-50 dark:bg-slate-800 text-xs">
-                        <td className="p-1 font-bold">Total</td>
-                        
-                        {/* Base Fee Total */}
-                        <td className="p-1 text-center text-blue-600">
-                          {discounts.length > 0 
-                            ? discounts.reduce((sum, d) => sum + (d.baseFee || studentInfo.classFee), 0) 
-                            : 0}
-                        </td>
-                        
-                        {/* Discount Total */}
-                        <td className="p-1 text-center text-pink-600 font-bold">
-                          {discounts.length > 0 
-                            ? discounts.reduce((sum, d) => sum + ((d.baseFee || studentInfo.classFee) - d.customNetFee), 0) 
-                            : 0}
-                        </td>
-                        
-                        {/* Net Total */}
-                        <td className="p-1 text-center text-green-600 font-bold">
-                          {discounts.length > 0 
-                            ? discounts.reduce((sum, d) => sum + d.customNetFee, 0) 
-                            : 0}
-                        </td>
-                      </tr>
+                    {/* TOTAL Row */}
+                    <tr className="border-t bg-slate-50 dark:bg-slate-800 text-xs">
+                      <td className="p-1 font-bold">Total</td>
+
+                      {/* Base Fee Total */}
+                      <td className="p-1 text-center text-blue-600">
+                        {discounts.reduce((sum, d) => sum + (d.baseFee ?? 0), 0)}
+                      </td>
+
+                      {/* Discount Total */}
+                      <td className="p-1 text-center text-pink-600 font-bold">
+                        {discounts.reduce(
+                          (sum, d) =>
+                            sum + ((d.baseFee ?? 0) - (d.customNetFee ?? 0)),
+                          0,
+                        )}
+                      </td>
+
+                      {/* Net Total */}
+                      <td className="p-1 text-center text-green-600 font-bold">
+                        {discounts.reduce(
+                          (sum, d) => sum + (d.customNetFee ?? 0),
+                          0,
+                        )}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -329,7 +327,6 @@ export default function StudentFeeLedgerPage() {
         </div>
       )}
 
-    
       {isModalOpen && (
         <DiscountAddModal
           isOpen={isModalOpen}
@@ -344,28 +341,48 @@ export default function StudentFeeLedgerPage() {
           schoolId={effectiveSchoolId}
           classFee={studentInfo?.classFee || 0}
           onSuccess={() => {
-          setIsModalOpen(false);
-          setEditDiscount(null);
-          fetchDiscounts(studentInfo?._id);
-        }}
+            setIsModalOpen(false);
+            setEditDiscount(null);
+            fetchDiscounts(studentInfo?._id);
+          }}
         />
       )}
 
+      {/* Create Invoice */}
       {isInvoiceModalOpen && (
         <InvoiceGenerateModal
-        isOpen={isInvoiceModalOpen}
-        onClose={() => setIsInvoiceModalOpen(false)}
-        studentId={studentInfo?._id}
-        studentName={studentInfo?.fullName}
-        className={studentInfo?.className || ""}
-        section={studentInfo?.section || ""}
-        schoolId={effectiveSchoolId}
-        classFee={studentInfo?.classFee || 0}
-        onSuccess={() => {
-          setIsInvoiceModalOpen(false);
-          setInvoiceRefreshKey(prev => prev + 1);
+          isOpen={isInvoiceModalOpen}
+          onClose={() => setIsInvoiceModalOpen(false)}
+          studentId={studentInfo?._id}
+          studentName={studentInfo?.fullName}
+          className={studentInfo?.className || ""}
+          section={studentInfo?.section || ""}
+          schoolId={effectiveSchoolId}
+          classFee={studentInfo?.classFee || 0}
+          onSuccess={() => {
+            setIsInvoiceModalOpen(false);
+            setInvoiceRefreshKey((prev) => prev + 1);
           }}
-      />
+        />
+      )}
+
+      {/* Edit Invoice (sirf is invoice ka discount) — same modal */}
+      {editInvoice && (
+        <InvoiceGenerateModal
+          isOpen={!!editInvoice}
+          onClose={() => setEditInvoice(null)}
+          editInvoice={editInvoice}
+          studentId={studentInfo?._id}
+          studentName={studentInfo?.fullName}
+          className={studentInfo?.className || ""}
+          section={studentInfo?.section || ""}
+          schoolId={effectiveSchoolId}
+          classFee={studentInfo?.classFee || 0}
+          onSuccess={() => {
+            setEditInvoice(null);
+            setInvoiceRefreshKey((prev) => prev + 1);
+          }}
+        />
       )}
 
       {isViewDiscountOpen && (
@@ -394,6 +411,24 @@ export default function StudentFeeLedgerPage() {
           schoolId={effectiveSchoolId || ""}
           onPayClick={(inv) => setPayInvoice(inv)}
           onDetailClick={(inv) => setDetailInvoice(inv)}
+          onEditClick={(inv) => setEditInvoice(inv)}
+          exportHeader={{
+            school: {
+              name: schoolInfo?.name,
+              address: schoolInfo?.address,
+              logo: schoolInfo?.logo,
+            },
+            info: [
+              { label: "Name", value: `${studentInfo?.fullName} (GR# ${studentInfo?.grNumber})` },
+              { label: "Father Name", value: studentInfo?.parentName },
+              {
+                label: "Class",
+                value: studentInfo?.section
+                  ? `${studentInfo?.className} (${studentInfo?.section})`
+                  : studentInfo?.className,
+              },
+            ],
+          }}
         />
       )}
 
@@ -404,7 +439,7 @@ export default function StudentFeeLedgerPage() {
           invoice={payInvoice}
           onSuccess={() => {
             setPayInvoice(null);
-            setInvoiceRefreshKey(prev => prev + 1);
+            setInvoiceRefreshKey((prev) => prev + 1);
           }}
         />
       )}
@@ -417,6 +452,20 @@ export default function StudentFeeLedgerPage() {
           studentInfo={studentInfo}
         />
       )}
+
+      {isRecentOpen && (
+        <RecentPaymentsModal
+          isOpen={isRecentOpen}
+          onClose={() => setIsRecentOpen(false)}
+          studentId={studentInfo?._id}
+          studentName={studentInfo?.fullName}
+          className={studentInfo?.className || ""}
+          section={studentInfo?.section || ""}
+          schoolId={effectiveSchoolId || ""}
+          onChanged={() => setInvoiceRefreshKey((prev) => prev + 1)}
+        />
+      )}
+
     </div>
   );
 }

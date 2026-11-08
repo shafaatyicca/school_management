@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Layers, Pencil, Trash2, CalendarCheck } from "lucide-react";
+import {
+  Layers,
+  Pencil,
+  Trash2,
+  CalendarCheck,
+  GraduationCap,
+} from "lucide-react";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
 import { Button } from "@/components/ui/button";
@@ -23,11 +29,15 @@ import {
 } from "@mui/material";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
+import { notify } from "@/lib/notify";
+
+type FeeSource = "fixed" | "class_fee";
 
 type CategoryFormValues = {
   name: string;
   isMonthly: boolean;
   maxBaseFee: number;
+  feeSource: FeeSource;
 };
 
 export default function FeeCategoryPage() {
@@ -56,6 +66,12 @@ export default function FeeCategoryPage() {
     open: false,
     id: null,
   });
+
+  // Kya is school mein pehle se koi class fee category hai? (modal mein checkbox disable karne ke liye)
+  const existingClassFeeCategoryId = useMemo(
+    () => categories.find((c) => c.feeSource === "class_fee")?._id || null,
+    [categories],
+  );
 
   // Fetch Data
   const fetchCategories = async () => {
@@ -111,12 +127,14 @@ export default function FeeCategoryPage() {
           name: values.name,
           isMonthly: values.isMonthly,
           maxBaseFee: values.maxBaseFee,
+          feeSource: values.feeSource,
           schoolId: effectiveSchoolId,
         }
       : {
           name: values.name,
           isMonthly: values.isMonthly,
           maxBaseFee: values.maxBaseFee,
+          feeSource: values.feeSource,
           schoolId: effectiveSchoolId,
         };
 
@@ -128,11 +146,16 @@ export default function FeeCategoryPage() {
       });
 
       if (res.ok) {
+        notify.success(isEditing ? "Category updated" : "Category created");
         setFormModal({ open: false, data: null });
         fetchCategories();
+      } else {
+        const err = await res.json().catch(() => null);
+        notify.error(err?.message || "Failed to save category");
       }
     } catch (error) {
       console.error("Save failed:", error);
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -195,11 +218,17 @@ export default function FeeCategoryPage() {
         size: 140,
         Cell: ({ row }) => (
           <div className="flex items-center justify-start w-full pl-1">
-            <span className="text-sm text-slate-700 dark:text-slate-300 font-mono">
-              {row.original.maxBaseFee
-                ? row.original.maxBaseFee.toLocaleString()
-                : "0"}
-            </span>
+            {row.original.feeSource === "class_fee" ? (
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold border bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800">
+                Dynamic
+              </span>
+            ) : (
+              <span className="text-sm text-slate-700 dark:text-slate-300 font-mono">
+                {row.original.maxBaseFee
+                  ? row.original.maxBaseFee.toLocaleString()
+                  : "0"}
+              </span>
+            )}
           </div>
         ),
       },
@@ -305,6 +334,7 @@ export default function FeeCategoryPage() {
         open={formModal.open}
         data={formModal.data}
         loading={loading}
+        existingClassFeeCategoryId={existingClassFeeCategoryId}
         onClose={() => setFormModal({ open: false, data: null })}
         onSave={handleSaveCategory}
       />
@@ -324,18 +354,27 @@ function CategoryFormModal({
   open,
   data,
   loading,
+  existingClassFeeCategoryId,
   onClose,
   onSave,
 }: {
   open: boolean;
   data: any | null;
   loading: boolean;
+  existingClassFeeCategoryId: string | null;
   onClose: () => void;
   onSave: (values: CategoryFormValues) => void;
 }) {
   const [name, setName] = useState("");
   const [isMonthly, setIsMonthly] = useState(false);
   const [maxBaseFee, setMaxBaseFee] = useState<number | "">("");
+  const [feeSource, setFeeSource] = useState<FeeSource>("fixed");
+
+  const isClassFee = feeSource === "class_fee";
+
+  // Agar school mein koi aur category pehle se class fee se linked hai to checkbox lock
+  const classFeeLockedByOther =
+    !!existingClassFeeCategoryId && existingClassFeeCategoryId !== data?._id;
 
   // Sync Form States when modal opens
   useEffect(() => {
@@ -344,10 +383,12 @@ function CategoryFormModal({
       setName(data.name || "");
       setIsMonthly(data.isMonthly || false);
       setMaxBaseFee(data.maxBaseFee || "");
+      setFeeSource(data.feeSource === "class_fee" ? "class_fee" : "fixed");
     } else {
       setName("");
       setIsMonthly(false);
       setMaxBaseFee("");
+      setFeeSource("fixed");
     }
   }, [data, open]);
 
@@ -355,8 +396,9 @@ function CategoryFormModal({
     e.preventDefault();
     onSave({
       name,
-      isMonthly,
-      maxBaseFee: Number(maxBaseFee || 0),
+      isMonthly: isClassFee ? true : isMonthly,
+      maxBaseFee: isClassFee ? 0 : Number(maxBaseFee || 0),
+      feeSource,
     });
   };
 
@@ -412,7 +454,8 @@ function CategoryFormModal({
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={isMonthly}
+                  checked={isClassFee ? true : isMonthly}
+                  disabled={isClassFee}
                   onChange={(e) => setIsMonthly(e.target.checked)}
                   color="primary"
                 />
@@ -422,14 +465,45 @@ function CategoryFormModal({
             />
           </div>
 
+          <div className="p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <GraduationCap className="w-4 h-4 text-indigo-500" /> Amount
+              comes from Class Fee?
+            </span>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={isClassFee}
+                  disabled={classFeeLockedByOther}
+                  onChange={(e) =>
+                    setFeeSource(e.target.checked ? "class_fee" : "fixed")
+                  }
+                  color="primary"
+                />
+              }
+              label=""
+              className="m-0"
+            />
+          </div>
+          {classFeeLockedByOther && (
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 -mt-2 ml-1">
+              Another category is already linked to Class Fee.
+            </p>
+          )}
+
           <TextField
-            label="Max Base Fee / Standard Amount (Optional)"
+            label={
+              isClassFee
+                ? "Amount auto from student's Class Fee"
+                : "Max Base Fee / Standard Amount (Optional)"
+            }
             fullWidth
             variant="outlined"
             size="small"
             type="number"
             placeholder="e.g. 5000"
-            value={maxBaseFee}
+            value={isClassFee ? "" : maxBaseFee}
+            disabled={isClassFee}
             onChange={(e) =>
               setMaxBaseFee(
                 e.target.value === "" ? "" : Number(e.target.value),

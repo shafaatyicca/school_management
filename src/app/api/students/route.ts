@@ -21,9 +21,15 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const parentId = searchParams.get("parentId");
-
-    const filter: any = { schoolId }; // Hamesha sirf apne school ka data
+    const classId = searchParams.get("classId");
+    const section = searchParams.get("section");
+    const ids = searchParams.get("ids");
+    
+    const filter: any = { schoolId }; // Always only this school's data
     if (parentId) filter.parentId = parentId;
+    if (classId) filter.classId = classId; // Student Information page
+    if (section) filter.section = section;
+    if (ids) filter._id = { $in: ids.split(",").filter(Boolean) };
 
     const students = await Student.find(filter)
       .populate("classId")

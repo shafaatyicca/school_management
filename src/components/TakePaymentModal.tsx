@@ -67,7 +67,10 @@ export default function TakePaymentModal({
       const data = await res.json();
 
       if (res.ok) {
-        notify.success("Payment recorded successfully!");
+        // ✅ Receipt number ke saath message
+        notify.success(
+          `Payment recorded! Receipt: ${data.payment?.paymentNo || ""}`,
+        );
         onSuccess();
       } else {
         notify.error(data.message || "Failed to record payment");

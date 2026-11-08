@@ -8,7 +8,7 @@ import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
 import ParentFormModal from "@/components/ParentFormModal";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
 import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
@@ -43,6 +43,7 @@ export default function StudentsPage() {
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
   const [isParentFormOpen, setIsParentFormOpen] = useState(false);
   const [isParentLoading, setIsParentLoading] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -62,6 +63,23 @@ export default function StudentsPage() {
   useEffect(() => {
     if (effectiveSchoolId) fetchData();
   }, [effectiveSchoolId]);
+
+  useEffect(() => {
+  if (!effectiveSchoolId) return;
+  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d && setSchoolInfo(d))
+    .catch(() => {});
+}, [effectiveSchoolId]);
+
+// Export header: school only
+const exportHeader: ExportHeader = {
+  school: {
+    name: schoolInfo?.name,
+    address: schoolInfo?.address,
+    logo: schoolInfo?.logo,
+  },
+};
 
   const fetchData = async () => {
     if (!effectiveSchoolId) return;
@@ -507,7 +525,7 @@ export default function StudentsPage() {
       <div className="flex items-center gap-2 ">
         {/* Excel Button */}
         <Button
-          onClick={() => handleExportRows(table, "excel", "Students Report")}
+          onClick={() => handleExportRows(table, "excel", "Students Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 h-8 cursor-pointer"
@@ -517,7 +535,7 @@ export default function StudentsPage() {
 
         {/* PDF Button */}
         <Button
-          onClick={() => handleExportRows(table, "pdf", "Students Report")}
+          onClick={() => handleExportRows(table, "pdf", "Students Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 h-8 cursor-pointer"
@@ -527,7 +545,7 @@ export default function StudentsPage() {
 
         {/* Print Button */}
         <Button
-          onClick={() => handlePrintTable(table, "Students Report")}
+          onClick={() => handlePrintTable(table, "Students Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"

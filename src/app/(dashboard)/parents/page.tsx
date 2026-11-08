@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useMemo } from "react";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
 import {
   FileSpreadsheet,
   FileText,
@@ -32,6 +32,7 @@ export default function ParentsPage() {
   const [parents, setParents] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState<any>(null);
   const [parentToDelete, setParentToDelete] = useState<{
     id: string;
     name: string;
@@ -55,6 +56,23 @@ export default function ParentsPage() {
   useEffect(() => {
     if (effectiveSchoolId) fetchParents();
   }, [effectiveSchoolId]);
+
+  useEffect(() => {
+  if (!effectiveSchoolId) return;
+  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d && setSchoolInfo(d))
+    .catch(() => {});
+}, [effectiveSchoolId]);
+
+// Export header: school only
+const exportHeader: ExportHeader = {
+  school: {
+    name: schoolInfo?.name,
+    address: schoolInfo?.address,
+    logo: schoolInfo?.logo,
+  },
+};
 
   const fetchParents = async () => {
     setFetchLoading(true);
@@ -241,7 +259,7 @@ export default function ParentsPage() {
         {/* Excel Button */}
         <Button
           onClick={() =>
-            handleExportRows(table, "excel", "Parents List Report")
+            handleExportRows(table, "excel", "Parents List Report", exportHeader)
           }
           variant="outline"
           size="sm"
@@ -252,7 +270,7 @@ export default function ParentsPage() {
 
         {/* PDF Button */}
         <Button
-          onClick={() => handleExportRows(table, "pdf", "Parents List Report")}
+          onClick={() => handleExportRows(table, "pdf", "Parents List Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
@@ -262,7 +280,7 @@ export default function ParentsPage() {
 
         {/* Print Button */}
         <Button
-          onClick={() => handlePrintTable(table, "Parents List Report")}
+          onClick={() => handlePrintTable(table, "Parents List Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"

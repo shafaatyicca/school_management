@@ -1,11 +1,25 @@
 import mongoose, { Schema, model, models, Document } from "mongoose";
 
 const PaymentRecordSchema = new Schema({
+  paymentNo: { type: String, default: "" },
   amount: { type: Number, required: true },
   paidDate: { type: Date, default: Date.now },
   method: { type: String, enum: ["cash", "bank", "online"], default: "cash" },
   note: { type: String, default: "" },
   receivedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+});
+
+// Reverse hui payments ka record (audit ke liye — kabhi mitaya nahi jata)
+const ReversedPaymentSchema = new Schema({
+  originalPaymentId: { type: Schema.Types.ObjectId },
+  paymentNo: { type: String, default: "" },
+  amount: { type: Number, required: true },
+  paidDate: { type: Date },
+  method: { type: String, default: "cash" },
+  note: { type: String, default: "" },
+  receivedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  reversedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+  reversedAt: { type: Date, default: Date.now },
 });
 
 export interface IStudentFeeInvoice extends Document {
@@ -16,6 +30,7 @@ export interface IStudentFeeInvoice extends Document {
   month: number;
   year: number;
   title: string;
+  description: string;
   baseFee: number;
   discount: number;
   netPayable: number;
@@ -23,6 +38,7 @@ export interface IStudentFeeInvoice extends Document {
   remainingAmount: number;
   status: "pending" | "paid" | "partial";
   paymentHistory: any[];
+  reversedPayments: any[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +52,7 @@ const StudentFeeInvoiceSchema = new Schema<IStudentFeeInvoice>(
     month:     { type: Number, required: true, min: 1, max: 12 },
     year:      { type: Number, required: true },
     title:     { type: String, default: "" },
+    description: { type: String, default: "", trim: true },
     baseFee:    { type: Number, default: 0 },
     discount:   { type: Number, default: 0 },
     netPayable: { type: Number, default: 0 },
@@ -48,6 +65,7 @@ const StudentFeeInvoiceSchema = new Schema<IStudentFeeInvoice>(
     },
 
     paymentHistory: [PaymentRecordSchema],
+    reversedPayments: [ReversedPaymentSchema],
   },
   { timestamps: true },
 );

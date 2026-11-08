@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Close as CloseIcon, Edit, Delete } from "@mui/icons-material";
 import { Receipt } from "lucide-react";
 import { notify } from "@/lib/notify";
@@ -45,8 +45,14 @@ export default function ViewSingleDiscountModal({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: deleteDialog.id }),
     });
+    const data = await res.json().catch(() => null);
     if (res.ok) {
-      notify.success("Discount deleted!");
+      // Tuition (Class Fee) ka record delete nahi hota, sirf discount hatta hai
+      notify.success(
+        data?.reset
+          ? "Discount removed — fee lock remains"
+          : "Discount deleted!",
+      );
       setDeleteDialog({ open: false, id: null, name: "" });
       onRefresh();
     } else {
@@ -139,9 +145,11 @@ export default function ViewSingleDiscountModal({
               </thead>
               <tbody>
                 {discounts.map((item, index) => {
-                  const base     = item.baseFee || classFee;
-                  const net      = item.customNetFee || 0;
+                  const base     = item.baseFee ?? 0;
+                  const net      = item.customNetFee ?? base;
                   const discount = base - net;
+                  // Tuition (Class Fee) row = student ki fee lock
+                  const isFeeLock = item.feeCategoryId?.feeSource === "class_fee";
                   return (
                     <tr
                       key={item._id}
@@ -180,11 +188,20 @@ export default function ViewSingleDiscountModal({
                           >
                             <Edit sx={{ fontSize: 15 }} />
                           </IconButton>
-                          {/* Delete */}
+                          {/* Delete (Tuition par sirf discount hatta hai) */}
                           <IconButton
                             size="small"
-                            disabled={deletingId === item._id}
-                            onClick={() => setDeleteDialog({ open: true, id: item._id, name: item.feeCategoryId?.name || "" })}
+                            title={isFeeLock ? "Remove Discount" : "Delete"}
+                            disabled={
+                              deletingId === item._id || (isFeeLock && discount <= 0)
+                            }
+                            onClick={() => setDeleteDialog({
+                              open: true,
+                              id: item._id,
+                              name: isFeeLock
+                                ? `${item.feeCategoryId?.name || ""} discount`
+                                : item.feeCategoryId?.name || "",
+                            })}
                             sx={{
                               color: "#ef4444",
                               "&:hover": { backgroundColor: "rgba(239,68,68,0.1)" },
@@ -207,13 +224,13 @@ export default function ViewSingleDiscountModal({
                     Total
                   </td>
                   <td className="p-2 text-center text-blue-600">
-                    {discounts.reduce((sum, d) => sum + (d.baseFee || classFee), 0).toLocaleString()}
+                    {discounts.reduce((sum, d) => sum + (d.baseFee ?? 0), 0).toLocaleString()}
                   </td>
                   <td className="p-2 text-center text-pink-500">
-                     {discounts.reduce((sum, d) => sum + ((d.baseFee || classFee) - d.customNetFee), 0).toLocaleString()}
+                     {discounts.reduce((sum, d) => sum + ((d.baseFee ?? 0) - (d.customNetFee ?? d.baseFee ?? 0)), 0).toLocaleString()}
                   </td>
                   <td className="p-2 text-center text-green-600">
-                    {discounts.reduce((sum, d) => sum + d.customNetFee, 0).toLocaleString()}
+                    {discounts.reduce((sum, d) => sum + (d.customNetFee ?? d.baseFee ?? 0), 0).toLocaleString()}
                   </td>
                   <td colSpan={2} />
                 </tr>

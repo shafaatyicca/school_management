@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { RefreshCw, CreditCard, Trash2, Pencil, FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { RefreshCw, CreditCard, Trash2, Pencil, FileSpreadsheet, FileText, Printer, Ticket } from "lucide-react";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
+import { printFeeVoucher } from "@/lib/printFeeVoucher";
 
 const MONTHS = [
   "", "January", "February", "March", "April", "May", "June",
@@ -22,9 +23,11 @@ interface Props {
   schoolId: string;
   onPayClick: (invoice: any) => void;
   onDetailClick: (invoice: any) => void;
+  onEditClick?: (invoice: any) => void;
+  exportHeader?: ExportHeader;
 }
 
-export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, onDetailClick  }: Props) {
+export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, onDetailClick, onEditClick, exportHeader }: Props) {
   const [invoices,     setInvoices]     = useState<any[]>([]);
   const [loading,      setLoading]      = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string | null; title?: string }>({
@@ -245,7 +248,8 @@ const totals = useMemo(() => ({
             <CreditCard className="w-4 h-4" />
           </Button>
           
-          <Button size="icon" variant="ghost" title="Edit Invoice" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer" onClick={() => {/* Apka Edit logic */}}>
+          {/* ✅ CHANGE 3: Edit button ab onEditClick call karta hai */}
+          <Button size="icon" variant="ghost" title="Edit Invoice" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer" onClick={() => onEditClick?.(row.original)}>
             <Pencil className="w-4 h-4" />
           </Button>
 
@@ -262,7 +266,7 @@ const totals = useMemo(() => ({
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
         <Button
-          onClick={() => handleExportRows(table, "excel", "Invoice Report")}
+          onClick={() => handleExportRows(table, "excel", "Invoice Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-7 text-[11px]"
@@ -270,7 +274,7 @@ const totals = useMemo(() => ({
           <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
         </Button>
         <Button
-          onClick={() => handleExportRows(table, "pdf", "Invoice Report")}
+          onClick={() => handleExportRows(table, "pdf", "Invoice Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-7 text-[11px]"
@@ -278,7 +282,7 @@ const totals = useMemo(() => ({
           <FileText className="h-3.5 w-3.5 mr-1" /> PDF
         </Button>
         <Button
-          onClick={() => handlePrintTable(table, "Invoice Report")}
+          onClick={() => handlePrintTable(table, "Invoice Report", exportHeader)}
           variant="outline"
           size="sm"
           className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-7 text-[11px] dark:text-slate-300"
@@ -293,6 +297,14 @@ const totals = useMemo(() => ({
         >
           <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
         </Button>
+        <Button
+  onClick={() => printFeeVoucher(studentId, schoolId)}
+  variant="outline"
+  size="sm"
+  className="text-sky-600 border-sky-200 hover:bg-sky-50 dark:hover:bg-sky-900/20 cursor-pointer h-7 text-[11px]"
+>
+  <Ticket className="h-3.5 w-3.5 mr-1" /> Print Voucher
+</Button>
       </div>
     ),
     muiTablePaperProps: {
