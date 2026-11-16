@@ -23,14 +23,14 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   staff: any;
-  onEdit: () => void; // Ye line add karein
+  onEdit: () => void; 
 }
 
 export default function EmployeeProfileModal({
   isOpen,
   onClose,
   staff,
-  onEdit, // Ye line add karein
+  onEdit, 
 }: Props) {
   if (!staff) return null;
 
@@ -42,7 +42,7 @@ export default function EmployeeProfileModal({
     <Dialog
       open={isOpen}
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       disableEnforceFocus
       disableAutoFocus

@@ -38,12 +38,15 @@ export default function DashboardLayout({
   if (status !== "authenticated") return null;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-muted/40">
+    // h-dvh = real visible height (h-screen can be taller on mobile / zoom)
+    <div className="flex h-dvh overflow-hidden bg-muted/40">
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0 h-full">
+      {/* min-h-0 → this column never grows taller than the screen */}
+      <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full">
         <Topbar />
-        <main className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar">
-          <div className="max-w-[1600px] mx-auto w-full pt-0">{children}</div>
+        {/* Only this area scrolls; the Topbar always stays on top */}
+        <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 custom-scrollbar">
+          <div className="max-w-[1600px] mx-auto w-full pt-3">{children}</div>
         </main>
       </div>
 

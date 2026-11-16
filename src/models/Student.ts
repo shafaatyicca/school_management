@@ -72,40 +72,35 @@ StudentSchema.index({ schoolId: 1, grNumber: 1 }, { unique: true });
 
 StudentSchema.pre<IStudent>("save", async function () {
   const doc = this;
-  if (doc.isNew) {
-    try {
-      const StudentModel =
-        mongoose.models.Student ||
-        mongoose.model<IStudent>("Student", StudentSchema);
+  if (!doc.isNew) return;
 
-      // 1. Calculate GR Number (Per School)
-      const lastStudent = await StudentModel.findOne({ schoolId: doc.schoolId })
-        .sort({ grNumber: -1 })
-        .select("grNumber")
-        .lean();
+  const StudentModel =
+    mongoose.models.Student || mongoose.model<IStudent>("Student", StudentSchema);
 
-      const nextGrNumber =
-        lastStudent && (lastStudent as any).grNumber
-          ? (lastStudent as any).grNumber + 1
-          : 1;
-      doc.grNumber = nextGrNumber;
+  // 1. GR Number: keep the given one (e.g. from an import sheet), otherwise next number
+  let grNumber = Number(doc.grNumber) || 0;
+  if (!grNumber) {
+    const lastStudent = await StudentModel.findOne({ schoolId: doc.schoolId })
+      .sort({ grNumber: -1 })
+      .select("grNumber")
+      .lean();
+    grNumber =
+      lastStudent && (lastStudent as any).grNumber
+        ? (lastStudent as any).grNumber + 1
+        : 1;
+  }
+  doc.grNumber = grNumber;
 
-      // 2. Prefix Logic (Aggressive Short)
-      const shortPrefix = String(doc.schoolId)
-        .replace(/[^a-zA-Z]/g, "")
-        .toLowerCase()
-        .substring(0, 3);
+  // 2. Prefix (first 3 letters of the school id)
+  const shortPrefix = String(doc.schoolId)
+    .replace(/[^a-zA-Z]/g, "")
+    .toLowerCase()
+    .substring(0, 3);
 
-      // 3. Email & Password (mcs1st@myschoolapp.com)
-      doc.email =
-        `${shortPrefix}${nextGrNumber}st@myschoolapp.com`.toLowerCase();
-
-      if (!doc.password) {
-        doc.password = `${shortPrefix}${nextGrNumber}123`;
-      }
-    } catch (error: any) {
-      throw error;
-    }
+  // 3. Login email & password
+  doc.email = `${shortPrefix}${grNumber}st@myschoolapp.com`.toLowerCase();
+  if (!doc.password) {
+    doc.password = `${shortPrefix}${grNumber}123`;
   }
 });
 

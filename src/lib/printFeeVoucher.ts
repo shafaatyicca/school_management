@@ -11,7 +11,20 @@ const esc = (v: any) =>
 
 const fmt = (d: any) => {
   const x = new Date(d);
-  const m = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const m = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   return `${String(x.getDate()).padStart(2, "0")}-${m[x.getMonth()]}-${x.getFullYear()}`;
 };
 const money = (n: number) => Number(n || 0).toLocaleString("en-US");
@@ -19,7 +32,9 @@ const money = (n: number) => Number(n || 0).toLocaleString("en-US");
 // One voucher (existing format)
 function voucherHtml(d: any, copyLabel: string) {
   const st = d.student;
-  const classText = st.className ? `${st.className}${st.section ? ` (${st.section})` : ""}` : "";
+  const classText = st.className
+    ? `${st.className}${st.section ? ` (${st.section})` : ""}`
+    : "";
   const bank = d.settings.bank || {};
 
   return `
@@ -102,12 +117,19 @@ function buildDocument(vouchers: any[]) {
     } else {
       threeAcross = true;
       for (let i = 0; i < vouchers.length; i += 3) {
-        pages.push(vouchers.slice(i, i + 3).map((v) => voucherHtml(v, "")).join(""));
+        pages.push(
+          vouchers
+            .slice(i, i + 3)
+            .map((v) => voucherHtml(v, ""))
+            .join(""),
+        );
       }
     }
   } else {
     const labels =
-      copies === 3 ? ["BANK COPY", "SCHOOL COPY", "STUDENT COPY"] : ["SCHOOL COPY", "STUDENT COPY"];
+      copies === 3
+        ? ["BANK COPY", "SCHOOL COPY", "STUDENT COPY"]
+        : ["SCHOOL COPY", "STUDENT COPY"];
     if (copies === 3) threeAcross = true;
     pages = vouchers.map((v) => labels.map((l) => voucherHtml(v, l)).join(""));
   }
@@ -131,8 +153,8 @@ function buildDocument(vouchers: any[]) {
   .three .voucher { flex: 0 0 calc((100% - 12mm) / 3); max-width: none; }
   .copy { position: absolute; top: -1px; right: -1px; background: #111; color: #fff; font-size: 8px; font-weight: 700; padding: 2px 6px; letter-spacing: .5px; }
   .head { background: #1ba6d8; display: flex; align-items: center; gap: 8px; padding: 8px; border-bottom: 2px solid #555; }
-  .logo { width: 52px; height: 52px; border-radius: 50%; background: #fff; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-  .logo img { width: 100%; height: 100%; object-fit: cover; }
+   .logo { width: 56px; height: 56px; border-radius: 8px; background: #fff; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; padding: 3px; }
+  .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .school { flex: 1; text-align: center; }
   .school .name { font-size: 14px; font-weight: 700; color: #000; }
   .school .addr { font-size: 9px; color: #111; margin-top: 2px; }
@@ -181,7 +203,9 @@ export async function printFeeVoucher(studentId: string, schoolId: string) {
     notify.error("Popup blocked — please allow popups for this site");
     return;
   }
-  win.document.write("<p style='font-family:Arial;padding:20px'>Loading voucher...</p>");
+  win.document.write(
+    "<p style='font-family:Arial;padding:20px'>Loading voucher...</p>",
+  );
 
   try {
     const res = await fetch(
@@ -414,26 +438,42 @@ function styleTwoBody(d: AdmissionFormData) {
       <span class="m">Form No.<span></span> Date<span></span></span>
     </div>
 
-    ${s2Section(1, "Student Information", `
+    ${s2Section(
+      1,
+      "Student Information",
+      `
       ${f2("Student's Full Name", 8, v.studentName)}${f2("B-Form Number", 4, v.bForm)}
       ${f2("Date of Birth", 4, v.dob)}${f2("Place of Birth", 4, v.placeOfBirth)}${f2Gender(4, v.gender)}
       ${f2("Religion", 3, v.religion)}${f2("Caste", 3, v.caste)}${f2("Nationality", 3, v.nationality)}${f2("Section", 3, v.section)}
       ${f2("Admission Class", 4, v.admissionClass)}${f2("Previous School", 8, v.previousSchool)}
-    `)}
+    `,
+    )}
 
-    ${s2Section(2, "Father Information", `
+    ${s2Section(
+      2,
+      "Father Information",
+      `
       ${f2("Father's Name", 6, v.fatherName)}${f2("CNIC", 6, v.cnic)}
       ${f2("Phone", 4, v.fatherPhone)}${f2("Occupation", 8, v.occupation)}
       ${f2("Full Address", 12, v.address)}
-    `)}
+    `,
+    )}
 
-    ${s2Section(3, "Mother Information", `
+    ${s2Section(
+      3,
+      "Mother Information",
+      `
       ${f2("Mother's Name", 5, v.motherName)}${f2("Profession", 4, v.motherProfession)}${f2("Phone", 3, v.motherPhone)}
-    `)}
+    `,
+    )}
 
-    ${s2Section(4, "Guardian Information (If Any)", `
+    ${s2Section(
+      4,
+      "Guardian Information (If Any)",
+      `
       ${f2("Guardian Name", 5, v.guardianName)}${f2("Relation", 3, v.guardianRelation)}${f2("Phone", 4, v.guardianPhone)}
-    `)}
+    `,
+    )}
 
     <div class="s2-sec">
       <div class="s2-sec-h"><span class="num">5</span>Undertaking<span class="rule"></span></div>
@@ -516,10 +556,17 @@ const STYLE_TWO_CSS = `
 // ══════════════════════════════════════════════════════════════
 
 // One document with one or many forms (one A4 page each)
-function admissionDocument(forms: AdmissionFormData[], autoPrint: boolean, docTitle: string) {
+function admissionDocument(
+  forms: AdmissionFormData[],
+  autoPrint: boolean,
+  docTitle: string,
+) {
   const isStyleTwo = forms[0]?.style === "style2";
   const pages = forms
-    .map((f) => `<div class="page">${isStyleTwo ? styleTwoBody(f) : styleOneBody(f)}</div>`)
+    .map(
+      (f) =>
+        `<div class="page">${isStyleTwo ? styleTwoBody(f) : styleOneBody(f)}</div>`,
+    )
     .join("");
 
   return `<!doctype html>
@@ -546,9 +593,16 @@ function admissionDocument(forms: AdmissionFormData[], autoPrint: boolean, docTi
 }
 
 /** Blank Admission Form HTML (preview + print) */
-export function buildAdmissionFormHtml(d: AdmissionFormData, autoPrint = false) {
+export function buildAdmissionFormHtml(
+  d: AdmissionFormData,
+  autoPrint = false,
+) {
   const name = d.school?.name;
-  return admissionDocument([d], autoPrint, `Admission Form${name ? ` - ${name}` : ""}`);
+  return admissionDocument(
+    [d],
+    autoPrint,
+    `Admission Form${name ? ` - ${name}` : ""}`,
+  );
 }
 
 /** Print the blank Admission Form */
@@ -567,7 +621,11 @@ export function printAdmissionForm(d: AdmissionFormData) {
 
 const bioDate = (d: any) =>
   d
-    ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    ? new Date(d).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
     : "";
 
 // Student record → form values (Registration Fee & Monthly Fee left blank)
@@ -600,7 +658,9 @@ export function toBioValues(st: any): Record<string, string> {
     guardianPhone: st.guardianPhone || "",
     admissionDate: bioDate(st.enrollmentDate),
     grNumber: st.grNumber != null ? String(st.grNumber) : "",
-    classSection: className ? `${className}${st.section ? ` (${st.section})` : ""}` : "",
+    classSection: className
+      ? `${className}${st.section ? ` (${st.section})` : ""}`
+      : "",
     registrationFee: "",
     monthlyFee: "",
   };
@@ -609,7 +669,11 @@ export function toBioValues(st: any): Record<string, string> {
 /** Print Bio Data for many students (one A4 page each, sorted by GR #) */
 export function printBioData(
   students: any[],
-  opts: { school: AdmissionFormData["school"]; undertaking: string; style: "style1" | "style2" },
+  opts: {
+    school: AdmissionFormData["school"];
+    undertaking: string;
+    style: "style1" | "style2";
+  },
 ) {
   if (!students.length) {
     notify.error("No students to print");

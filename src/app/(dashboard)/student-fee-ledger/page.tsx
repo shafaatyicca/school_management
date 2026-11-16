@@ -96,6 +96,17 @@ export default function StudentFeeLedgerPage() {
       setLoading(false);
     }
   };
+useEffect(() => {
+    if (!effectiveSchoolId) return;
+
+    const id = new URLSearchParams(window.location.search).get("student");
+    if (id) loadStudent(id);
+
+    const onOpen = (e: Event) => loadStudent((e as CustomEvent).detail);
+    window.addEventListener("ledger:open-student", onOpen);
+    return () => window.removeEventListener("ledger:open-student", onOpen);
+  }, [effectiveSchoolId]);
+
   const fetchDiscounts = (studentId: string) => {
     if (!studentId) return;
     fetch(`/api/Fee_Management/discounts?studentId=${studentId}`)

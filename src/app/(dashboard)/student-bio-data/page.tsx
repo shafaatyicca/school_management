@@ -32,6 +32,7 @@ export default function StudentBioDataPage() {
   const [school, setSchool] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
+    const [classesLoading, setClassesLoading] = useState(true);
 
   // "" = nothing, SEARCH_MODE = search, "all" = all classes, otherwise classId
   const [mode, setMode] = useState("");
@@ -63,19 +64,28 @@ export default function StudentBioDataPage() {
     }
   }, [isSuperAdmin]);
 
-  // School, settings, classes
+    // Classes — loaded on their own so the dropdown is ready quickly
+  useEffect(() => {
+    if (!schoolId) return;
+    setClassesLoading(true);
+    fetch(`/api/classes?schoolId=${schoolId}`)
+      .then((r) => r.json())
+      .then((cls) => setClasses(Array.isArray(cls) ? cls : []))
+      .catch(() => notify.error("Failed to load classes"))
+      .finally(() => setClassesLoading(false));
+  }, [schoolId]);
+
+  // School details + settings (needed only when printing)
   useEffect(() => {
     if (!schoolId) return;
     Promise.all([
       fetch(`/api/superadmin/schools?id=${schoolId}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/settings?schoolId=${schoolId}`).then((r) => (r.ok ? r.json() : null)),
-      fetch(`/api/classes?schoolId=${schoolId}`).then((r) => r.json()),
     ])
-      .then(([sch, set, cls]) => {
+      .then(([sch, set]) => {
         setSchool(sch);
         setSettings(set);
         setFormStyle(set?.admission?.formStyle === "style2" ? "style2" : "style1");
-        setClasses(Array.isArray(cls) ? cls : []);
       })
       .catch(() => notify.error("Failed to load school details"));
   }, [schoolId]);
@@ -206,17 +216,20 @@ export default function StudentBioDataPage() {
         style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
       >
         <div className="flex flex-wrap items-center gap-3">
-          <TextField
+                    <TextField
             select
             label="Select By"
             size="small"
             value={mode}
             onChange={(e) => changeMode(e.target.value)}
+            disabled={classesLoading}
             SelectProps={{ native: true }}
             InputLabelProps={{ shrink: true }}
             sx={{ minWidth: 230 }}
           >
-            <option value="">Choose a class or search</option>
+            <option value="">
+              {classesLoading ? "Loading classes..." : "Choose a class or search"}
+            </option>
             <option value={SEARCH_MODE}>Search Students</option>
             <option value={ALL}>All Classes</option>
             <optgroup label="Classes">

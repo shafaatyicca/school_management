@@ -222,6 +222,7 @@ const totals = useMemo(() => ({
     enableRowActions: true,
     enableBottomToolbar: false,
     positionActionsColumn: "last",
+    enableKeyboardShortcuts: false,
     displayColumnDefOptions: {
       "mrt-row-actions": { size: 90, header: "Actions" },
     },

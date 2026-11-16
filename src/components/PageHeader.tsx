@@ -20,7 +20,7 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className=" w-full ">
-      <div className="group relative p-[2px] overflow-hidden rounded-xl bg-transparent shadow-2xl">
+      <div className="group relative p-[2px] overflow-hidden rounded-xl bg-transparent">
         {/* 1. Slow Rotating 4-Sided Border Beam */}
         <div className="absolute inset-[-1000%] animate-[spin_8s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,transparent_0%,transparent_30%,#3b82f6_50%,transparent_70%,transparent_100%)] opacity-100"></div>
 

@@ -229,6 +229,7 @@ const exportHeader: ExportHeader = {
     enableColumnActions: false,
     // enableRowActions: !isOrderMode,
     enableRowActions: isSuperAdmin,
+     enableKeyboardShortcuts: false,
     positionActionsColumn: "last",
     initialState: {
       density: "compact",

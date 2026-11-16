@@ -244,6 +244,7 @@ export default function FeeCategoryPage() {
     enableColumnActions: false,
     enableRowActions: isSuperAdmin,
     positionActionsColumn: "last",
+    enableKeyboardShortcuts: false,
     initialState: {
       density: "compact",
       pagination: { pageSize: 15, pageIndex: 0 },

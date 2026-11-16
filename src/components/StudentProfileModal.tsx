@@ -1,23 +1,25 @@
 "use client";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogActions,
   DialogContent,
   Button,
-  Chip,
   Zoom,
 } from "@mui/material";
 import {
   BookOpen,
   User,
   Users,
-  AlertCircle,
   Clock,
   Edit,
   Printer,
   KeyRound,
 } from "lucide-react";
 import { calculateTenure, calculateAge, formatDate } from "@/lib/tenureUtils";
+import { printBioData } from "@/lib/printFeeVoucher";
+import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
+import { notify } from "@/lib/notify";
 
 interface Props {
   isOpen: boolean;
@@ -34,7 +36,46 @@ export default function StudentProfileModal({
   onEdit,
   schoolId,
 }: Props) {
+  // School details + settings for the Bio Data print (loaded when the modal opens)
+  const [printData, setPrintData] = useState<any>(null);
+  const sid = schoolId || student?.schoolId;
+
+  useEffect(() => {
+    if (!isOpen || !sid || printData?.sid === sid) return;
+    Promise.all([
+      fetch(`/api/superadmin/schools?id=${sid}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/settings?schoolId=${sid}`).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([sch, set]) =>
+        setPrintData({
+          sid,
+          school: {
+            name: sch?.name,
+            address: sch?.address,
+            logo: sch?.logo,
+            phone: sch?.phone,
+          },
+          undertaking: set?.admission?.undertaking || DEFAULT_UNDERTAKING,
+          style: set?.admission?.formStyle === "style2" ? "style2" : "style1",
+        }),
+      )
+      .catch(() => {});
+  }, [isOpen, sid, printData?.sid]);
+
   if (!student) return null;
+
+  const handlePrintBio = () => {
+    if (!printData) {
+      notify.error("Loading school details — please try again in a moment");
+      return;
+    }
+    printBioData([student], {
+      school: printData.school,
+      undertaking: printData.undertaking,
+      style: printData.style,
+    });
+  };
+
   const displayImg =
     student.image ||
     (student.gender === "Female"
@@ -116,9 +157,7 @@ export default function StudentProfileModal({
 
         {/* Content Sections */}
         <div className="space-y-3">
-          {/* Main Grid */}
-
-          {/* Personal Info - full width, 3 columns andar */}
+          {/* Personal Info */}
           <div className="p-2 bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-2 text-sky-500">
               <User className="w-4 h-4" />
@@ -141,7 +180,7 @@ export default function StudentProfileModal({
             </div>
           </div>
 
-          {/* Academic Info - full width */}
+          {/* Academic Info */}
           <div className="p-2 bg-card rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-2 text-sky-500">
               <BookOpen className="w-4 h-4" />
@@ -279,9 +318,10 @@ export default function StudentProfileModal({
           gap: 1,
         }}
       >
-        {/* Left: Print */}
+        {/* Left: Print Bio Data (style from Settings) */}
         <Button
-          onClick={() => window.print()}
+          onClick={handlePrintBio}
+          disabled={!printData}
           variant="outlined"
           size="small"
           startIcon={<Printer className="w-4 h-4" />}
@@ -296,7 +336,7 @@ export default function StudentProfileModal({
             },
           }}
         >
-          Print Bio Data
+          {printData ? "Print Bio Data" : "Loading..."}
         </Button>
 
         {/* Right: Cancel & Edit */}

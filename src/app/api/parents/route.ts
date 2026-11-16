@@ -6,7 +6,7 @@ import "@/models/Class";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// --- GET: Fetch Parents with their Students ---
+// --- GET: Fetch Parents with their Students (2 queries instead of one per parent) ---
 export async function GET(req: Request) {
   try {
     await connectDB();
@@ -19,26 +19,33 @@ export async function GET(req: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const parents = await ParentModel.find({ schoolId })
+    // 1. All parents of this school
+    const parents: any[] = await ParentModel.find({ schoolId })
       .sort({ fullName: 1 })
       .lean();
 
-    const parentsWithStudents = await Promise.all(
-      parents.map(async (parent) => {
-        // Parent ke bache dhoondo jo isi school mein hon
-        const students = await StudentModel.find({
-          parentId: parent._id,
-          schoolId: schoolId,
-        })
-          .populate("classId")
-          .lean();
+    // 2. All their students in ONE query (password never sent to the browser)
+    const parentIds = parents.map((p) => p._id);
+    const students: any[] = parentIds.length
+      ? await StudentModel.find({ schoolId, parentId: { $in: parentIds } } as any)
+          .select("grNumber fullName section classId parentId status")
+          .populate("classId", "name")
+          .lean()
+      : [];
 
-        return {
-          ...parent,
-          students: students,
-        };
-      }),
-    );
+    // 3. Group students by parent
+    const byParent = new Map<string, any[]>();
+    for (const s of students) {
+      const key = String(s.parentId);
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key)!.push(s);
+    }
+
+    // Same response shape as before: parent fields + students[]
+    const parentsWithStudents = parents.map((parent) => ({
+      ...parent,
+      students: byParent.get(String(parent._id)) || [],
+    }));
 
     return NextResponse.json(parentsWithStudents);
   } catch (error: any) {

@@ -9,9 +9,43 @@ export async function GET(req: Request) {
     await connectDB();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
-    const slug = searchParams.get("slug"); // ← NEW: slug param add kiya
+    const slug = searchParams.get("slug");
+
+    // Optional: ?fields=basic → light response (no logo / plan)
+    const basic = searchParams.get("fields") === "basic";
+    const BASIC_FIELDS = "_id name slug status updatedAt";
+
+    // ?logo=1&id=… or ?logo=1&slug=… → the logo as an IMAGE (browser caches it)
+    if (searchParams.get("logo") === "1" && (id || slug)) {
+      const s: any = await SchoolModel.findOne(id ? { _id: id } : { slug })
+        .select("logo")
+        .lean();
+      const logo: string = s?.logo || "";
+      if (!logo) return new Response(null, { status: 404 });
+
+      // Logo saved as base64 data URL → send the image bytes
+      const m = logo.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (m) {
+        return new Response(Buffer.from(m[2], "base64"), {
+          headers: {
+            "Content-Type": m[1],
+            // URL contains ?v=updatedAt, so it is safe to cache for a long time
+            "Cache-Control": "public, max-age=31536000, immutable",
+          },
+        });
+      }
+      // Logo saved as a normal URL (e.g. Cloudinary) → redirect to it
+      return NextResponse.redirect(new URL(logo, req.url));
+    }
 
     if (id) {
+      if (basic) {
+        const school = await SchoolModel.findById(id).select(BASIC_FIELDS).lean();
+        if (!school)
+          return NextResponse.json({ error: "School not found" }, { status: 404 });
+        return NextResponse.json(school);
+      }
+
       const school = await SchoolModel.findById(id).populate("planId");
       if (!school)
         return NextResponse.json(
@@ -21,8 +55,15 @@ export async function GET(req: Request) {
       return NextResponse.json(school);
     }
 
-    // ← NEW: Slug se single school fetch karo (super admin dashboard view k liye)
+    // Slug → single school (super admin dashboard view)
     if (slug) {
+      if (basic) {
+        const school = await SchoolModel.findOne({ slug }).select(BASIC_FIELDS).lean();
+        if (!school)
+          return NextResponse.json({ error: "School not found" }, { status: 404 });
+        return NextResponse.json(school);
+      }
+
       const school = await SchoolModel.findOne({ slug }).populate("planId");
       if (!school)
         return NextResponse.json(

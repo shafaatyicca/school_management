@@ -89,7 +89,7 @@ export default function DashboardPage() {
     }
   }, [status, session, router]);
 
-  // ── NEW: Super Admin k liye slug se schoolId fetch karo ─────────
+  // ── Super Admin: school _id from the subdomain (light request) ──
   useEffect(() => {
     if (status === "loading") return;
     if (!isSuperAdmin) return;
@@ -100,7 +100,7 @@ export default function DashboardPage() {
 
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) {
@@ -136,25 +136,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (effectiveSchoolId) fetchData();
-  }, [effectiveSchoolId]); // ← effectiveSchoolId use ho raha hai
+  }, [effectiveSchoolId]);
 
+  // ── Stats + payment warning (re-runs when the session refreshes → auto update) ──
   useEffect(() => {
     const fetchDashboardStats = async () => {
       if (status === "loading" || !effectiveSchoolId) return;
 
       try {
-        const [statsRes, invRes] = await Promise.all([
-          fetch(`/api/schoolStats?schoolId=${effectiveSchoolId}`),
-          fetch(`/api/superadmin/invoices?schoolId=${effectiveSchoolId}`),
-        ]);
-        const statsData = await statsRes.json();
-        const invoices = await invRes.json();
-        setStats(statsData);
-
         const isSchoolAdminRole =
           session?.user?.role === "admin" ||
           session?.user?.role === "school_admin";
 
+        // Invoices are only needed for the school admin's payment warning
+        const [statsRes, invRes] = await Promise.all([
+          fetch(`/api/schoolStats?schoolId=${effectiveSchoolId}`),
+          isSchoolAdminRole
+            ? fetch(`/api/superadmin/invoices?schoolId=${effectiveSchoolId}`)
+            : Promise.resolve(null),
+        ]);
+        const statsData = await statsRes.json();
+        setStats(statsData);
+
+        const invoices = invRes ? await invRes.json() : null;
         if (!isSchoolAdminRole || !Array.isArray(invoices)) return;
 
         const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
@@ -178,13 +182,13 @@ export default function DashboardPage() {
         const nowPKT = toKarachiMidnight(new Date());
         const latestDuePKT = toKarachiMidnight(new Date(latestPending.dueDate));
 
-        // Suspend: due date aaj ya pehle
+        // Suspend: due date today or earlier
         if (latestDuePKT <= nowPKT) {
           setIsInactive(true);
           return;
         }
 
-        // Warning: 5 din ya kam bache
+        // Warning: 5 days or less left
         const diff = latestDuePKT.getTime() - nowPKT.getTime();
         if (diff > 0 && diff <= FIVE_DAYS_MS) {
           const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -222,10 +226,10 @@ export default function DashboardPage() {
     setIsTodoModalOpen(true);
   };
 
-  // ── Loading Screen ──────────────────────────────────────────────
+  // ── Loading Screen ──────
   if (status === "loading") {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#f8fafc]">
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#f8fafc] dark:bg-slate-950">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
         <p className="text-slate-500 text-sm font-medium italic">
           Verifying your dashboard access...
@@ -235,7 +239,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-4 pb-4 bg-[#f8fafc] dark:bg-background min-h-screen font-sans transition-colors duration-300">
+    <div className="space-y-4 pb-4 font-sans transition-colors duration-300">
       {/* Top Header */}
       <div className="flex justify-between items-center">
         <PageHeader
@@ -281,15 +285,9 @@ export default function DashboardPage() {
             Assign Tasks
           </h2>
           {isCollapsed ? (
-            <ChevronDown
-              size={20}
-              className="text-slate-400 dark:text-slate-200"
-            />
+            <ChevronDown size={20} className="text-slate-400 dark:text-slate-200" />
           ) : (
-            <ChevronUp
-              size={20}
-              className="text-slate-400 dark:text-slate-200"
-            />
+            <ChevronUp size={20} className="text-slate-400 dark:text-slate-200" />
           )}
         </div>
 
@@ -371,9 +369,7 @@ export default function DashboardPage() {
                               key={id}
                               className="text-[10px] text-blue-500 dark:text-blue-400 font-medium"
                             >
-                              {emp
-                                ? `(${emp.emp_id}) ${emp.fullName}`
-                                : "Unknown"}
+                              {emp ? `(${emp.emp_id}) ${emp.fullName}` : "Unknown"}
                             </span>
                           );
                         })}
@@ -416,9 +412,10 @@ export default function DashboardPage() {
         employees={employees}
         onRefresh={fetchData}
         editData={editingTodo}
-        schoolId={effectiveSchoolId} // ← effectiveSchoolId
+        schoolId={effectiveSchoolId}
       />
-      {/* ↓ YEH NAYA WARNING MODAL ADD KARO */}
+
+      {/* Payment warning */}
       {paymentWarning?.show && !isInactive && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4">
           <div className="bg-white dark:bg-card p-8 rounded-3xl shadow-2xl max-w-md w-full text-center border-t-4 border-amber-500 animate-in zoom-in duration-300">
@@ -430,14 +427,11 @@ export default function DashboardPage() {
             </h2>
             <p className="text-slate-500 dark:text-muted-foreground text-sm mb-4 leading-relaxed">
               Aapka payment{" "}
-              <strong className="text-amber-600">
-                {paymentWarning.daysLeft} din
-              </strong>{" "}
+              <strong className="text-amber-600">{paymentWarning.daysLeft} din</strong>{" "}
               mein due hai. Baraaye meharbani waqt par payment karein warna
               account suspend ho jayega.
             </p>
 
-            {/* Invoice detail */}
             <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-4 mb-6 text-left space-y-1.5">
               {paymentWarning.invoice?.invoiceNumber && (
                 <div className="flex justify-between text-xs">
@@ -458,10 +452,11 @@ export default function DashboardPage() {
               <div className="flex justify-between text-xs">
                 <span className="text-slate-500">Due Date</span>
                 <span className="font-medium text-amber-600">
-                  {new Date(paymentWarning.invoice.dueDate).toLocaleDateString(
-                    "en-PK",
-                    { day: "numeric", month: "long", year: "numeric" },
-                  )}
+                  {new Date(paymentWarning.invoice.dueDate).toLocaleDateString("en-PK", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
             </div>
@@ -490,6 +485,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
       {/* Inactive Account Modal */}
       {isInactive && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-4">

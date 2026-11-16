@@ -52,7 +52,7 @@ export default function StudentsPage() {
       hostname.includes(".lvh.me") || hostname.includes(".localhost");
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) setViewSchoolId(data._id);
@@ -65,12 +65,12 @@ export default function StudentsPage() {
   }, [effectiveSchoolId]);
 
   useEffect(() => {
-  if (!effectiveSchoolId) return;
-  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => d && setSchoolInfo(d))
-    .catch(() => {});
-}, [effectiveSchoolId]);
+    if (!effectiveSchoolId || fetchLoading || schoolInfo) return;
+    fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSchoolInfo(d))
+      .catch(() => {});
+  }, [effectiveSchoolId, fetchLoading, schoolInfo]);
 
 // Export header: school only
 const exportHeader: ExportHeader = {
@@ -472,12 +472,13 @@ const exportHeader: ExportHeader = {
   const table = useMaterialReactTable({
     columns,
     data: students,
-    state: { showProgressBars: fetchLoading },
+    state: { showProgressBars: fetchLoading},
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
     enableDensityToggle: false, // Density toggle disable
     enableColumnActions: false, // 3 dots menu disable
+    enableKeyboardShortcuts: false,
     initialState: {
       density: "compact",
       columnVisibility: {

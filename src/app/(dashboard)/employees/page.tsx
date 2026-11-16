@@ -360,6 +360,7 @@ const exportHeader: ExportHeader = {
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
+    enableKeyboardShortcuts: false,
     enableDensityToggle: false, // Density toggle disable
     enableColumnActions: false, // 3 dots menu disable
     initialState: {

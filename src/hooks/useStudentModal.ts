@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { notify } from "@/lib/notify";
 
 export function useStudentModal(
@@ -12,10 +12,11 @@ export function useStudentModal(
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const openStudentProfile = (student: any) => {
+  // Stable function → table columns are not rebuilt on every render
+  const openStudentProfile = useCallback((student: any) => {
     setViewingStudent(student);
     setIsViewModalOpen(true);
-  };
+  }, []);
 
   const handleEditFromProfile = () => {
     setSelectedStudent(viewingStudent);

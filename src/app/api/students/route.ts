@@ -31,10 +31,11 @@ export async function GET(req: Request) {
     if (section) filter.section = section;
     if (ids) filter._id = { $in: ids.split(",").filter(Boolean) };
 
-    const students = await Student.find(filter)
-      .populate("classId")
+        const students = await Student.find(filter)
+      .populate("classId", "name")
       .populate("parentId")
-      .sort(parentId ? { fullName: 1 } : { grNumber: -1 });
+      .sort(parentId ? { fullName: 1 } : { grNumber: -1 })
+      .lean();
 
     return NextResponse.json(students);
   } catch (error: any) {

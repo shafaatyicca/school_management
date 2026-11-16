@@ -4,37 +4,22 @@ import { usePathname, useParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  GraduationCap,
-  UsersRound,
-  BriefcaseBusiness,
-  WalletCards,
-  ChevronDown,
-  ReceiptText,
-  Ticket,
-  UserPlus,
-  Contact,
-  FileText,
-  BookUser,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
+import { getSidebarMenu } from "@/components/menuConfig";
 
 const HOVER =
   "hover:bg-gradient-to-r hover:from-sky-500/60 hover:to-transparent hover:text-white";
 
-  const ACTIVE = "bg-gradient-to-r from-sky-500/60 to-transparent text-white";
+const ACTIVE = "bg-gradient-to-r from-sky-500/60 to-transparent text-white";
 
 export default function Sidebar() {
   const { data: session } = useSession();
   const params = useParams();
   const schoolId = params.schoolId || session?.user?.schoolId;
   const pathname = usePathname();
+  const isSuperAdmin = session?.user?.role === "super_admin";
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false); // Expand on hover while collapsed
@@ -46,33 +31,8 @@ export default function Sidebar() {
   const isFullyExpanded = !isCollapsed || isHovered;
   const sidebarWidth = isFullyExpanded ? "lg:w-[220px]" : "lg:w-[70px]";
 
-  const menu = [
-    { name: "Dashboard", href: "/", icon: LayoutDashboard },
-    { name: "Classes", href: "/classes", icon: BookOpen },
-    {
-      name: "Students Management",
-      icon: GraduationCap,
-      isDropdown: true,
-      subItems: [
-        { name: "Add Student", href: "/students", icon: UserPlus },
-        { name: "Student Information", href: "/student-information", icon: Contact },
-        { name: "Admission Form", href: "/admission-form", icon: FileText },
-        { name: "Student Bio Data", href: "/student-bio-data", icon: BookUser },
-      ],
-    },
-    { name: "Employees", href: "/employees", icon: BriefcaseBusiness },
-    { name: "Parents", href: "/parents", icon: UsersRound },
-    {
-      name: "Fee Management",
-      icon: WalletCards,
-      isDropdown: true,
-      subItems: [
-        { name: "Fee Categories", href: "/fee-categories", icon: WalletCards },
-        { name: "Student Fee Ledger", href: "/student-fee-ledger", icon: ReceiptText },
-        { name: "Fee Voucher Printing", href: "/fee-voucher", icon: Ticket },
-      ],
-    },
-  ];
+  // Menu comes from components/menuConfig.ts (shared with the global search)
+  const menu = getSidebarMenu(isSuperAdmin);
 
   return (
     <>
@@ -191,13 +151,11 @@ export default function Sidebar() {
                         return (
                           <Link
                             key={sub.href}
-                            href={sub.href}
+                            href={sub.href!}
                             onClick={() => setIsMobileOpen(false)}
                             className={cn(
                               "flex items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium transition-all duration-300 group relative w-full",
-                              isSubActive
-                                ? ACTIVE
-                                : cn("text-slate-300", HOVER),
+                              isSubActive ? ACTIVE : cn("text-slate-300", HOVER),
                             )}
                           >
                             {SubIcon && (
@@ -233,9 +191,7 @@ export default function Sidebar() {
                 onClick={() => setIsMobileOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium transition-all duration-300 group relative w-full",
-                  isActive
-                    ? ACTIVE
-                    : cn("text-slate-100", HOVER),
+                  isActive ? ACTIVE : cn("text-slate-100", HOVER),
                   !isFullyExpanded && isActive && "bg-sky-500/15 border border-sky-500/20",
                   !isFullyExpanded && "justify-center px-0 mx-auto w-10",
                 )}

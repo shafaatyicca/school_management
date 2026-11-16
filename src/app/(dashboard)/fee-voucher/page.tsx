@@ -248,7 +248,7 @@ export default function FeeVoucherPage() {
     if (!isSuperAdmin) return;
     const host = window.location.hostname;
     if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}`)
+     fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }

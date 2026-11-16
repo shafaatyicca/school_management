@@ -46,7 +46,8 @@ export default function StudentInformationPage() {
 
   // Filters
   const [classes, setClasses] = useState<any[]>([]);
-  const [classId, setClassId] = useState(""); // "" = not selected, "all" = all classes
+    const [classesLoading, setClassesLoading] = useState(true);
+  const [classId, setClassId] = useState("");
   const [section, setSection] = useState(ALL);
   const [status, setStatus] = useState<StatusFilter>("active");
 
@@ -80,10 +81,12 @@ export default function StudentInformationPage() {
   // Classes + school info (for export header)
   useEffect(() => {
     if (!effectiveSchoolId) return;
+    setClassesLoading(true);
     fetch(`/api/classes?schoolId=${effectiveSchoolId}`)
       .then((r) => r.json())
       .then((d) => setClasses(Array.isArray(d) ? d : []))
-      .catch(() => notify.error("Failed to load classes"));
+      .catch(() => notify.error("Failed to load classes"))
+      .finally(() => setClassesLoading(false));
     fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSchoolInfo(d))
@@ -429,6 +432,7 @@ export default function StudentInformationPage() {
     enablePagination: true,
     enableDensityToggle: false,
     enableColumnActions: false,
+    enableKeyboardShortcuts: false,
     initialState: {
       density: "compact",
       pagination: { pageSize: 25, pageIndex: 0 },
@@ -560,11 +564,12 @@ export default function StudentInformationPage() {
               setSection(ALL);
               setStatus("active");
             }}
+            disabled={classesLoading}
             SelectProps={{ native: true }}
             InputLabelProps={{ shrink: true }}
             sx={{ minWidth: 220 }}
           >
-            <option value="">Select Class</option>
+            <option value="">{classesLoading ? "Loading classes..." : "Select Class"}</option>
             <option value={ALL}>All Classes</option>
             {classes.map((c) => (
               <option key={c._id} value={String(c._id)}>

@@ -68,7 +68,7 @@ export default function ParentProfileModal({
     <Dialog
       open={isOpen}
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       disableEnforceFocus
       disableAutoFocus
