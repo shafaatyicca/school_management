@@ -13,6 +13,7 @@ import { History, Trash2, CalendarDays } from "lucide-react";
 import dayjs from "dayjs";
 import { notify } from "@/lib/notify";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 const fmtDate = (d: any) =>
   d
@@ -134,6 +135,11 @@ export default function RecentPaymentsModal({
 }: Props) {
   const isDark = useIsDark();
 
+  // Reverse → "Reverse Payment → Delete"
+  const { can } = usePermissions();
+  const canReverse = can("reversePayment", "delete");
+  const colCount = canReverse ? 8 : 7;
+
   // Range har roz khud calculate — saal khud barhte rahenge, code change ki zaroorat nahi
   const today = dayjs().format("YYYY-MM-DD");
   const minDate = dayjs().subtract(10, "year").startOf("year").format("YYYY-MM-DD");
@@ -181,18 +187,21 @@ export default function RecentPaymentsModal({
         body: JSON.stringify({
           invoiceId: confirm.invoiceId,
           paymentId: confirm.paymentId,
+          schoolId,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok) {
         notify.success(
-          `Payment ${data.paymentNo || ""} reversed — invoice is now ${data.invoiceStatus}`,
+          `Payment ${data?.paymentNo || ""} reversed — invoice is now ${data?.invoiceStatus}`,
         );
         setConfirm(null);
         load();
         onChanged();
       } else {
-        notify.error(data.message || "Failed to reverse payment");
+        // API's own message (e.g. permission) — same text as the Access Denied modal
+        notify.error(data?.message || "Failed to reverse payment");
+        setConfirm(null);
       }
     } catch {
       notify.error("Something went wrong");
@@ -203,6 +212,17 @@ export default function RecentPaymentsModal({
   const classText = className
     ? `${className}${section ? ` (${section})` : ""}`
     : "";
+
+  const headers = [
+    "#",
+    "Receipt #",
+    "Date",
+    "Invoice",
+    "Amount",
+    "Method",
+    "Received By",
+    ...(canReverse ? [""] : []),
+  ];
 
   return (
     <>
@@ -303,26 +323,24 @@ export default function RecentPaymentsModal({
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr style={{ backgroundColor: "var(--muted)" }}>
-                  {["#", "Receipt #", "Date", "Invoice", "Amount", "Method", "Received By", ""].map(
-                    (h, i) => (
-                      <th
-                        key={i}
-                        className={`p-1.5 font-bold ${
-                          h === "Amount" || h === "Method" ? "text-center" : "text-left"
-                        }`}
-                        style={{ color: "var(--muted-foreground)" }}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
+                  {headers.map((h, i) => (
+                    <th
+                      key={i}
+                      className={`p-1.5 font-bold ${
+                        h === "Amount" || h === "Method" ? "text-center" : "text-left"
+                      }`}
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {loading && rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={colCount}
                       className="p-4 text-center"
                       style={{ color: "var(--muted-foreground)" }}
                     >
@@ -332,7 +350,7 @@ export default function RecentPaymentsModal({
                 ) : rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={colCount}
                       className="p-4 text-center"
                       style={{ color: "var(--muted-foreground)" }}
                     >
@@ -382,19 +400,21 @@ export default function RecentPaymentsModal({
                       >
                         {r.receivedBy || "---"}
                       </td>
-                      <td className="p-1.5 text-center">
-                        <IconButton
-                          size="small"
-                          title="Reverse this payment"
-                          onClick={() => setConfirm(r)}
-                          sx={{
-                            color: "#ef4444",
-                            "&:hover": { backgroundColor: "rgba(239,68,68,0.1)" },
-                          }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 dark:text-red-500" />
-                        </IconButton>
-                      </td>
+                      {canReverse && (
+                        <td className="p-1.5 text-center">
+                          <IconButton
+                            size="small"
+                            title="Reverse this payment"
+                            onClick={() => setConfirm(r)}
+                            sx={{
+                              color: "#ef4444",
+                              "&:hover": { backgroundColor: "rgba(239,68,68,0.1)" },
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 dark:text-red-500" />
+                          </IconButton>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -418,7 +438,7 @@ export default function RecentPaymentsModal({
                     <td className="p-1.5 text-center text-green-600 dark:text-green-400">
                       {total.toLocaleString()}
                     </td>
-                    <td colSpan={3} />
+                    <td colSpan={canReverse ? 3 : 2} />
                   </tr>
                 )}
               </tbody>

@@ -5,6 +5,7 @@ import Cropper from "react-easy-crop";
 import { Point, Area } from "react-easy-crop";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogActions } from "@mui/material";
+import { notify } from "@/lib/notify";
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -40,6 +41,7 @@ export default function ImageUploadWithCrop({
       });
       reader.readAsDataURL(e.target.files[0]);
     }
+    e.target.value = ""; // allow picking the same photo again
   };
 
   const onCropComplete = useCallback(
@@ -55,27 +57,34 @@ export default function ImageUploadWithCrop({
       const croppedBlob = await getCroppedImg(image, croppedAreaPixels);
       const base64Image = await blobToBase64(croppedBlob);
 
-      //  Pehle modal close karo — user wait nahi karega
+      // Close the crop popup first — the user doesn't have to wait
       handleCloseModal();
 
-      //  Placeholder show karo jab tak upload ho
-      onImageCropped("loading"); // parent mein loading spinner dikhao
+      // Show the spinner in the form while uploading
+      onImageCropped("loading");
 
       setIsUploading(true);
 
-      //  Background mein upload karo
+      // Upload in the background
       const res = await fetch("/api/upload-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Image, schoolId, folder }),
       });
-      const { url } = await res.json();
+      const data = await res.json().catch(() => null);
 
-      //  URL parent ko bhejo
-      onImageCropped(url);
+      if (!res.ok || !data?.url) {
+        notify.error(data?.message || "Photo upload failed, please try again");
+        onImageCropped(""); // remove the spinner
+        return;
+      }
+
+      // Send the URL to the parent form
+      onImageCropped(data.url);
     } catch (e) {
       console.error(e);
-      onImageCropped(""); // error pe clear karo
+      notify.error("Photo upload failed, please try again");
+      onImageCropped(""); // clear on error
     } finally {
       setIsUploading(false);
     }

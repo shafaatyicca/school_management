@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
+import { getAccess, schoolIdFor } from "@/lib/access";
 import Student from "@/models/Student";
 import { ParentModel } from "@/models/Parent";
 import Employee from "@/models/Employee";
 import "@/models/Class";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 const LIMIT = 5;
 
@@ -15,18 +14,29 @@ const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const digitsPattern = (d: string) => d.split("").join("[\\s-]*");
 
 // GET → ?q=…&schoolId=… → { students, parents, employees } (max 5 each)
+// Each group comes back only if the user may open it (otherwise an empty list)
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-
-    const { searchParams } = new URL(req.url);
-    const q = (searchParams.get("q") || "").trim();
-    const isSuperAdmin = session.user.role === "super_admin";
-    const schoolId = isSuperAdmin ? searchParams.get("schoolId") : session.user.schoolId;
+    const access = await getAccess();
+    if (!access) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const empty = { students: [], parents: [], employees: [] };
+
+    // Which groups may this user see?
+    const canStudents =
+      access.can("students", "view") ||
+      access.can("studentInfo", "view") ||
+      access.can("fees", "view") ||
+      access.can("bioData", "view");
+    const canParents = access.can("parents", "view");
+    const canEmployees = access.can("employees", "view");
+    if (!canStudents && !canParents && !canEmployees) return NextResponse.json(empty);
+
+    await connectDB();
+    const { searchParams } = new URL(req.url);
+    const q = (searchParams.get("q") || "").trim().slice(0, 50);
+    const schoolId = schoolIdFor(access, searchParams.get("schoolId"));
+
     if (!schoolId || q.length < 2) return NextResponse.json(empty);
 
     const nameRegex = { $regex: escapeRegex(q), $options: "i" };
@@ -52,26 +62,33 @@ export async function GET(req: Request) {
     if (isNumber && digits) employeeOr.push(idPrefix("emp_id"));
     if (looseDigits) employeeOr.push({ phone: looseDigits }, { nicNumber: looseDigits });
 
+    // Groups without permission are not even queried
     const [students, parents, employees] = await Promise.all([
-      (Student as any)
-        .find({ schoolId, $or: studentOr })
-        .select("fullName grNumber section classId image gender status")
-        .populate("classId", "name")
-        .sort({ grNumber: 1 })
-        .limit(LIMIT)
-        .lean(),
-      (ParentModel as any)
-        .find({ schoolId, $or: parentOr })
-        .select("-password")
-        .sort({ fullName: 1 })
-        .limit(LIMIT)
-        .lean(),
-      (Employee as any)
-        .find({ schoolId, $or: employeeOr })
-        .select("-password")
-        .sort({ fullName: 1 })
-        .limit(LIMIT)
-        .lean(),
+      canStudents
+        ? (Student as any)
+            .find({ schoolId, $or: studentOr })
+            .select("fullName grNumber section classId image gender status")
+            .populate("classId", "name")
+            .sort({ grNumber: 1 })
+            .limit(LIMIT)
+            .lean()
+        : [],
+      canParents
+        ? (ParentModel as any)
+            .find({ schoolId, $or: parentOr })
+            .select("-password")
+            .sort({ fullName: 1 })
+            .limit(LIMIT)
+            .lean()
+        : [],
+      canEmployees
+        ? (Employee as any)
+            .find({ schoolId, $or: employeeOr })
+            .select("-password")
+            .sort({ fullName: 1 })
+            .limit(LIMIT)
+            .lean()
+        : [],
     ]);
 
     return NextResponse.json({
@@ -89,6 +106,7 @@ export async function GET(req: Request) {
       employees,
     });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Global search error:", error?.message);
+    return NextResponse.json({ message: "Search failed" }, { status: 500 });
   }
 }

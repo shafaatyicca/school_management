@@ -26,6 +26,7 @@ const FeeDiscountSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    
     discountType: {
       type: String,
       enum: ["fixed", "percentage"],

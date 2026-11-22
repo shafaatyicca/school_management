@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document, Model } from "mongoose";
 import "./Plan";
 
 export interface ISchool extends Document {
@@ -52,5 +52,6 @@ const SchoolSchema = new Schema<ISchool>(
   { timestamps: true },
 );
 
-export const SchoolModel =
-  mongoose.models.School || mongoose.model<ISchool>("School", SchoolSchema);
+export const SchoolModel: Model<ISchool> =
+  (mongoose.models.School as Model<ISchool>) ||
+  mongoose.model<ISchool>("School", SchoolSchema);

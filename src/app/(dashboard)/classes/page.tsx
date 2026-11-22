@@ -1,9 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ArrowDown10, Save, X, BookOpen, Pencil, Trash2 } from "lucide-react";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
-import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
+import { ArrowDown10, Save, BookOpen, Pencil, Trash2 } from "lucide-react";
+import { type ExportHeader } from "@/lib/exportUtils";
+import ExportButtons from "@/components/ExportButtons";
+import { usePermissions } from "@/components/PermissionsProvider";
+import PageGuard from "@/components/PageGuard";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import ClassFormModal from "@/components/ClassFormModal";
 import PageHeader from "@/components/PageHeader";
@@ -17,12 +20,18 @@ import {
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 
-export default function ClassPage() {
-  const { data: session, status } = useSession();
+function ClassPage() {
+  const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
+  // Permissions
+  const { can } = usePermissions();
+  const canSetOrders = can("classes", "edit"); // Set Orders
+  const canExport = can("classes", "export"); // divider next to export buttons
+  // Add / Edit / Delete / Set Class Fee stay Super Admin only (by design)
 
   const [classes, setClasses] = useState<any[]>([]);
   const [isOrderMode, setIsOrderMode] = useState(false);
@@ -40,13 +49,15 @@ export default function ClassPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/classes?schoolId=${effectiveSchoolId}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      // API error (e.g. no permission) → empty list instead of a crash
+      const list = Array.isArray(data) ? data : [];
       setClasses(
-        data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
+        [...list].sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),
       );
       const oMap: any = {};
       const fMap: any = {};
-      data.forEach((c: any) => {
+      list.forEach((c: any) => {
         oMap[c._id] = c.order || 0;
         fMap[c._id] = c.classFee || 0;
       });
@@ -66,7 +77,7 @@ export default function ClassPage() {
       hostname.includes(".lvh.me") || hostname.includes(".localhost");
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) setViewSchoolId(data._id);
@@ -79,21 +90,21 @@ export default function ClassPage() {
   }, [effectiveSchoolId]);
 
   useEffect(() => {
-  if (!effectiveSchoolId) return;
-  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => d && setSchoolInfo(d))
-    .catch(() => {});
-}, [effectiveSchoolId]);
+    if (!effectiveSchoolId) return;
+    fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSchoolInfo(d))
+      .catch(() => {});
+  }, [effectiveSchoolId]);
 
-// Export header: school only (no student info on this page)
-const exportHeader: ExportHeader = {
-  school: {
-    name: schoolInfo?.name,
-    address: schoolInfo?.address,
-    logo: schoolInfo?.logo,
-  },
-};
+  // Export header: school only (no student info on this page)
+  const exportHeader: ExportHeader = {
+    school: {
+      name: schoolInfo?.name,
+      address: schoolInfo?.address,
+      logo: schoolInfo?.logo,
+    },
+  };
 
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
@@ -112,19 +123,25 @@ const exportHeader: ExportHeader = {
           method: "DELETE",
         },
       );
+      const data = await res.json().catch(() => null);
       if (res.ok) {
+        notify.success("Class deleted");
         fetchClasses();
-        setDeleteDialog({ open: false, id: null });
+      } else {
+        notify.error(data?.message || data?.error || "Failed to delete class");
       }
     } catch (error) {
       console.error("Delete failed", error);
+      notify.error("Something went wrong");
+    } finally {
+      setDeleteDialog({ open: false, id: null });
     }
   };
 
   const handleBulkSave = async (mode: "order" | "fee") => {
     setLoading(true);
 
-    // Sirf wahi data payload mein bhejein jiski zaroorat hai
+    // Send only the data that is needed
     const items = classes.map((cls) => {
       if (mode === "order") {
         return {
@@ -140,11 +157,20 @@ const exportHeader: ExportHeader = {
     });
 
     try {
-      await fetch("/api/classes", {
+      const res = await fetch("/api/classes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items, schoolId: effectiveSchoolId, mode }), // mode ko sath bheja
+        body: JSON.stringify({ items, schoolId: effectiveSchoolId, mode }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        notify.error(
+          data?.message || data?.error ||
+            (mode === "order" ? "Failed to save order" : "Failed to save class fee"),
+        );
+        return;
+      }
 
       if (mode === "order") setIsOrderMode(false);
       if (mode === "fee") setIsFeeMode(false);
@@ -152,10 +178,12 @@ const exportHeader: ExportHeader = {
       fetchClasses();
     } catch (error) {
       console.error(`Bulk update failed for ${mode}:`, error);
+      notify.error("Something went wrong");
     } finally {
       setLoading(false);
     }
   };
+
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
       {
@@ -180,7 +208,7 @@ const exportHeader: ExportHeader = {
         size: 200,
         Cell: ({ cell }) => (
           <div className="flex gap-1 flex-wrap">
-            {cell.getValue<string[]>().map((s, i) => (
+            {(cell.getValue<string[]>() || []).map((s, i) => (
               <span
                 key={i}
                 className="bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-blue-200 dark:border-blue-800"
@@ -210,12 +238,29 @@ const exportHeader: ExportHeader = {
         header: "Sort Order",
         size: 90,
         Cell: ({ row }) => (
-  <div className="flex items-center justify-start w-full pl-1">
-    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
-      {row.original.order || 0}
-    </span>
-  </div>
-),
+          <div className="flex items-center justify-start w-full pl-1">
+            <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-600 dark:text-slate-400 text-[11px]">
+              {row.original.order || 0}
+            </span>
+          </div>
+        ),
+      },
+      {
+        // "Used" = has students (active or inactive), "Empty" = none
+        id: "status",
+        header: "Status",
+        size: 90,
+        accessorFn: (row) => ((row.studentCount || 0) > 0 ? "Used" : "Empty"),
+        Cell: ({ row }) =>
+          (row.original.studentCount || 0) > 0 ? (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+              Used
+            </span>
+          ) : (
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+              Empty
+            </span>
+          ),
       },
     ],
     [],
@@ -227,16 +272,17 @@ const exportHeader: ExportHeader = {
     state: { showProgressBars: loading },
     enableDensityToggle: false,
     enableColumnActions: false,
-    // enableRowActions: !isOrderMode,
-    enableRowActions: isSuperAdmin,
-     enableKeyboardShortcuts: false,
+    enableRowActions: isSuperAdmin, // Edit / Delete: Super Admin only
+    enableKeyboardShortcuts: false,
     positionActionsColumn: "last",
     initialState: {
       density: "compact",
       pagination: { pageSize: 15, pageIndex: 0 },
     },
-    renderRowActions: ({ row }) =>
-      isSuperAdmin ? (
+    renderRowActions: ({ row }) => {
+      if (!isSuperAdmin) return null;
+      const used = (row.original.studentCount || 0) > 0;
+      return (
         <div className="flex gap-2">
           <Button
             size="icon"
@@ -246,32 +292,37 @@ const exportHeader: ExportHeader = {
           >
             <Pencil className="w-4 h-4 text-sky-500" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-            onClick={() =>
-              setDeleteDialog({ open: true, id: row.original._id })
-            }
-          >
-            <Trash2 className="w-4 h-4 text-red-500" />
-          </Button>
+          {/* A used class can't be deleted (span keeps the tooltip on a disabled button) */}
+          <span title={used ? "This class has students" : "Delete class"}>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={used}
+              className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setDeleteDialog({ open: true, id: row.original._id })}
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </Button>
+          </span>
         </div>
-      ) : null,
+      );
+    },
 
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
-        {/* 1. Set Orders Button - Ab click hote hi Popup open karega */}
-        <Button
-          onClick={() => setIsOrderModalOpen(true)}
-          variant="outline"
-          size="sm"
-          className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer h-8"
-        >
-          <ArrowDown10 className="h-4 w-4 mr-1" /> Set Orders
-        </Button>
+        {/* 1. Set Orders → "Classes → Edit" */}
+        {canSetOrders && (
+          <Button
+            onClick={() => setIsOrderModalOpen(true)}
+            variant="outline"
+            size="sm"
+            className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer h-8"
+          >
+            <ArrowDown10 className="h-4 w-4 mr-1" /> Set Orders
+          </Button>
+        )}
 
-        {/* 2. Set Class Fee Button - Only Super Admin aur click par Popup open hoga */}
+        {/* 2. Set Class Fee → Super Admin only */}
         {isSuperAdmin && (
           <Button
             onClick={() => setIsFeeModalOpen(true)}
@@ -283,36 +334,18 @@ const exportHeader: ExportHeader = {
           </Button>
         )}
 
-        {/* Divider Line */}
-        <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+        {/* Divider Line (only when there is something on both sides) */}
+        {canExport && (canSetOrders || isSuperAdmin) && (
+          <div className="h-6 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1" />
+        )}
 
-        {/* Export Buttons */}
-        <Button
-          onClick={() =>
-            handleExportRows(table, "excel", "Classes List Report", exportHeader)
-          }
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Classes List Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-        <Button
-          onClick={() => handlePrintTable(table, "Classes List Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
+        {/* Export Buttons → "Classes → Export / Print" */}
+        <ExportButtons
+          table={table}
+          module="classes"
+          title="Classes List Report"
+          header={exportHeader}
+        />
       </div>
     ),
     muiTablePaperProps: {
@@ -387,7 +420,16 @@ const exportHeader: ExportHeader = {
         onOpenChange={(open) => setDeleteDialog({ open, id: null })}
         onConfirm={handleDelete}
         itemName="Class"
-      />{" "}
+      />
     </div>
+  );
+}
+
+// Guard: page opens only with "Classes → View"
+export default function Page() {
+  return (
+    <PageGuard module="classes">
+      <ClassPage />
+    </PageGuard>
   );
 }

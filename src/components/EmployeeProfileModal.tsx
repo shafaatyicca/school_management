@@ -15,23 +15,35 @@ import {
   Edit,
   X,
   Printer,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { calculateTenure, formatDate } from "@/lib/tenureUtils";
-import {} from "./ui/button";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { useState, useEffect } from "react";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   staff: any;
-  onEdit: () => void; 
+  onEdit: () => void;
 }
 
 export default function EmployeeProfileModal({
   isOpen,
   onClose,
   staff,
-  onEdit, 
+  onEdit,
 }: Props) {
+  // Permissions (hooks must stay above the early return below)
+  const { can } = usePermissions();
+  const canEdit = can("employees", "edit"); // Edit Profile + see password
+  const canPrint = can("employees", "export"); // Print Bio Data
+  const [showPass, setShowPass] = useState(false);
+  useEffect(() => {
+    setShowPass(false); // hide again when the modal opens / another employee is shown
+  }, [isOpen, staff?._id]);
+
   if (!staff) return null;
 
   const displayImg =
@@ -181,25 +193,29 @@ export default function EmployeeProfileModal({
               <InfoItem label="Phone" value={staff.emergencyContact?.phone} />
             </Section>
 
-            {/* System */}
+            {/* System (password only for users who can edit employees) */}
             <Section
               title="System Access"
               icon={<Shield className="w-4 h-4" />}
             >
-              <InfoItem
-                label="Role"
-                value={
-                  <span className="capitalize font-semibold text-purple-600 dark:text-purple-400">
-                    {staff.role}
-                  </span>
-                }
-              />
               <InfoItem label="Email" value={staff.email || "---"} />
-              <InfoItem
+                            <InfoItem
                 label="Password"
                 value={
-                  <span className="font-mono text-xs">
-                    {staff.password || "••••••••"}
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="font-mono text-xs">
+                      {canEdit && staff.password && showPass ? staff.password : "••••••••"}
+                    </span>
+                    {canEdit && staff.password && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPass((v) => !v)}
+                        title={showPass ? "Hide password" : "Show password"}
+                        className="text-muted-foreground hover:text-sky-600 cursor-pointer"
+                      >
+                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
                   </span>
                 }
               />
@@ -244,25 +260,27 @@ export default function EmployeeProfileModal({
           gap: 1,
         }}
       >
-        {/* Left side: Print Button */}
-        <Button
-          onClick={() => window.print()}
-          variant="outlined"
-          size="small"
-          startIcon={<Printer className="w-4 h-4" />}
-          sx={{
-            textTransform: "none",
-            borderColor: "var(--border)",
-            color: "var(--foreground)",
-            marginRight: "auto",
-            "&:hover": {
-              backgroundColor: "var(--muted)",
+        {/* Left side: Print → "Employees → Export / Print" */}
+        {canPrint && (
+          <Button
+            onClick={() => window.print()}
+            variant="outlined"
+            size="small"
+            startIcon={<Printer className="w-4 h-4" />}
+            sx={{
+              textTransform: "none",
               borderColor: "var(--border)",
-            },
-          }}
-        >
-          Print Bio Data
-        </Button>
+              color: "var(--foreground)",
+              marginRight: "auto",
+              "&:hover": {
+                backgroundColor: "var(--muted)",
+                borderColor: "var(--border)",
+              },
+            }}
+          >
+            Print Bio Data
+          </Button>
+        )}
 
         {/* Right side: Cancel & Edit Buttons */}
         <Button
@@ -280,21 +298,24 @@ export default function EmployeeProfileModal({
           Cancel
         </Button>
 
-        <Button
-          onClick={onEdit}
-          variant="contained"
-          size="small"
-          startIcon={<Edit className="w-4 h-4" />}
-          sx={{
-            backgroundColor: "#1e293b", // Aapke Form Modal wala color
-            "&:hover": { backgroundColor: "#334155" },
-            textTransform: "none",
-            px: 2,
-            py: 0.5,
-          }}
-        >
-          Edit Profile
-        </Button>
+        {/* Edit Profile → "Employees → Edit" */}
+        {canEdit && (
+          <Button
+            onClick={onEdit}
+            variant="contained"
+            size="small"
+            startIcon={<Edit className="w-4 h-4" />}
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 2,
+              py: 0.5,
+            }}
+          >
+            Edit Profile
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

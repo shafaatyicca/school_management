@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ShieldOff,
   ScrollText,
+  Eye,
 } from "lucide-react";
 import {
   TextField,
@@ -25,6 +26,8 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import PageHeader from "@/components/PageHeader";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notify";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
@@ -71,7 +74,7 @@ const TABS = [
     icon: Landmark,
     color: "text-emerald-500",
   },
-    {
+  {
     key: "admission",
     label: "Admission Form",
     description: "Undertaking text on the form",
@@ -93,12 +96,11 @@ const TAB_HEADINGS: Record<string, { title: string; subtitle: string }> = {
     title: "Bank Details",
     subtitle: "These details are printed at the bottom of every fee voucher.",
   },
-    admission: {
+  admission: {
     title: "Admission Form",
     subtitle: "This text is printed in the Undertaking section of the blank Admission Form.",
   },
 };
-
 
 const toggleSx = {
   "& .MuiToggleButton-root": {
@@ -187,10 +189,7 @@ const monthPickerPopperSx = {
 };
 
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
-  <span
-    className="text-[11px] font-semibold uppercase tracking-wider"
-    style={{ color: "var(--muted-foreground)" }}
-  >
+  <span className="text-[11px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
     {children}
   </span>
 );
@@ -198,10 +197,7 @@ const FieldLabel = ({ children }: { children: React.ReactNode }) => (
 const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="space-y-3">
     <div className="flex items-center gap-2">
-      <span
-        className="text-[11px] font-bold uppercase tracking-wider"
-        style={{ color: "var(--muted-foreground)" }}
-      >
+      <span className="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">
         {title}
       </span>
       <span className="h-px flex-1" style={{ backgroundColor: "var(--border)" }} />
@@ -210,11 +206,15 @@ const Group = ({ title, children }: { title: string; children: React.ReactNode }
   </div>
 );
 
-export default function SettingsPage() {
+function SettingsPage() {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
+
+  // Save / Discard → "Settings → Edit"
+  const { can } = usePermissions();
+  const canEdit = can("settings", "edit");
 
   const [tab, setTab] = useState("voucher");
   const [form, setForm] = useState<any>(EMPTY);
@@ -225,12 +225,41 @@ export default function SettingsPage() {
   // Last saved snapshot — used for "Unsaved changes" and "Discard"
   const savedRef = useRef<string>(JSON.stringify(EMPTY));
 
+    // ── Fit the page to the screen (md and up): no empty space at the bottom
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [fitHeight, setFitHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      if (window.innerWidth < 768) {
+        setFitHeight(null); // mobile: normal scroll
+        return;
+      }
+      // Bottom padding/border of the layout containers below this page
+      let bottom = 0;
+      let p = el.parentElement;
+      while (p && p !== document.body) {
+        const cs = getComputedStyle(p);
+        bottom += (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+        p = p.parentElement;
+      }
+      const top = el.getBoundingClientRect().top;
+      setFitHeight(Math.max(420, Math.floor(window.innerHeight - top - bottom)));
+    };
+
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
     const host = window.location.hostname;
     if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}`)
+      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }
@@ -258,11 +287,13 @@ export default function SettingsPage() {
     if (!schoolId) return;
     setLoading(true);
     Promise.all([
-      fetch(`/api/settings?schoolId=${schoolId}`).then((r) => r.json()),
-      fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}`).then((r) => r.json()),
+      fetch(`/api/settings?schoolId=${schoolId}`).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}&for=fees`).then((r) =>
+        r.ok ? r.json() : [],
+      ),
     ])
       .then(([s, cats]) => {
-        const next = toForm(s);
+        const next = toForm(s || {});
         setForm(next);
         savedRef.current = JSON.stringify(next);
         setCategories(Array.isArray(cats) ? cats : []);
@@ -294,14 +325,14 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, schoolId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok) {
-        const next = toForm(data);
+        const next = toForm(data || {});
         setForm(next);
         savedRef.current = JSON.stringify(next);
         notify.success("Settings saved successfully");
       } else {
-        notify.error(data.message || "Failed to save settings");
+        notify.error(data?.message || "Failed to save settings");
       }
     } catch {
       notify.error("Something went wrong");
@@ -322,13 +353,18 @@ export default function SettingsPage() {
       : null;
 
   return (
-    <div className="space-y-4">
+    <div
+      ref={rootRef}
+      className="flex flex-col gap-4"
+      style={fitHeight ? { height: fitHeight } : undefined}
+    >
       <PageHeader title="School Settings" icon={<Settings className="w-4 h-4" />} />
 
-      <div className="max-w-5xl grid grid-cols-1 md:grid-cols-[230px_1fr] gap-4 items-start">
+      {/* Sidebar + content start at the same top; only the content scrolls */}
+      <div className={`grid grid-cols-1 md:grid-cols-[230px_1fr] gap-4 items-start md:flex-1 md:min-h-0`}>
         {/* ── Sidebar ─────────────────────────────────────── */}
         <nav
-          className="rounded-xl border p-2 flex md:flex-col gap-1 overflow-x-auto md:sticky md:top-24"
+          className="rounded-xl border p-2 flex md:flex-col gap-1 overflow-x-auto"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
         >
           <p
@@ -386,21 +422,67 @@ export default function SettingsPage() {
           })}
         </nav>
 
-        {/* ── Content ─────────────────────────────────────── */}
+        {/* ── Content (full width, scrolls inside) ─────────── */}
         <div
-          className="rounded-xl border overflow-hidden"
+          className="flex min-h-0 flex-col rounded-xl border overflow-hidden md:h-full"
           style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
         >
-          {/* Header */}
-          <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-            <h2 className="text-sm font-bold text-foreground">{heading.title}</h2>
-            <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-              {heading.subtitle}
-            </p>
+          {/* Header: title + Save / Discard (saves all tabs together) */}
+          <div
+            className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-5 py-2 border-b"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-foreground">{heading.title}</h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                {heading.subtitle}
+              </p>
+            </div>
+
+            {canEdit ? (
+              <div className="flex items-center gap-2">
+                {isDirty && (
+                  <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                    <CircleDot className="w-3 h-3" />
+                    Unsaved
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleDiscard}
+                  disabled={!isDirty || saving}
+                  className="h-8 px-2.5 text-xs font-semibold cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Discard
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || !schoolId || !isDirty}
+                  className="h-8 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5 mr-1" />
+                  {saving ? "Saving..." : "Save Settings"}
+                </Button>
+              </div>
+            ) : (
+              <span
+                className="flex items-center gap-1.5 text-[11px] font-semibold"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                View only
+              </span>
+            )}
           </div>
 
-          {/* Body */}
-          <div className={`p-5 space-y-6 transition-opacity ${loading ? "opacity-50" : ""}`}>
+          {/* Body (scroll area) */}
+          <div
+            className={`flex-1 min-h-0 overflow-y-auto p-5 space-y-6 transition-opacity ${
+              loading ? "opacity-50" : ""
+            }`}
+          >
             {/* ── Fee Voucher ── */}
             {tab === "voucher" && (
               <>
@@ -647,7 +729,8 @@ export default function SettingsPage() {
             )}
 
             {/* ── Admission Form ── */}
-              {tab === "admission" && ( <>
+            {tab === "admission" && (
+              <>
                 <Group title="Form Style">
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
                     <FieldLabel>Admission Form Format</FieldLabel>
@@ -687,53 +770,20 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </Group>
-                </>
-              )}
-          </div>
-
-          {/* Footer — saves all tabs together */}
-          <div
-            className="flex items-center justify-between gap-3 px-5 py-3 border-t"
-            style={{ borderColor: "var(--border)", backgroundColor: "var(--muted)" }}
-          >
-            <span className="flex items-center gap-1.5 text-[11px]">
-              {isDirty ? (
-                <>
-                  <CircleDot className="w-3 h-3 text-amber-500" />
-                  <span className="font-semibold text-amber-600 dark:text-amber-400">
-                    Unsaved changes
-                  </span>
-                </>
-              ) : (
-                <span style={{ color: "var(--muted-foreground)" }}>
-                  All changes saved
-                </span>
-              )}
-            </span>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleDiscard}
-                disabled={!isDirty || saving}
-                className="h-8 text-xs font-semibold cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                Discard
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving || !schoolId || !isDirty}
-                className="h-8 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5 mr-1" />
-                {saving ? "Saving..." : "Save Settings"}
-              </Button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// Guard: page opens only with "Settings → View"
+export default function Page() {
+  return (
+    <PageGuard module="settings">
+      <SettingsPage />
+    </PageGuard>
   );
 }

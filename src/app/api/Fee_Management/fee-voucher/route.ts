@@ -1,74 +1,115 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import { buildVouchers } from "@/lib/buildVoucher";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import Student from "@/models/Student";
+import { requirePermission, schoolIdFor, logActivity } from "@/lib/access";
 
 const MAX_STUDENTS = 500;
 
-// Super admin sends schoolId; everyone else uses their own school from the session
-const resolveSchoolId = (session: any, fromRequest: string | null | undefined) =>
-  session?.user?.role === "super_admin" ? fromRequest : session?.user?.schoolId;
+const isOid = (v: any) => !!v && v !== "undefined" && mongoose.Types.ObjectId.isValid(String(v));
+const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
+
+// Keep only students that really belong to this school
+async function ownStudents(schoolId: string, ids: string[]) {
+  const valid = [...new Set(ids.map(String))].filter(isOid); // no bad / duplicate IDs
+  if (valid.length === 0) return [];
+  const found: any[] = await (Student as any)
+    .find({ _id: { $in: valid }, schoolId })
+    .select("_id")
+    .lean();
+  return found.map((s) => String(s._id));
+}
+
+// "2026-11-20" or a full date → Date (midnight for a plain date)
+function parseIssueDate(input: any): Date | null {
+  if (!input) return new Date();
+  const s = String(input);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00+05:00`) : new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 // ── GET → single student's voucher (ledger "Print Voucher" button)
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user)
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const { access, error } = await requirePermission("fees", "export");
+    if (error) return error;
 
+    await connectDB();
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get("studentId");
-    const schoolId = resolveSchoolId(session, searchParams.get("schoolId"));
+    const schoolId = schoolIdFor(access!, searchParams.get("schoolId"));
 
-    if (!studentId || !schoolId)
-      return NextResponse.json({ message: "Student / School missing" }, { status: 400 });
+    if (!isOid(studentId) || !schoolId) return bad("Student / School missing");
 
-    const { vouchers } = await buildVouchers(String(schoolId), [studentId], new Date());
+    const [ownId] = await ownStudents(schoolId, [studentId!]);
+    if (!ownId) return bad("Student not found in your school", 404);
 
-    if (vouchers.length === 0)
-      return NextResponse.json(
-        { message: "This student has no pending invoices" },
-        { status: 404 },
-      );
+    const { vouchers } = await buildVouchers(String(schoolId), [ownId], new Date());
+    if (vouchers.length === 0) return bad("This student has no pending invoices", 404);
 
-    return NextResponse.json(vouchers[0]);
+    const v: any = vouchers[0];
+    logActivity(access!, req, {
+      action: "print",
+      module: "fees",
+      schoolId,
+      entityId: ownId,
+      entityLabel: v?.student ? `${v.student.name} (GR ${v.student.grNumber})` : "",
+      summary: `Printed fee voucher · Rs. ${Number(v?.withinDue || 0).toLocaleString("en-US")}`,
+    });
+
+    return NextResponse.json(v);
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Voucher GET error:", error?.message);
+    return bad("Failed to generate voucher", 500);
   }
 }
 
 // ── POST → bulk vouchers (Fee Voucher page)
 export async function POST(req: Request) {
   try {
+    const { access, error } = await requirePermission("vouchers", "export");
+    if (error) return error;
+
     await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user)
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const body = await req.json().catch(() => null);
+    if (!body) return bad("Invalid request");
 
-    const body = await req.json();
-    const schoolId = resolveSchoolId(session, body.schoolId);
-    const studentIds: string[] = Array.isArray(body.studentIds) ? body.studentIds : [];
+    const schoolId = schoolIdFor(access!, body.schoolId);
+    const requested: string[] = Array.isArray(body.studentIds) ? body.studentIds : [];
 
-    if (!schoolId)
-      return NextResponse.json({ message: "School ID missing" }, { status: 400 });
-    if (studentIds.length === 0)
-      return NextResponse.json({ message: "No students selected" }, { status: 400 });
-    if (studentIds.length > MAX_STUDENTS)
-      return NextResponse.json(
-        { message: `Maximum ${MAX_STUDENTS} students at a time` },
-        { status: 400 },
-      );
+    if (!schoolId) return bad("School ID missing");
+    if (requested.length === 0) return bad("No students selected");
+    if (requested.length > MAX_STUDENTS) return bad(`Maximum ${MAX_STUDENTS} students at a time`);
 
     // Issue date can be past, today or future
-    const issueDate = body.issueDate ? new Date(`${body.issueDate}T00:00:00`) : new Date();
-    if (isNaN(issueDate.getTime()))
-      return NextResponse.json({ message: "Invalid issue date" }, { status: 400 });
+    const issueDate = parseIssueDate(body.issueDate);
+    if (!issueDate) return bad("Invalid issue date");
 
-    const result = await buildVouchers(String(schoolId), studentIds, issueDate);
+    // Students of other schools (and bad IDs) are silently dropped
+    const studentIds = await ownStudents(schoolId, requested);
+    if (studentIds.length === 0) return bad("No students found in your school", 404);
+
+    const result: any = await buildVouchers(String(schoolId), studentIds, issueDate);
+
+    const total = (result.vouchers || []).reduce(
+      (sum: number, v: any) => sum + (Number(v.withinDue) || 0),
+      0,
+    );
+    logActivity(access!, req, {
+      action: "print",
+      module: "vouchers",
+      schoolId,
+      summary: `Generated ${result.vouchers?.length || 0} fee voucher(s) · Rs. ${total.toLocaleString("en-US")}`,
+      entityLabel: `Issue date ${body.issueDate || "today"}${
+        result.skipped ? ` · ${result.skipped} skipped (no dues)` : ""
+      }`,
+    });
+
+
     return NextResponse.json(result);
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Voucher POST error:", error?.message);
+    return bad("Failed to generate vouchers", 500);
   }
 }

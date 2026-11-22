@@ -18,6 +18,8 @@ import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 import { getSearchPages, type SearchPage } from "@/components/menuConfig";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { showAccessDenied } from "@/lib/accessDenied";
 import { printBioData } from "@/lib/printFeeVoucher";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
 import { notify } from "@/lib/notify";
@@ -43,6 +45,17 @@ export default function GlobalSearch({
   const pathname = usePathname();
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
+  const isAdmin = isSuperAdmin || session?.user?.role === "school_admin";
+
+  // ── Permissions (same ticks as User Access)
+  const { can } = usePermissions();
+  const canStudentProfile = can("students", "view") || can("studentInfo", "view");
+  const canLedger = can("fees", "view");
+  const canBioData = can("bioData", "export");
+  const canStudents = canStudentProfile || canLedger || canBioData;
+  const canParents = can("parents", "view");
+  const canEmployees = can("employees", "view");
+  const canSearchPeople = canStudents || canParents || canEmployees;
 
   const [schoolId, setSchoolId] = useState<string | null>(session?.user?.schoolId || null);
   const [q, setQ] = useState("");
@@ -97,16 +110,16 @@ export default function GlobalSearch({
     }
   }, [open]);
 
-    // ── Put the cursor in the search box as soon as the popup opens
+  // ── Put the cursor in the search box as soon as the popup opens
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => inputRef.current?.focus(), 50);
     return () => clearTimeout(t);
   }, [open]);
 
-  // ── Load print context once (background)
+  // ── Load print context once (background) — only if Bio Data print is allowed
   useEffect(() => {
-    if (!open || !schoolId || printCtx) return;
+    if (!open || !schoolId || printCtx || !canBioData) return;
     Promise.all([
       fetch(`/api/superadmin/schools?id=${schoolId}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/settings?schoolId=${schoolId}`).then((r) => (r.ok ? r.json() : null)),
@@ -119,12 +132,12 @@ export default function GlobalSearch({
         }),
       )
       .catch(() => {});
-  }, [open, schoolId, printCtx]);
+  }, [open, schoolId, printCtx, canBioData]);
 
   // ── People search (300ms after typing stops)
   useEffect(() => {
     const term = q.trim();
-    if (!schoolId || term.length < 2) {
+    if (!schoolId || term.length < 2 || !canSearchPeople) {
       setResults(EMPTY);
       return;
     }
@@ -143,11 +156,21 @@ export default function GlobalSearch({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [q, schoolId]);
+  }, [q, schoolId, canSearchPeople]);
 
-  // ── Pages (instant, local)
+  // Only the groups this user is allowed to see
+  const visible: Results = useMemo(
+    () => ({
+      students: canStudents ? results.students : [],
+      parents: canParents ? results.parents : [],
+      employees: canEmployees ? results.employees : [],
+    }),
+    [results, canStudents, canParents, canEmployees],
+  );
+
+  // ── Pages (instant, local) — only pages with "View"
   const pages = useMemo(() => {
-    const all = getSearchPages(isSuperAdmin);
+    const all = getSearchPages(isSuperAdmin, isAdmin, can);
     const term = q.trim().toLowerCase();
     if (!term) return [];
     return all
@@ -158,17 +181,17 @@ export default function GlobalSearch({
           p.keywords.some((k) => k.includes(term)),
       )
       .slice(0, 6);
-  }, [q, isSuperAdmin]);
+  }, [q, isSuperAdmin, isAdmin, can]);
 
   // Flat list for keyboard navigation
   const items: Item[] = useMemo(
     () => [
       ...pages.map((p) => ({ kind: "page" as const, key: `p-${p.href}`, data: p })),
-      ...results.students.map((s) => ({ kind: "student" as const, key: `s-${s._id}`, data: s })),
-      ...results.parents.map((p) => ({ kind: "parent" as const, key: `pa-${p._id}`, data: p })),
-      ...results.employees.map((e) => ({ kind: "employee" as const, key: `e-${e._id}`, data: e })),
+      ...visible.students.map((s) => ({ kind: "student" as const, key: `s-${s._id}`, data: s })),
+      ...visible.parents.map((p) => ({ kind: "parent" as const, key: `pa-${p._id}`, data: p })),
+      ...visible.employees.map((e) => ({ kind: "employee" as const, key: `e-${e._id}`, data: e })),
     ],
-    [pages, results],
+    [pages, visible],
   );
 
   useEffect(() => setActive(0), [items.length]);
@@ -177,13 +200,18 @@ export default function GlobalSearch({
   const fetchFullStudent = useCallback(
     async (id: string) => {
       const res = await fetch(`/api/students?ids=${id}&schoolId=${schoolId}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        notify.error(data?.message || "Could not load student");
+        return null;
+      }
       return Array.isArray(data) ? data[0] : null;
     },
     [schoolId],
   );
 
   const openStudentProfile = async (id: string) => {
+    if (!canStudentProfile) return;
     onOpenChange(false);
     try {
       const s = await fetchFullStudent(id);
@@ -194,6 +222,7 @@ export default function GlobalSearch({
   };
 
   const openLedger = (id: string) => {
+    if (!canLedger) return;
     onOpenChange(false);
     const url = `${LEDGER}?student=${id}`;
     if (pathname === LEDGER) {
@@ -206,6 +235,7 @@ export default function GlobalSearch({
   };
 
   const printBio = async (id: string) => {
+    if (!canBioData) return;
     if (!printCtx) {
       notify.error("Loading school details — please try again in a moment");
       return;
@@ -218,12 +248,19 @@ export default function GlobalSearch({
     }
   };
 
+  // Student row click / Enter → first allowed action
+  const openStudent = (id: string) => {
+    if (canStudentProfile) openStudentProfile(id);
+    else if (canLedger) openLedger(id);
+    else if (canBioData) printBio(id);
+  };
+
   const runDefault = (item: Item) => {
     if (item.kind === "page") {
       onOpenChange(false);
       router.push(item.data.href);
     } else if (item.kind === "student") {
-      openStudentProfile(item.data._id);
+      openStudent(item.data._id);
     } else if (item.kind === "parent") {
       onOpenChange(false);
       setViewParent(item.data);
@@ -231,6 +268,21 @@ export default function GlobalSearch({
       onOpenChange(false);
       setViewEmployee(item.data);
     }
+  };
+
+  // Edit from the profile popups → only with the "Edit" tick
+  const goEdit = (
+    module: "students" | "parents" | "employees",
+    href: string,
+    label: string,
+    close: () => void,
+  ) => {
+    if (!can(module, "edit")) {
+      showAccessDenied(`You don't have permission to edit ${label}.`);
+      return;
+    }
+    close();
+    router.push(href);
   };
 
   // ── Keyboard
@@ -327,7 +379,7 @@ export default function GlobalSearch({
             <Search className="h-4 w-4 text-muted-foreground" />
           )}
           <input
-          ref={inputRef}
+            ref={inputRef}
             autoFocus
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -342,7 +394,7 @@ export default function GlobalSearch({
 
         {/* Results */}
         <div ref={listRef} className="max-h-[60vh] overflow-y-auto pb-2">
-            {!term && (
+          {!term && (
             <p className="px-4 py-8 text-center text-xs text-muted-foreground">
               Start typing to search pages, students, parents and employees
             </p>
@@ -372,8 +424,8 @@ export default function GlobalSearch({
             );
           })}
 
-          {results.students.length > 0 && <Section title="Students" />}
-          {results.students.map((s) => {
+          {visible.students.length > 0 && <Section title="Students" />}
+          {visible.students.map((s) => {
             idx++;
             const i = idx;
             return (
@@ -382,7 +434,7 @@ export default function GlobalSearch({
                 data-idx={i}
                 className={rowClass(i)}
                 onMouseEnter={() => setActive(i)}
-                onClick={() => openStudentProfile(s._id)}
+                onClick={() => openStudent(s._id)}
               >
                 {avatar(
                   s.image,
@@ -403,16 +455,22 @@ export default function GlobalSearch({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <ActionBtn icon={User} label="Profile" onClick={() => openStudentProfile(s._id)} />
-                  <ActionBtn icon={ReceiptText} label="Fee Ledger" onClick={() => openLedger(s._id)} />
-                  <ActionBtn icon={BookUser} label="Bio Data" onClick={() => printBio(s._id)} />
+                  {canStudentProfile && (
+                    <ActionBtn icon={User} label="Profile" onClick={() => openStudentProfile(s._id)} />
+                  )}
+                  {canLedger && (
+                    <ActionBtn icon={ReceiptText} label="Fee Ledger" onClick={() => openLedger(s._id)} />
+                  )}
+                  {canBioData && (
+                    <ActionBtn icon={BookUser} label="Bio Data" onClick={() => printBio(s._id)} />
+                  )}
                 </div>
               </div>
             );
           })}
 
-          {results.parents.length > 0 && <Section title="Parents" />}
-          {results.parents.map((p) => {
+          {visible.parents.length > 0 && <Section title="Parents" />}
+          {visible.parents.map((p) => {
             idx++;
             const i = idx;
             return (
@@ -436,8 +494,8 @@ export default function GlobalSearch({
             );
           })}
 
-          {results.employees.length > 0 && <Section title="Employees" />}
-          {results.employees.map((e) => {
+          {visible.employees.length > 0 && <Section title="Employees" />}
+          {visible.employees.map((e) => {
             idx++;
             const i = idx;
             return (
@@ -485,10 +543,7 @@ export default function GlobalSearch({
         isOpen={!!viewStudent}
         onClose={() => setViewStudent(null)}
         student={viewStudent}
-        onEdit={() => {
-          setViewStudent(null);
-          router.push("/students");
-        }}
+        onEdit={() => goEdit("students", "/students", "students", () => setViewStudent(null))}
       />
       <ParentProfileModal
         isOpen={!!viewParent}
@@ -497,21 +552,15 @@ export default function GlobalSearch({
         schoolId={schoolId}
         onStudentClick={(s: any) => {
           setViewParent(null);
-          setViewStudent(s);
+          if (canStudentProfile) setViewStudent(s);
         }}
-        onEdit={() => {
-          setViewParent(null);
-          router.push("/parents");
-        }}
+        onEdit={() => goEdit("parents", "/parents", "parents", () => setViewParent(null))}
       />
       <EmployeeProfileModal
         isOpen={!!viewEmployee}
         onClose={() => setViewEmployee(null)}
         staff={viewEmployee}
-        onEdit={() => {
-          setViewEmployee(null);
-          router.push("/employees");
-        }}
+        onEdit={() => goEdit("employees", "/employees", "employees", () => setViewEmployee(null))}
       />
     </>
   );

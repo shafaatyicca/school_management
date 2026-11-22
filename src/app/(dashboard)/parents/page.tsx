@@ -2,15 +2,12 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useMemo } from "react";
-import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
-import {
-  FileSpreadsheet,
-  FileText,
-  Printer,
-  Pencil,
-  Trash2,
-} from "lucide-react";
+import { type ExportHeader } from "@/lib/exportUtils";
+import { Pencil, Trash2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
+import PageGuard from "@/components/PageGuard";
+import ExportButtons from "@/components/ExportButtons";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { Button } from "@/components/ui/button";
 import { useParentModal } from "@/hooks/useParentModal";
 import ParentFormModal from "@/components/ParentFormModal";
@@ -22,12 +19,17 @@ import {
   useMaterialReactTable,
 } from "material-react-table";
 
-export default function ParentsPage() {
+function ParentsPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
+  const { can } = usePermissions();
+  const canCreate = can("parents", "create");
+  const canEdit = can("parents", "edit");
+  const canDelete = can("parents", "delete");
 
   const [parents, setParents] = useState([]);
   const [fetchLoading, setFetchLoading] = useState(true);
@@ -74,7 +76,7 @@ const exportHeader: ExportHeader = {
   },
 };
 
-  const fetchParents = async () => {
+    const fetchParents = async () => {
     setFetchLoading(true);
     try {
       if (!effectiveSchoolId) {
@@ -82,13 +84,15 @@ const exportHeader: ExportHeader = {
         return;
       }
       const res = await fetch(`/api/parents?schoolId=${effectiveSchoolId}`);
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Server error");
+        // API's own message (e.g. permission) — same text as the Access Denied modal
+        notify.error(data?.message || data?.error || "Could not load parents list");
+        setParents([]);
+        return;
       }
 
-      const data = await res.json();
       setParents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch parents:", error);
@@ -102,7 +106,7 @@ const exportHeader: ExportHeader = {
     setParentToDelete({ id: original._id, name: original.fullName });
     setDeleteDialogOpen(true);
   };
-  const confirmDelete = async () => {
+    const confirmDelete = async () => {
     if (!parentToDelete) return;
 
     try {
@@ -114,8 +118,14 @@ const exportHeader: ExportHeader = {
         }),
         headers: { "Content-Type": "application/json" },
       });
+      const data = await res.json().catch(() => null);
 
-      if (!res.ok) throw new Error("Failed to delete");
+      if (!res.ok) {
+        notify.error(
+          data?.message || data?.error || "Could not delete parent. Please try again.",
+        );
+        return;
+      }
 
       notify.success("Parent deleted successfully");
       fetchParents();
@@ -248,67 +258,44 @@ const exportHeader: ExportHeader = {
       columnVisibility: { address: true, gender: false, occupation: false },
     },
     enableKeyboardShortcuts: false,
-    enableRowActions: true,
+     enableRowActions: canEdit || canDelete,
     positionActionsColumn: "last",
     displayColumnDefOptions: {
       "mrt-row-actions": { size: 80, header: "Actions" },
     },
     // Export Buttons
     renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex items-center gap-2">
-        {/* Excel Button */}
-        <Button
-          onClick={() =>
-            handleExportRows(table, "excel", "Parents List Report", exportHeader)
-          }
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-
-        {/* PDF Button */}
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Parents List Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-
-        {/* Print Button */}
-        <Button
-          onClick={() => handlePrintTable(table, "Parents List Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
-      </div>
+      <ExportButtons
+        table={table}
+        module="parents"
+        title="Parents List Report"
+        header={exportHeader}
+      />
     ),
 
-    renderRowActions: ({ row }) => (
+        renderRowActions: ({ row }) => (
       <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => openEditParent(row.original)}
-          className="h-8 w-8 cursor-pointer hover:bg-accent"
-        >
-          <Pencil className="h-4 w-4 text-sky-500" />
-        </Button>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openEditParent(row.original)}
+            className="h-8 w-8 cursor-pointer hover:bg-accent"
+          >
+            <Pencil className="h-4 w-4 text-sky-500" />
+          </Button>
+        )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => openDeleteDialog(row.original)}
-          className="h-8 w-8 cursor-pointer hover:bg-destructive/10"
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => openDeleteDialog(row.original)}
+            className="h-8 w-8 cursor-pointer hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        )}
       </div>
     ),
 
@@ -339,8 +326,8 @@ const exportHeader: ExportHeader = {
     <div className="space-y-2">
       <PageHeader
         title="Parents Management"
-        buttonLabel="Add Parent"
-        onButtonClick={() => openEditParent(null)}
+        buttonLabel={canCreate ? "Add Parent" : undefined}
+        onButtonClick={canCreate ? () => openEditParent(null) : undefined}
       />
 
       <div className="border border-border rounded-xl shadow-sm bg-background overflow-hidden">
@@ -361,5 +348,12 @@ const exportHeader: ExportHeader = {
         itemName={parentToDelete?.name || "this parent"}
       />
     </div>
+  );
+}
+export default function Page() {
+  return (
+    <PageGuard module="parents">
+      <ParentsPage />
+    </PageGuard>
   );
 }

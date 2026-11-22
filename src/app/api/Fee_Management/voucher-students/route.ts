@@ -1,32 +1,38 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
+import { getAccess, schoolIdFor } from "@/lib/access";
 import Student from "@/models/Student";
 import "@/models/Class";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// GET → students of ONE class (?classId=...&section=A | all)
+const M = (model: any) => model as any; // avoids Mongoose union-type errors
+const isOid = (v: any) => !!v && mongoose.Types.ObjectId.isValid(String(v));
+
+// GET → students of ONE class (?classId=...&section=A | all)  — Fee Voucher Printing
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user)
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const access = await getAccess();
+    if (!access) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    if (!access.can("vouchers", "view")) {
+      return NextResponse.json(
+        { message: "You don't have permission to print fee vouchers" },
+        { status: 403 },
+      );
+    }
 
+    await connectDB();
     const { searchParams } = new URL(req.url);
-    const schoolId =
-      session.user.role === "super_admin"
-        ? searchParams.get("schoolId")
-        : session.user.schoolId;
+    const schoolId = schoolIdFor(access, searchParams.get("schoolId"));
     const classId = searchParams.get("classId");
     const section = searchParams.get("section");
 
-    if (!schoolId || !classId) return NextResponse.json([]);
+    if (!schoolId || !classId || !isOid(classId)) return NextResponse.json([]);
 
     const filter: any = { schoolId, classId };
     if (section && section !== "all") filter.section = section;
 
-    const students: any[] = await Student.find(filter)
+    const students: any[] = await M(Student)
+      .find(filter)
       .select("fullName grNumber section classId image")
       .populate("classId", "name")
       .sort({ grNumber: 1 })
@@ -43,6 +49,7 @@ export async function GET(req: Request) {
       })),
     );
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Voucher students error:", error?.message);
+    return NextResponse.json({ message: "Failed to load students" }, { status: 500 });
   }
 }

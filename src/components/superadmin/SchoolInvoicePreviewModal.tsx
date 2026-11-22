@@ -9,6 +9,15 @@ import {
 import { Dialog, DialogTitle, DialogContent, IconButton } from "@mui/material";
 import Zoom from "@mui/material/Zoom";
 
+// Date in Pakistan time, e.g. 20 Nov 2026
+const pkDate = (d: any) =>
+  new Date(d).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Karachi",
+  });
+
 export default function SchoolInvoicePreviewModal({
   isOpen,
   onClose,
@@ -89,7 +98,7 @@ export default function SchoolInvoicePreviewModal({
             }`}
           >
             {isPaid ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />}
-            {invoice.status}
+            {String(invoice.status || "").replace("_", " ")}
           </span>
         </div>
       </DialogTitle>
@@ -163,13 +172,7 @@ export default function SchoolInvoicePreviewModal({
                   {label}
                 </span>
                 <span className={`text-xs font-bold ${color}`}>
-                  {value
-                    ? new Date(value).toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "—"}
+                  {value ? pkDate(value) : "—"}
                 </span>
               </div>
             </div>
@@ -234,19 +237,18 @@ export default function SchoolInvoicePreviewModal({
             <div className="flex flex-col gap-1.5">
               {paymentLogs.map((pay: any, idx: number) => (
                 <div
-                  key={idx}
+                  key={pay.paymentNo || idx}
                   className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-colors"
                 >
                   <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block" />
+                    {pay.paymentNo && (
+                      <span className="font-mono text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">
+                        {pay.paymentNo}
+                      </span>
+                    )}
                     {pay.date || pay.paymentDate
-                      ? new Date(
-                          pay.date || pay.paymentDate,
-                        ).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
+                      ? pkDate(pay.date || pay.paymentDate)
                       : "—"}
                   </div>
                   <span className="text-xs font-bold text-emerald-600 tabular-nums">
@@ -263,13 +265,7 @@ export default function SchoolInvoicePreviewModal({
           <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-medium text-emerald-700">
             <CheckCircle2 size={14} />
             Paid on:{" "}
-            <strong className="text-emerald-900">
-              {new Date(invoice.paidAt).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            </strong>
+            <strong className="text-emerald-900">{pkDate(invoice.paidAt)}</strong>
           </div>
         )}
       </DialogContent>

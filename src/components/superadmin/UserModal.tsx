@@ -30,6 +30,7 @@ export const UserModal = ({
 }: any) => {
   const [showPassword, setShowPassword] = useState(false);
 
+  
   const handleImageDone = useCallback(
     (url: string) => {
       setFormData((prev: any) => ({ ...prev, image: url }));

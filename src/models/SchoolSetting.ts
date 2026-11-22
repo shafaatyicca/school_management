@@ -21,6 +21,7 @@ const SchoolSettingSchema = new Schema(
       maxItems: { type: Number, min: 1, max: 15, default: 10 }, // voucher par kitni lines
     },
 
+    
     // NOTE: "type" mongoose ka reserved word hai, is liye "mode"
     lateFee: {
       mode: { type: String, enum: ["fixed", "percentage"], default: "fixed" },

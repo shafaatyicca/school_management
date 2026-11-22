@@ -1,35 +1,38 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
+import { getAccess, schoolIdFor } from "@/lib/access";
 import Student from "@/models/Student";
-import "@/models/Class"; // populate ke liye model register
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import "@/models/Class"; // registers the model for populate
 
-// GET → typing ke dauran students ki list (dropdown ke liye, max 10)
+// GET → students while typing (dropdown, max 10)
+// Used by the search box on: Student Fee Ledger, Bulk Student Bio Data, Fee Voucher Printing
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const access = await getAccess();
+    if (!access) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+
+    const allowed =
+      access.can("fees", "view") || access.can("bioData", "view") || access.can("vouchers", "view");
+    if (!allowed) {
+      return NextResponse.json(
+        { message: "You don't have permission to search students" },
+        { status: 403 },
+      );
     }
 
+    await connectDB();
     const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim() || "";
-    const urlSchoolId = searchParams.get("schoolId");
-    const isSuperAdmin = session.user.role === "super_admin";
-    const schoolId = isSuperAdmin ? urlSchoolId : session.user.schoolId;
+    const q = (searchParams.get("q") || "").trim().slice(0, 50);
+    const schoolId = schoolIdFor(access, searchParams.get("schoolId"));
 
     if (!schoolId || !q) return NextResponse.json([]);
 
-    // Regex ke special characters safe karo
+    // Regex special characters become plain text
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const orConditions: any[] = [
-      { fullName: { $regex: escaped, $options: "i" } },
-    ];
+    const orConditions: any[] = [{ fullName: { $regex: escaped, $options: "i" } }];
 
-    // Number type kiya → GR number us se shuru ho (1 → 1, 12, 105...)
+    // Typed a number → GR numbers starting with it (1 → 1, 12, 105…)
     if (/^\d+$/.test(q)) {
       orConditions.push({
         $expr: {
@@ -38,10 +41,8 @@ export async function GET(req: Request) {
       });
     }
 
-    const students: any[] = await Student.find({
-      schoolId,
-      $or: orConditions,
-    } as any)
+    const students: any[] = await (Student as any)
+      .find({ schoolId, $or: orConditions })
       .select("fullName grNumber section classId image")
       .populate("classId", "name")
       .sort({ grNumber: 1 })
@@ -59,6 +60,7 @@ export async function GET(req: Request) {
       })),
     );
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Student search error:", error?.message);
+    return NextResponse.json({ message: "Search failed" }, { status: 500 });
   }
 }

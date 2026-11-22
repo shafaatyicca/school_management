@@ -15,6 +15,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
   itemName?: string;
+  details?: string; // optional extra line (e.g. "This will also delete: 3 unpaid invoice(s)")
 }
 
 export default function DeleteConfirmDialog({
@@ -22,6 +23,7 @@ export default function DeleteConfirmDialog({
   onOpenChange,
   onConfirm,
   itemName = "item",
+  details,
 }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -36,6 +38,11 @@ export default function DeleteConfirmDialog({
               {itemName}
             </span>{" "}
             and associated data.
+            {details && (
+              <span className="mt-2 block font-medium text-rose-600 dark:text-rose-400">
+                {details}
+              </span>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="mt-4">

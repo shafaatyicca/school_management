@@ -16,7 +16,10 @@ import {
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
 import { notify } from "@/lib/notify";
+import { showAccessDenied } from "@/lib/accessDenied";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { FileText, Tag, Calendar } from "lucide-react";
+import { toYMD } from "@/lib/pkTime";
 
 interface Props {
   isOpen: boolean;
@@ -28,7 +31,7 @@ interface Props {
   schoolId: string;
   classFee: number;
   onSuccess: () => void;
-  editInvoice?: any; // ho to modal EDIT mode mein khulega
+  editInvoice?: any; // when set, the modal opens in EDIT mode
 }
 
 const MONTHS = [
@@ -46,10 +49,10 @@ const MONTHS = [
   { value: 12, label: "December" },
 ];
 
-// Class Fee wali category ke amount box mein yeh text dikhega
+// Text shown in the amount box for the Class Fee category
 const CLASS_FEE_TEXT = "Dynamic Value";
 
-// Locked (readonly) field ka style
+// Locked (readonly) field style
 const lockedSx = {
   "& .MuiOutlinedInput-root": { backgroundColor: "var(--muted)" },
   "& input, & select": { color: "var(--muted-foreground)" },
@@ -69,11 +72,15 @@ export default function InvoiceGenerateModal({
 }: Props) {
   const isEditMode = !!editInvoice;
 
+  // Generate → "Invoices → Create", Update → "Invoices → Edit"
+  const { can } = usePermissions();
+  const canSave = isEditMode ? can("invoices", "edit") : can("invoices", "create");
+
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  const [date, setDate] = useState(now.toISOString().split("T")[0]);
+  const [date, setDate] = useState(toYMD());
   const [month, setMonth] = useState(currentMonth);
   const [year, setYear] = useState(currentYear);
   const [isAdvance, setIsAdvance] = useState(false);
@@ -86,8 +93,9 @@ export default function InvoiceGenerateModal({
   const [loading, setLoading] = useState(false);
   const [titleLocked, setTitleLocked] = useState(true);
   const [customTitle, setCustomTitle] = useState("");
-  // Edit mode: sirf is invoice ka discount
+  // Edit mode: discount on this invoice only
   const [invoiceDiscount, setInvoiceDiscount] = useState<number | "">("");
+    const [amountEdited, setAmountEdited] = useState(false);
 
   // Dynamic title
   const monthLabel = MONTHS.find((m) => m.value === month)?.label || "";
@@ -101,7 +109,7 @@ export default function InvoiceGenerateModal({
   const editDiscountNum = Number(invoiceDiscount) || 0;
   const editNet = Math.max(0, editBase - editDiscountNum);
 
-  // Edit mode: month/year na badle to purana title, badle to naya dynamic title
+  // Edit mode: keep the old title unless month/year changed
   const monthYearChanged =
     isEditMode &&
     (month !== Number(editInvoice?.month) || year !== Number(editInvoice?.year));
@@ -114,13 +122,13 @@ export default function InvoiceGenerateModal({
   // Categories fetch
   useEffect(() => {
     if (!isOpen || !schoolId) return;
-    fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}`)
+    fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}&for=fees`)
       .then((r) => r.json())
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setCategories(list);
-        if (isEditMode) return; // edit mein invoice wali category hi rahegi
-        // Default: jo category Class Fee se linked hai (jaise Tuition Fee) woh select karo
+        if (isEditMode) return; // edit keeps the invoice's own category
+        // Default: the category linked to Class Fee (e.g. Tuition Fee)
         const classFeeCat = list.find((c: any) => c.feeSource === "class_fee");
         if (classFeeCat) {
           setSelectedCat(classFeeCat._id);
@@ -132,7 +140,7 @@ export default function InvoiceGenerateModal({
       .catch(() => notify.error("Failed to load categories"));
   }, [isOpen, schoolId, isEditMode]);
 
-  // Edit mode: invoice ki values bhar do
+  // Edit mode: fill the invoice values
   useEffect(() => {
     if (!isOpen || !editInvoice) return;
     setSelectedCat(
@@ -141,12 +149,8 @@ export default function InvoiceGenerateModal({
     setSelectedCatName(editInvoice.categoryName || "");
     setMonth(Number(editInvoice.month) || currentMonth);
     setYear(Number(editInvoice.year) || currentYear);
-    setDate(
-      editInvoice.createdAt
-        ? new Date(editInvoice.createdAt).toISOString().split("T")[0]
-        : now.toISOString().split("T")[0],
-    );
-    setIsClassFee(false); // edit mein asal amount dikhega
+    setDate(editInvoice.createdAt ? toYMD(editInvoice.createdAt) : toYMD());
+    setIsClassFee(false); // edit shows the real amount
     setAmount(editBase);
     setInvoiceDiscount(editInvoice.discount ?? 0);
     setDescription(editInvoice.description || "");
@@ -157,6 +161,7 @@ export default function InvoiceGenerateModal({
   // Category change handler
   const handleCategoryChange = (catId: string) => {
     setSelectedCat(catId);
+    setAmountEdited(false);
     if (!catId) {
       setAmount(0);
       setSelectedCatName("");
@@ -172,18 +177,24 @@ export default function InvoiceGenerateModal({
     }
   };
 
-  // Month / Year change — Advance khud check nahi hoga
+  // Month / Year change — Advance is not ticked automatically
   const handleMonthChange = (val: number) => setMonth(val);
   const handleYearChange = (val: number) => setYear(val);
 
   // ── Create
   const handleGenerate = async () => {
+    if (!canSave) {
+      showAccessDenied("You don't have permission to generate invoices.");
+      return;
+    }
     if (!selectedCat) {
       notify.error("Please select a fee category");
       return;
     }
-    if (!isClassFee && (!amount || amount <= 0)) {
-      notify.error("Please enter a valid amount");
+    const cat = categories.find((c) => c._id === selectedCat);
+    const maxFee = Number(cat?.maxBaseFee) || 0;
+    if (!isClassFee && amountEdited && maxFee > 0 && amount > maxFee) {
+      notify.error(`Amount cannot be more than the base fee (Rs. ${maxFee.toLocaleString()})`);
       return;
     }
     setLoading(true);
@@ -200,20 +211,20 @@ export default function InvoiceGenerateModal({
           title: titleLocked ? dynamicTitle : customTitle || dynamicTitle,
           date,
           feeCategoryId: selectedCat,
-          amount: isClassFee ? 0 : amount,
+          amount: isClassFee || !amountEdited ? "" : amount,
           description,
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (res.ok) {
         notify.success("Invoice generated successfully!");
         onSuccess();
       } else if (res.status === 409) {
-        notify.error(data.message || "Invoice already exists for this month");
+        notify.error(data?.message || "Invoice already exists for this month");
       } else {
-        notify.error(data.message || "Failed to generate invoice");
+        notify.error(data?.message || "Failed to generate invoice");
       }
     } catch {
       notify.error("Something went wrong");
@@ -222,14 +233,18 @@ export default function InvoiceGenerateModal({
     }
   };
 
-  // ── Edit (title, date, month, year + is invoice ka discount)
+  // ── Edit (title, date, month, year + this invoice's discount)
   const handleUpdate = async () => {
+    if (!canSave) {
+      showAccessDenied("You don't have permission to edit invoices.");
+      return;
+    }
     if (editDiscountNum < 0 || editDiscountNum > editBase) {
-      notify.error(`Discount 0 se ${editBase} ke beech hona chahiye`);
+      notify.error(`Discount must be between 0 and ${editBase}`);
       return;
     }
     if (editNet < editPaid) {
-      notify.error(`Is invoice par ${editPaid} pehle hi pay ho chuka hai`);
+      notify.error(`Rs. ${editPaid} has already been paid on this invoice`);
       return;
     }
     setLoading(true);
@@ -239,6 +254,7 @@ export default function InvoiceGenerateModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invoiceId: editInvoice._id,
+          schoolId,
           discount: editDiscountNum,
           title: titleLocked ? lockedTitle : customTitle || lockedTitle,
           date,
@@ -247,12 +263,12 @@ export default function InvoiceGenerateModal({
           description,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (res.ok) {
         notify.success("Invoice updated!");
         onSuccess();
       } else {
-        notify.error(data.message || "Failed to update invoice");
+        notify.error(data?.message || "Failed to update invoice");
       }
     } catch {
       notify.error("Something went wrong");
@@ -315,7 +331,7 @@ export default function InvoiceGenerateModal({
         sx={{ backgroundColor: "var(--background)", p: 2 }}
       >
         <div className="flex flex-col gap-3 pt-1">
-          {/* Row 1 — Title (double click to edit — create aur edit dono mein) */}
+          {/* Row 1 — Title (double click to edit — in create and edit) */}
           <TextField
             label={
               titleLocked
@@ -431,8 +447,10 @@ export default function InvoiceGenerateModal({
               fullWidth
               value={isClassFee ? CLASS_FEE_TEXT : amount}
               onChange={(e) => {
-                if (!isClassFee && !isEditMode)
+                if (!isClassFee && !isEditMode) {
                   setAmount(Number(e.target.value));
+                  setAmountEdited(true);
+                }
               }}
               InputProps={{
                 readOnly: isClassFee || isEditMode,
@@ -487,7 +505,7 @@ export default function InvoiceGenerateModal({
             )}
           </div>
 
-          {/* Row 5 — Class + Section (readonly) */}
+          {/* Row 5 — Student + Class + Section (readonly) */}
           <div className="grid grid-cols-3 gap-3">
             <TextField
               label="Student"
@@ -632,7 +650,7 @@ export default function InvoiceGenerateModal({
         <Button
           onClick={isEditMode ? handleUpdate : handleGenerate}
           variant="contained"
-          disabled={loading}
+          disabled={loading || !canSave}
           size="small"
           sx={{
             backgroundColor: "#1e293b",

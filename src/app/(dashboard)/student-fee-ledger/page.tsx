@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { notify } from "@/lib/notify";
 import { AlertCircle, User } from "lucide-react";
@@ -13,13 +13,24 @@ import TakePaymentModal from "@/components/TakePaymentModal";
 import InvoiceDetailModal from "@/components/InvoiceDetailModal";
 import StudentSearchBox from "@/components/StudentSearchBox";
 import RecentPaymentsModal from "@/components/RecentPaymentsModal";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
 
-export default function StudentFeeLedgerPage() {
+function StudentFeeLedgerPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
+  // Permissions (each button has its own row in User Access)
+  const { can } = usePermissions();
+  const canCreateInvoice = can("invoices", "create");
+  const canExport = can("fees", "export");
+  const canAddDiscount = can("discounts", "create");
+  const canViewDiscounts = can("discounts", "view");
+  const canTakePayment = can("takePayment", "create");
+
   const [loading, setLoading] = useState(false);
   const [studentInfo, setStudentInfo] = useState<any>(null);
   const [discounts, setDiscounts] = useState<any[]>([]);
@@ -33,6 +44,7 @@ export default function StudentFeeLedgerPage() {
   const [editInvoice, setEditInvoice] = useState<any>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
+    const urlStudentLoaded = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -41,7 +53,7 @@ export default function StudentFeeLedgerPage() {
       hostname.includes(".lvh.me") || hostname.includes(".localhost");
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) setViewSchoolId(data._id);
@@ -50,12 +62,21 @@ export default function StudentFeeLedgerPage() {
   }, [isSuperAdmin]);
 
   useEffect(() => {
-  if (!effectiveSchoolId) return;
-  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => d && setSchoolInfo(d))
-    .catch(() => {});
-}, [effectiveSchoolId]);
+    if (!effectiveSchoolId) return;
+    fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSchoolInfo(d))
+      .catch(() => {});
+  }, [effectiveSchoolId]);
+
+  // Student ke discounts (fee lock + discount summary)
+  const fetchDiscounts = (studentId: string) => {
+    if (!studentId) return;
+    fetch(`/api/Fee_Management/discounts?studentId=${studentId}&schoolId=${effectiveSchoolId}`)
+      .then((r) => r.json())
+      .then((data) => setDiscounts(Array.isArray(data) ? data : []))
+      .catch(() => setDiscounts([]));
+  };
 
   // Student load karo — query = naam, GR# ya student ki _id (dropdown se)
   const loadStudent = async (query: string) => {
@@ -65,7 +86,15 @@ export default function StudentFeeLedgerPage() {
       const response = await fetch(
         `/api/Fee_Management/student-fee-ledger?studentId=${encodeURIComponent(query)}&schoolId=${effectiveSchoolId}`,
       );
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
+
+      // API error (e.g. no permission) → API's own message
+      if (!response.ok) {
+        setStudentInfo(null);
+        notify.error(data?.message || "Failed to fetch data");
+        return;
+      }
+
       const match = Array.isArray(data) ? data[0] : null;
       if (match && match.studentId) {
         const student = match.studentId._doc || match.studentId;
@@ -81,11 +110,7 @@ export default function StudentFeeLedgerPage() {
         });
         setDiscounts(match.studentId.discounts || []);
         notify.success("Student Fee Ledger loaded");
-        if (match.studentId?._id) {
-          fetch(`/api/Fee_Management/discounts?studentId=${match.studentId._id}`)
-            .then((r) => r.json())
-            .then((data) => setDiscounts(Array.isArray(data) ? data : []));
-        }
+        if (match.studentId?._id) fetchDiscounts(match.studentId._id);
       } else {
         setStudentInfo(null);
         notify.error("No student found");
@@ -96,23 +121,22 @@ export default function StudentFeeLedgerPage() {
       setLoading(false);
     }
   };
-useEffect(() => {
+
+  // Open a student from the URL (?student=<id>) or from the global search
+  useEffect(() => {
     if (!effectiveSchoolId) return;
 
     const id = new URLSearchParams(window.location.search).get("student");
-    if (id) loadStudent(id);
+   if (id && urlStudentLoaded.current !== id) {
+      urlStudentLoaded.current = id;
+      loadStudent(id);
+    }
 
     const onOpen = (e: Event) => loadStudent((e as CustomEvent).detail);
     window.addEventListener("ledger:open-student", onOpen);
     return () => window.removeEventListener("ledger:open-student", onOpen);
   }, [effectiveSchoolId]);
 
-  const fetchDiscounts = (studentId: string) => {
-    if (!studentId) return;
-    fetch(`/api/Fee_Management/discounts?studentId=${studentId}`)
-      .then((r) => r.json())
-      .then((data) => setDiscounts(Array.isArray(data) ? data : []));
-  };
   return (
     <div className="space-y-6">
       {/* Header Row */}
@@ -140,17 +164,24 @@ useEffect(() => {
                   <div className="text-md text-red-500">Student Info :</div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setIsInvoiceModalOpen(true)}
-                      className="rounded bg-green-600 px-3 py-1 text-xs text-white cursor-pointer hover:bg-green-700"
-                    >
-                      Generate Invoice
-                    </button>
+                    {/* Generate Invoice → "Invoices → Create" */}
+                    {canCreateInvoice && (
+                      <button
+                        onClick={() => setIsInvoiceModalOpen(true)}
+                        className="rounded bg-green-600 px-3 py-1 text-xs text-white cursor-pointer hover:bg-green-700"
+                      >
+                        Generate Invoice
+                      </button>
+                    )}
 
-                    <button className="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-indigo-800">
-                      Final Reminder Letter
-                    </button>
+                    {/* Final Reminder Letter → "Student Fee Ledger → Export / Print" */}
+                    {canExport && (
+                      <button className="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-indigo-800">
+                        Final Reminder Letter
+                      </button>
+                    )}
 
+                    {/* Recent Payments → viewing only (reverse is checked inside) */}
                     <button
                       onClick={() => setIsRecentOpen(true)}
                       className="rounded bg-sky-500 px-3 py-1 text-xs text-white cursor-pointer hover:bg-sky-600"
@@ -254,17 +285,28 @@ useEffect(() => {
                 <div className="flex items-center justify-between border-b bg-slate-50 dark:bg-slate-800 p-1">
                   <h4 className=" text-red-500">Discounts</h4>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="rounded bg-green-600 px-2 py-1 text-xs text-white cursor-pointer"
-                    >
-                      Add
-                    </button>
+                    {/* Add → "Fee Discounts → Create" */}
+                    {canAddDiscount && (
+                      <button
+                        onClick={() => {
+                          setEditDiscount(null);
+                          setIsModalOpen(true);
+                        }}
+                        className="rounded bg-green-600 px-2 py-1 text-xs text-white cursor-pointer"
+                      >
+                        Add
+                      </button>
+                    )}
 
-                    <button className="rounded bg-blue-600/20 dark:text-white px-2 py-1 text-xs text-black cursor-pointer" 
-                      onClick={() => setIsViewDiscountOpen(true)}>
-                      View Discounts
-                    </button>
+                    {/* View Discounts → "Fee Discounts → View" */}
+                    {canViewDiscounts && (
+                      <button
+                        className="rounded bg-blue-600/20 dark:text-white px-2 py-1 text-xs text-black cursor-pointer"
+                        onClick={() => setIsViewDiscountOpen(true)}
+                      >
+                        View Discounts
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -360,7 +402,7 @@ useEffect(() => {
       )}
 
       {/* Create Invoice */}
-      {isInvoiceModalOpen && (
+      {isInvoiceModalOpen && canCreateInvoice && (
         <InvoiceGenerateModal
           isOpen={isInvoiceModalOpen}
           onClose={() => setIsInvoiceModalOpen(false)}
@@ -396,7 +438,7 @@ useEffect(() => {
         />
       )}
 
-      {isViewDiscountOpen && (
+      {isViewDiscountOpen && canViewDiscounts && (
         <ViewSingleDiscountModal
           isOpen={isViewDiscountOpen}
           onClose={() => setIsViewDiscountOpen(false)}
@@ -443,11 +485,12 @@ useEffect(() => {
         />
       )}
 
-      {payInvoice && (
+      {payInvoice && canTakePayment && (
         <TakePaymentModal
           isOpen={!!payInvoice}
           onClose={() => setPayInvoice(null)}
           invoice={payInvoice}
+          schoolId={effectiveSchoolId || ""}
           onSuccess={() => {
             setPayInvoice(null);
             setInvoiceRefreshKey((prev) => prev + 1);
@@ -476,7 +519,14 @@ useEffect(() => {
           onChanged={() => setInvoiceRefreshKey((prev) => prev + 1)}
         />
       )}
-
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <PageGuard module="fees">
+      <StudentFeeLedgerPage />
+    </PageGuard>
   );
 }

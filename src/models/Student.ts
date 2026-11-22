@@ -1,4 +1,5 @@
 import mongoose, { Schema, model, models, Document } from "mongoose";
+import { randomPassword } from "@/lib/password";
 
 export interface IStudent extends Document {
   schoolId: string;
@@ -91,6 +92,7 @@ StudentSchema.pre<IStudent>("save", async function () {
   }
   doc.grNumber = grNumber;
 
+  
   // 2. Prefix (first 3 letters of the school id)
   const shortPrefix = String(doc.schoolId)
     .replace(/[^a-zA-Z]/g, "")
@@ -100,7 +102,7 @@ StudentSchema.pre<IStudent>("save", async function () {
   // 3. Login email & password
   doc.email = `${shortPrefix}${grNumber}st@myschoolapp.com`.toLowerCase();
   if (!doc.password) {
-    doc.password = `${shortPrefix}${grNumber}123`;
+    doc.password = randomPassword();
   }
 });
 

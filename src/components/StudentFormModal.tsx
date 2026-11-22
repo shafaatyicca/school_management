@@ -12,6 +12,7 @@ import { Close as CloseIcon } from "@mui/icons-material";
 import { Autocomplete, Box, createFilterOptions } from "@mui/material";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { validationSchema } from "@/lib/validation";
+import { toYMD } from "@/lib/pkTime";
 import {
   Dialog,
   DialogTitle,
@@ -64,6 +65,7 @@ export default function StudentFormModal({
   const parentIdValue = watch("parentId") || "";
   const fatherGender = watch("parentData.gender") || "Male";
   const currentImage = watch("image");
+  
 
   const handleImageDone = useCallback(
     (url: string) => {
@@ -74,13 +76,17 @@ export default function StudentFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      fetch(`/api/parents?schoolId=${schoolId}`)
-        .then((res) => res.json())
-        .then((data) => setParents(data));
+      if (schoolId) {
+        fetch(`/api/parents?schoolId=${schoolId}`)
+          .then((res) => res.json())
+          .then((data) => setParents(Array.isArray(data) ? data : []))
+          .catch(() => setParents([]));
+      }
 
       if (student) {
         setIsNewParent(false);
 
+        
         reset({
           ...student,
           image:
@@ -89,15 +95,9 @@ export default function StudentFormModal({
               : student.gender === "Female"
                 ? "/studentfemale-avatar.jpg"
                 : "/studentmale-avatar.jpg",
-          dateOfBirth: student.dateOfBirth
-            ? new Date(student.dateOfBirth).toISOString().split("T")[0]
-            : "",
-          enrollmentDate: student.enrollmentDate
-            ? new Date(student.enrollmentDate).toISOString().split("T")[0]
-            : "",
-          inactiveDate: student.inactiveDate
-            ? new Date(student.inactiveDate).toISOString().split("T")[0]
-            : "",
+          dateOfBirth: student.dateOfBirth ? toYMD(student.dateOfBirth) : "",
+          enrollmentDate: student.enrollmentDate ? toYMD(student.enrollmentDate) : "",
+          inactiveDate: student.inactiveDate ? toYMD(student.inactiveDate) : "",
           inactiveReason: student.inactiveReason || "",
           motherName: student.motherName || "",
           motherProfession: student.motherProfession || "",
@@ -127,7 +127,7 @@ export default function StudentFormModal({
           status: "active",
           classId: "",
           section: "",
-          enrollmentDate: new Date().toISOString().split("T")[0],
+          enrollmentDate: toYMD(),
           parentData: {
             fullName: "",
             cnic: "",

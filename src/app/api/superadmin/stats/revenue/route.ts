@@ -1,16 +1,28 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import { SchoolInvoiceModel } from "@/models/SchoolInvoice";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { pkToday, PK_TZ } from "@/lib/pkTime";
 
 export async function GET() {
   try {
+    // Super Admin only
+    const session = await getServerSession(authOptions);
+    if ((session?.user as any)?.role !== "super_admin") {
+      return NextResponse.json({ error: "Only Super Admin" }, { status: 403 });
+    }
     await connectDB();
-    const currentYear = new Date().getFullYear();
+
+    // This year in Pakistan
+    const currentYear = pkToday().y;
+    const yearStart = new Date(`${currentYear}-01-01T00:00:00+05:00`);
+    const nextYearStart = new Date(`${currentYear + 1}-01-01T00:00:00+05:00`);
 
     const stats = await SchoolInvoiceModel.aggregate([
       {
         $facet: {
-          // 1. BILLING DATA: Billing Month ke text se mahina nikalna (Expected)
+                    // 1. BILLING DATA: this year's bills only (Expected)
           billingData: [
             {
               $match: {
@@ -20,89 +32,49 @@ export async function GET() {
             {
               $project: {
                 finalAmount: 1,
-                bMonth: { $toLower: "$billingMonth" }, // "january 2026"
+                createdAt: 1,
+                bMonth: { $toLower: { $ifNull: ["$billingMonth", ""] } }, // "january 2026"
               },
             },
+            // Year from the text ("january 2026" → 2026); no year in the text → createdAt year (Pakistan)
+            {
+              $addFields: {
+                yearFound: { $regexFind: { input: "$bMonth", regex: /(\d{4})/ } },
+              },
+            },
+            {
+              $addFields: {
+                bYear: {
+                  $cond: [
+                    { $ne: ["$yearFound", null] },
+                    { $toInt: { $arrayElemAt: ["$yearFound.captures", 0] } },
+                    { $year: { date: "$createdAt", timezone: PK_TZ } },
+                  ],
+                },
+              },
+            },
+            { $match: { bYear: currentYear } },
             {
               $project: {
                 finalAmount: 1,
                 monthIndex: {
                   $switch: {
                     branches: [
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /jan/ },
-                        },
-                        then: 1,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /feb/ },
-                        },
-                        then: 2,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /mar/ },
-                        },
-                        then: 3,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /apr/ },
-                        },
-                        then: 4,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /may/ },
-                        },
-                        then: 5,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /jun/ },
-                        },
-                        then: 6,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /jul/ },
-                        },
-                        then: 7,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /aug/ },
-                        },
-                        then: 8,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /sep/ },
-                        },
-                        then: 9,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /oct/ },
-                        },
-                        then: 10,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /nov/ },
-                        },
-                        then: 11,
-                      },
-                      {
-                        case: {
-                          $regexMatch: { input: "$bMonth", regex: /dec/ },
-                        },
-                        then: 12,
-                      },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /jan/ } }, then: 1 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /feb/ } }, then: 2 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /mar/ } }, then: 3 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /apr/ } }, then: 4 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /may/ } }, then: 5 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /jun/ } }, then: 6 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /jul/ } }, then: 7 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /aug/ } }, then: 8 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /sep/ } }, then: 9 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /oct/ } }, then: 10 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /nov/ } }, then: 11 },
+                      { case: { $regexMatch: { input: "$bMonth", regex: /dec/ } }, then: 12 },
                     ],
-                    default: { $month: "$createdAt" },
+                    // No month in the text → month of createdAt (Pakistan time)
+                    default: { $month: { date: "$createdAt", timezone: PK_TZ } },
                   },
                 },
               },
@@ -119,15 +91,13 @@ export async function GET() {
             { $unwind: "$paymentHistory" },
             {
               $match: {
-                "paymentHistory.date": {
-                  $gte: new Date(`${currentYear}-01-01`),
-                  $lte: new Date(`${currentYear}-12-31`),
-                },
+                // Whole year in Pakistan time (1 Jan 12:00 AM → 31 Dec 11:59 PM)
+                "paymentHistory.date": { $gte: yearStart, $lt: nextYearStart },
               },
             },
             {
               $group: {
-                _id: { $month: "$paymentHistory.date" },
+                _id: { $month: { date: "$paymentHistory.date", timezone: PK_TZ } },
                 totalCollected: { $sum: "$paymentHistory.amount" },
               },
             },
@@ -167,7 +137,6 @@ export async function GET() {
     monthlyData.forEach((month) => {
       totalBilledSoFar += month.expected;
       totalCollectedSoFar += month.income;
-      // Balance calculate karein ke ab tak kitna pending hai
       month.pending = Math.max(0, totalBilledSoFar - totalCollectedSoFar);
     });
 

@@ -2,13 +2,17 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useMemo } from "react";
-import { Box, Chip } from "@mui/material";
+import { Chip } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
 import ParentFormModal from "@/components/ParentFormModal";
-import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
+import { type ExportHeader } from "@/lib/exportUtils";
+import PageGuard from "@/components/PageGuard";
+import ExportButtons from "@/components/ExportButtons";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { showAccessDenied } from "@/lib/accessDenied";
 import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
@@ -19,21 +23,22 @@ import {
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
-import {
-  Pencil,
-  Trash2,
-  FileSpreadsheet,
-  FileText,
-  Printer,
-  X,
-} from "lucide-react";
+import { Pencil, Trash2, X } from "lucide-react";
 
-export default function StudentsPage() {
+
+function StudentsPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
+  // Permissions ("Add Student (Students)" row; parent edit → Parents row)
+  const { can } = usePermissions();
+  const canCreateStudent = can("students", "create");
+  const canEditStudent = can("students", "edit");
+  const canDeleteStudent = can("students", "delete");
+  const canEditParent = can("parents", "edit");
 
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -72,14 +77,14 @@ export default function StudentsPage() {
       .catch(() => {});
   }, [effectiveSchoolId, fetchLoading, schoolInfo]);
 
-// Export header: school only
-const exportHeader: ExportHeader = {
-  school: {
-    name: schoolInfo?.name,
-    address: schoolInfo?.address,
-    logo: schoolInfo?.logo,
-  },
-};
+  // Export header: school only
+  const exportHeader: ExportHeader = {
+    school: {
+      name: schoolInfo?.name,
+      address: schoolInfo?.address,
+      logo: schoolInfo?.logo,
+    },
+  };
 
   const fetchData = async () => {
     if (!effectiveSchoolId) return;
@@ -89,9 +94,9 @@ const exportHeader: ExportHeader = {
         fetch(`/api/students?schoolId=${effectiveSchoolId}`),
         fetch(`/api/classes?schoolId=${effectiveSchoolId}`),
       ]);
-      const stdData = await stdRes.json();
-      setStudents(stdData);
-      const clsData = await clsRes.json();
+      const stdData = await stdRes.json().catch(() => null);
+      setStudents(Array.isArray(stdData) ? stdData : []);
+      const clsData = await clsRes.json().catch(() => null);
       setClasses(Array.isArray(clsData) ? clsData : []);
     } catch (error) {
       notify.error("Failed to fetch students data. Please try again.");
@@ -118,6 +123,24 @@ const exportHeader: ExportHeader = {
     openStudentProfile(studentData);
   };
 
+  // Edit from the profile popups — blocked without permission
+  const editStudentFromProfile = () => {
+    if (!canEditStudent) {
+      showAccessDenied("You don't have permission to edit students.");
+      return;
+    }
+    handleEditFromProfile();
+  };
+
+  const editParentFromProfile = (parent: any) => {
+    if (!canEditParent) {
+      showAccessDenied("You don't have permission to edit parents.");
+      return;
+    }
+    setViewingParent(parent);
+    setIsParentFormOpen(true);
+  };
+
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     id: string | null;
@@ -125,6 +148,35 @@ const exportHeader: ExportHeader = {
     open: false,
     id: null,
   });
+
+  const [deleteDetails, setDeleteDetails] = useState("");
+  const [checkingDelete, setCheckingDelete] = useState(false);
+
+  // Trash icon → first ask the API: can this student be deleted, and what goes with it?
+  const askDelete = async (student: any) => {
+    if (checkingDelete || !effectiveSchoolId) return;
+    setCheckingDelete(true);
+    try {
+      const res = await fetch(`/api/students`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: student._id, schoolId: effectiveSchoolId, preview: true }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        // e.g. "This student has fee payments ... Mark the student as Inactive instead."
+        notify.error(data?.message || "This student cannot be deleted");
+        return;
+      }
+      const parts = (data?.willDelete || []).map((w: any) => `${w.count} ${w.label}`);
+      setDeleteDetails(parts.length ? `This will also delete: ${parts.join(", ")}.` : "");
+      setDeleteDialog({ open: true, id: student._id });
+    } catch {
+      notify.error("Something went wrong");
+    } finally {
+      setCheckingDelete(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteDialog.id || !effectiveSchoolId) return;
@@ -137,17 +189,18 @@ const exportHeader: ExportHeader = {
         }),
         headers: { "Content-Type": "application/json" },
       });
+      const data = await res.json().catch(() => null);
 
       if (res.ok) {
         notify.success("Student deleted successfully");
         fetchData();
       } else {
-        notify.error("Failed to delete student");
+        notify.error(data?.message || "Failed to delete student");
       }
-      setDeleteDialog({ open: false, id: null });
     } catch (error) {
       notify.error("Something went wrong during deletion");
-      console.error("Delete failed");
+    } finally {
+      setDeleteDialog({ open: false, id: null });
     }
   };
 
@@ -472,7 +525,7 @@ const exportHeader: ExportHeader = {
   const table = useMaterialReactTable({
     columns,
     data: students,
-    state: { showProgressBars: fetchLoading},
+    state: { showProgressBars: fetchLoading },
     enableColumnOrdering: true,
     enableGlobalFilter: true,
     enablePagination: true,
@@ -483,7 +536,6 @@ const exportHeader: ExportHeader = {
       density: "compact",
       columnVisibility: {
         "parentId.address": false,
-        reason: false,
         inactiveReason: false,
         dateOfBirth: true,
         bFormNumber: false,
@@ -493,67 +545,48 @@ const exportHeader: ExportHeader = {
         tenure: false,
       },
     },
-    enableRowActions: true,
+    // Actions column only when the user can edit or delete students
+    enableRowActions: canEditStudent || canDeleteStudent,
     positionActionsColumn: "last",
     displayColumnDefOptions: {
       "mrt-row-actions": { size: 50, header: "Actions" },
     },
     renderRowActions: ({ row }) => (
       <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-          onClick={() => {
-            setSelectedStudent(row.original);
-            setIsModalOpen(true);
-          }}
-        >
-          <Pencil className="w-4 h-4 text-sky-500" />
-        </Button>
+        {canEditStudent && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => {
+              setSelectedStudent(row.original);
+              setIsModalOpen(true);
+            }}
+          >
+            <Pencil className="w-4 h-4 text-sky-500" />
+          </Button>
+        )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-          onClick={() => setDeleteDialog({ open: true, id: row.original._id })}
-        >
-          <Trash2 className="h-4 w-4 text-red-500" />
-        </Button>
+        {canDeleteStudent && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+            onClick={() => askDelete(row.original)}
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
+        )}
       </div>
     ),
+    // Export buttons (only with "Add Student (Students) → Export / Print")
     renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex items-center gap-2 ">
-        {/* Excel Button */}
-        <Button
-          onClick={() => handleExportRows(table, "excel", "Students Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 h-8 cursor-pointer"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-
-        {/* PDF Button */}
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Students Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 h-8 cursor-pointer"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-
-        {/* Print Button */}
-        <Button
-          onClick={() => handlePrintTable(table, "Students Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
-      </div>
+      <ExportButtons
+        table={table}
+        module="students"
+        title="Students Report"
+        header={exportHeader}
+      />
     ),
     muiTablePaperProps: {
       elevation: 0,
@@ -580,11 +613,15 @@ const exportHeader: ExportHeader = {
     <div className="space-y-2">
       <PageHeader
         title="Students Management"
-        buttonLabel="Add Student"
-        onButtonClick={() => {
-          setSelectedStudent(null);
-          setIsModalOpen(true);
-        }}
+        buttonLabel={canCreateStudent ? "Add Student" : undefined}
+        onButtonClick={
+          canCreateStudent
+            ? () => {
+                setSelectedStudent(null);
+                setIsModalOpen(true);
+              }
+            : undefined
+        }
       />
       <div className="border border-border rounded-xl shadow-sm bg-background overflow-hidden">
         <MaterialReactTable table={table} />
@@ -602,17 +639,14 @@ const exportHeader: ExportHeader = {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
-        onEdit={handleEditFromProfile}
+        onEdit={editStudentFromProfile}
       />
       <ParentProfileModal
         isOpen={isParentModalOpen}
         onClose={() => setIsParentModalOpen(false)}
         parent={viewingParent}
         onStudentClick={handleOpenStudentFromParent}
-        onEdit={(parent) => {
-          setViewingParent(parent);
-          setIsParentFormOpen(true);
-        }}
+        onEdit={editParentFromProfile}
         schoolId={effectiveSchoolId}
       />
       <ParentFormModal
@@ -639,8 +673,8 @@ const exportHeader: ExportHeader = {
               await fetchData();
               setIsParentFormOpen(false);
             } else {
-              const err = await res.json();
-              notify.error(err.message || "Failed to update parent details");
+              const err = await res.json().catch(() => null);
+              notify.error(err?.message || "Failed to update parent details");
             }
           } catch (error) {
             notify.error("Network error. Please try again.");
@@ -655,9 +689,10 @@ const exportHeader: ExportHeader = {
         onConfirm={handleDelete}
         itemName={
           deleteDialog.id
-            ? students.find((s) => s._id === deleteDialog.id)?.fullName
+            ? (students as any[]).find((s) => s._id === deleteDialog.id)?.fullName
             : ""
         }
+        details={deleteDetails}
       />
       {/* Picture Pop-up */}
       {openPhotoId &&
@@ -708,5 +743,14 @@ const exportHeader: ExportHeader = {
           );
         })()}
     </div>
+  );
+}
+
+// Guard: page opens only with "Add Student (Students) → View"
+export default function Page() {
+  return (
+    <PageGuard module="students">
+      <StudentsPage />
+    </PageGuard>
   );
 }

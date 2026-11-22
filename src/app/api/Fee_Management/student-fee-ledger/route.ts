@@ -1,89 +1,71 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
+import { getAccess, schoolIdFor } from "@/lib/access";
 import { StudentFeeInvoice } from "@/models/StudentFeeInvoice";
 import Student from "@/models/Student";
 import { ClassModel } from "@/models/Class";
 import Parent from "@/models/Parent";
 import { FeeDiscount } from "@/models/FeeDiscount";
 import "@/models/FeeCategory";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import mongoose from "mongoose";
+
+const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
+
+// Search text is used as plain text, not as a regex pattern
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Never send passwords to the ledger
+const HIDE = "-password -plainPassword";
 
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    const access = await getAccess();
+    if (!access) return bad("Unauthorized", 401);
+    if (!access.can("fees", "view")) {
+      return bad("You don't have permission to view the fee ledger", 403);
     }
 
+    await connectDB();
     const { searchParams } = new URL(req.url);
     const searchInput = searchParams.get("studentId")?.trim();
-    const urlSchoolId = searchParams.get("schoolId");
-    const isSuperAdmin = session?.user?.role === "super_admin";
-    const schoolId = isSuperAdmin ? urlSchoolId : session?.user?.schoolId;
+    const schoolId = schoolIdFor(access, searchParams.get("schoolId"));
 
-    if (!schoolId) {
-      return NextResponse.json(
-        { message: "Unauthorized - School ID missing" },
-        { status: 401 },
-      );
-    }
+    if (!schoolId) return bad("School not found");
+    if (!searchInput) return bad("Search input required");
 
-    if (!searchInput) {
-      return NextResponse.json(
-        { message: "Search input required" },
-        { status: 400 },
-      );
-    }
-    let studentSearchConditions: any = { schoolId };
+    // Name, GR number or student ID
     const orConditions: any[] = [
-      { fullName: { $regex: searchInput, $options: "i" } },
+      { fullName: { $regex: escapeRegex(searchInput), $options: "i" } },
     ];
+    if (!isNaN(Number(searchInput))) orConditions.push({ grNumber: Number(searchInput) });
+    if (mongoose.isValidObjectId(searchInput)) orConditions.push({ _id: searchInput });
 
-    if (!isNaN(Number(searchInput)) && searchInput !== "") {
-      orConditions.push({ grNumber: Number(searchInput) });
-    }
-    if (mongoose.isValidObjectId(searchInput)) {
-      orConditions.push({ _id: searchInput });
-    }
-
-    studentSearchConditions.$or = orConditions;
-
-    const matchedStudent = await Student.findOne(studentSearchConditions)
+    const matchedStudent: any = await (Student as any)
+      .findOne({ schoolId, $or: orConditions })
+      .select(HIDE)
       .populate("classId", "name classFee")
       .populate("parentId", "fullName phone address");
 
-    if (!matchedStudent) {
-      return NextResponse.json(
-        { message: "Student not found in this school" },
-        { status: 404 },
-      );
-    }
+    if (!matchedStudent) return bad("Student not found in this school", 404);
 
-    const studentDiscounts = await FeeDiscount.find({
-      studentId: matchedStudent._id,
-      schoolId: schoolId,
-    } as any).populate("feeCategoryId", "name feeSource");
+    const studentDiscounts = await (FeeDiscount as any)
+      .find({ studentId: matchedStudent._id, schoolId })
+      .populate("feeCategoryId", "name feeSource");
 
-    // Tuition (Class Fee) ka locked record — student ki fee isi se
-    const classFee = (matchedStudent.classId as any)?.classFee || 0;
+    // Tuition (Class Fee) locked record — the student's fee comes from it
+    const classFee = matchedStudent.classId?.classFee || 0;
     const tuitionRecord: any = studentDiscounts.find(
       (d: any) => d.feeCategoryId?.feeSource === "class_fee",
     );
     const baseFee = tuitionRecord?.baseFee ?? classFee;
     const netPayable = tuitionRecord ? tuitionRecord.customNetFee : classFee;
 
-    // Fetch Data
-    const invoices = await StudentFeeInvoice.find({
-      studentId: matchedStudent._id,
-      schoolId: schoolId,
-    } as any)
+    const invoices: any[] = await (StudentFeeInvoice as any)
+      .find({ studentId: matchedStudent._id, schoolId })
       .populate({
         path: "studentId",
         model: Student,
+        select: HIDE,
         populate: [
           { path: "classId", model: ClassModel, select: "name classFee" },
           { path: "parentId", model: Parent, select: "fullName phone address" },
@@ -91,30 +73,32 @@ export async function GET(req: Request) {
       })
       .exec();
 
-    // Fallback: Agar koi invoice nahi to profile return kare
+    // No invoices yet → return the profile only
     if (!invoices || invoices.length === 0) {
       return NextResponse.json([
         {
           _id: "dummy_record",
           studentId: matchedStudent.toObject(),
           discounts: studentDiscounts,
-          baseFee: baseFee,
-          netPayable: netPayable,
+          baseFee,
+          netPayable,
           isDummy: true,
         },
       ]);
     }
+
     const responseData = invoices.map((inv) => ({
       ...inv.toObject(),
       studentId: {
-        ...(inv.studentId as any).toObject(),
+        ...(inv.studentId?.toObject?.() || matchedStudent.toObject()),
         discounts: studentDiscounts,
-        netPayable: netPayable,
+        netPayable,
       },
     }));
 
     return NextResponse.json(responseData);
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Fee ledger error:", error?.message);
+    return bad("Failed to load the fee ledger", 500);
   }
 }

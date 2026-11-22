@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
   Zoom,
 } from "@mui/material";
 import { Close as CloseIcon } from "@mui/icons-material";
+import { notify } from "@/lib/notify";
 
 interface Props {
   isOpen: boolean;
@@ -40,12 +41,16 @@ export default function ClassFormModal({
     },
   });
 
+  // Own saving state → button disabled while saving (no double class)
+  const [saving, setSaving] = useState(false);
+  const busy = saving || !!isLoading;
+
   useEffect(() => {
     if (!isOpen) return;
     if (editClass) {
       reset({
         name: editClass.name,
-        sections: editClass.sections.join(", "),
+        sections: (editClass.sections || []).join(", "),
         order: editClass.order || 0,
         classFee: editClass.classFee || 0,
       });
@@ -55,6 +60,8 @@ export default function ClassFormModal({
   }, [editClass, isOpen, reset]);
 
   const onFormSubmit = async (data: any) => {
+    if (saving) return;
+
     const sectionsArray = data.sections
       ? data.sections
           .split(",")
@@ -71,18 +78,27 @@ export default function ClassFormModal({
       schoolId: schoolId,
     };
 
+    setSaving(true);
     try {
       const res = await fetch("/api/classes", {
         method: editClass ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      const result = await res.json().catch(() => null);
+
       if (res.ok) {
+        notify.success(editClass ? "Class updated" : "Class saved");
         onSuccess();
         onClose();
+      } else {
+        // API's own message (e.g. duplicate name, no permission)
+        notify.error(result?.message || "Failed to save class");
       }
-    } catch (error) {
-      console.error("Failed to save class:", error);
+    } catch {
+      notify.error("Something went wrong");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -194,7 +210,7 @@ export default function ClassFormModal({
         >
           <Button
             onClick={onClose}
-            disabled={isLoading}
+            disabled={busy}
             size="small"
             sx={{
               textTransform: "none",
@@ -207,7 +223,7 @@ export default function ClassFormModal({
           <Button
             type="submit"
             variant="contained"
-            disabled={isLoading}
+            disabled={busy}
             size="small"
             sx={{
               backgroundColor: "#1e293b",
@@ -217,7 +233,7 @@ export default function ClassFormModal({
               py: 0.5,
             }}
           >
-            {isLoading
+            {busy
               ? "Processing..."
               : editClass
                 ? "Update Class"

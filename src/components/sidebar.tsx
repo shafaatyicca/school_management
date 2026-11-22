@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Menu, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "next-auth/react";
 import { getSidebarMenu } from "@/components/menuConfig";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 const HOVER =
   "hover:bg-gradient-to-r hover:from-sky-500/60 hover:to-transparent hover:text-white";
@@ -32,8 +33,9 @@ export default function Sidebar() {
   const sidebarWidth = isFullyExpanded ? "lg:w-[220px]" : "lg:w-[70px]";
 
   // Menu comes from components/menuConfig.ts (shared with the global search)
-  const menu = getSidebarMenu(isSuperAdmin);
-
+    const { can } = usePermissions();
+  const isAdmin = isSuperAdmin || session?.user?.role === "school_admin";
+  const menu = getSidebarMenu(isSuperAdmin, isAdmin, can);
   return (
     <>
       {/* 1. Mobile Trigger */}

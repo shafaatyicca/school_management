@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Chip, TextField } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
@@ -8,12 +9,11 @@ import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileModal from "@/components/StudentProfileModal";
 import ParentProfileModal from "@/components/ParentProfileModal";
 import ParentFormModal from "@/components/ParentFormModal";
-import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
-import {
-  handleExportRows,
-  handlePrintTable,
-  type ExportHeader,
-} from "@/lib/exportUtils";
+import { type ExportHeader } from "@/lib/exportUtils";
+import PageGuard from "@/components/PageGuard";
+import ExportButtons from "@/components/ExportButtons";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { showAccessDenied } from "@/lib/accessDenied";
 import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
@@ -23,30 +23,31 @@ import {
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
-import {
-  Contact,
-  Pencil,
-  Trash2,
-  FileSpreadsheet,
-  FileText,
-  Printer,
-  X,
-  Filter,
-} from "lucide-react";
+import { Contact, Pencil, Wallet, X, Filter } from "lucide-react";
 
 const ALL = "all";
 type StatusFilter = "active" | "inactive" | "all";
 
-export default function StudentInformationPage() {
+// Student Fee Ledger page (opens a student with ?student=<id>)
+const LEDGER_PATH = "/student-fee-ledger";
+
+function StudentInformationPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
 
+  // Permissions (Edit belongs to the Students row, parent edit to Parents, ledger to Fees)
+  const { can } = usePermissions();
+  const canEditStudent = can("students", "edit");
+  const canEditParent = can("parents", "edit");
+  const canViewLedger = can("fees", "view");
+
   // Filters
   const [classes, setClasses] = useState<any[]>([]);
-    const [classesLoading, setClassesLoading] = useState(true);
+  const [classesLoading, setClassesLoading] = useState(true);
   const [classId, setClassId] = useState("");
   const [section, setSection] = useState(ALL);
   const [status, setStatus] = useState<StatusFilter>("active");
@@ -62,17 +63,13 @@ export default function StudentInformationPage() {
   const [isParentFormOpen, setIsParentFormOpen] = useState(false);
   const [isParentLoading, setIsParentLoading] = useState(false);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string | null }>({
-    open: false,
-    id: null,
-  });
 
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
     const hostname = window.location.hostname;
     if (hostname.includes(".lvh.me") || hostname.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${hostname.split(".")[0]}`)
+      fetch(`/api/superadmin/schools?slug=${hostname.split(".")[0]}&fields=basic`)
         .then((r) => r.json())
         .then((data) => data?._id && setViewSchoolId(data._id));
     }
@@ -104,7 +101,8 @@ export default function StudentInformationPage() {
         if (section !== ALL) params.set("section", section);
       }
       const res = await fetch(`/api/students?${params.toString()}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) notify.error(data?.message || "Failed to load students");
       setStudents(Array.isArray(data) ? data : []);
     } catch {
       notify.error("Failed to load students");
@@ -131,6 +129,24 @@ export default function StudentInformationPage() {
     isLoading,
     handleFormSubmit,
   } = useStudentModal(students, setStudents, effectiveSchoolId);
+
+  // Edit from the profile popups — blocked without permission
+  const editStudentFromProfile = () => {
+    if (!canEditStudent) {
+      showAccessDenied("You don't have permission to edit students.");
+      return;
+    }
+    handleEditFromProfile();
+  };
+
+  const editParentFromProfile = (parent: any) => {
+    if (!canEditParent) {
+      showAccessDenied("You don't have permission to edit parents.");
+      return;
+    }
+    setViewingParent(parent);
+    setIsParentFormOpen(true);
+  };
 
   // ── Derived ──
   const selectedClass = classes.find((c) => String(c._id) === classId);
@@ -173,27 +189,6 @@ export default function StudentInformationPage() {
   };
 
   // ── Actions ──
-  const handleDelete = async () => {
-    if (!deleteDialog.id || !effectiveSchoolId) return;
-    try {
-      const res = await fetch(`/api/students`, {
-        method: "DELETE",
-        body: JSON.stringify({ id: deleteDialog.id, schoolId: effectiveSchoolId }),
-        headers: { "Content-Type": "application/json" },
-      });
-      if (res.ok) {
-        notify.success("Student deleted successfully");
-        loadStudents();
-      } else {
-        notify.error("Failed to delete student");
-      }
-    } catch {
-      notify.error("Something went wrong during deletion");
-    } finally {
-      setDeleteDialog({ open: false, id: null });
-    }
-  };
-
   // After edit: reload so status / class changes move the student correctly
   const handleSubmitAndReload = async (data: any) => {
     await handleFormSubmit(data);
@@ -444,65 +439,50 @@ export default function StudentInformationPage() {
         tenure: false,
       },
     },
-    enableRowActions: true,
+    // Actions column only when the user can edit students or open the ledger
+    enableRowActions: canEditStudent || canViewLedger,
     positionActionsColumn: "last",
     displayColumnDefOptions: {
       "mrt-row-actions": { size: 50, header: "Actions" },
     },
     renderRowActions: ({ row }) => (
       <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-          onClick={() => {
-            setSelectedStudent(row.original);
-            setIsModalOpen(true);
-          }}
-        >
-          <Pencil className="w-4 h-4 text-sky-500" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-          onClick={() => setDeleteDialog({ open: true, id: row.original._id })}
-        >
-          <Trash2 className="h-4 w-4 text-red-500" />
-        </Button>
+        {canEditStudent && (
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Edit Student"
+            className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={() => {
+              setSelectedStudent(row.original);
+              setIsModalOpen(true);
+            }}
+          >
+            <Pencil className="w-4 h-4 text-sky-500" />
+          </Button>
+        )}
+        {/* Fee Ledger → "Student Fee Ledger → View" */}
+        {canViewLedger && (
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Fee Ledger"
+            className="h-8 w-8 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+            onClick={() => router.push(`${LEDGER_PATH}?student=${row.original._id}`)}
+          >
+            <Wallet className="h-4 w-4 text-emerald-600" />
+          </Button>
+        )}
       </div>
     ),
+    // Export buttons (only with "Student Information → Export / Print")
     renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() =>
-            handleExportRows(table, "excel", "Student Information Report", exportHeader)
-          }
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 h-8 cursor-pointer"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-        <Button
-          onClick={() =>
-            handleExportRows(table, "pdf", "Student Information Report", exportHeader)
-          }
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 h-8 cursor-pointer"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-        <Button
-          onClick={() => handlePrintTable(table, "Student Information Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
-      </div>
+      <ExportButtons
+        table={table}
+        module="studentInfo"
+        title="Student Information Report"
+        header={exportHeader}
+      />
     ),
     muiTablePaperProps: {
       elevation: 0,
@@ -658,17 +638,14 @@ export default function StudentInformationPage() {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         student={viewingStudent}
-        onEdit={handleEditFromProfile}
+        onEdit={editStudentFromProfile}
       />
       <ParentProfileModal
         isOpen={isParentModalOpen}
         onClose={() => setIsParentModalOpen(false)}
         parent={viewingParent}
         onStudentClick={(s: any) => openStudentProfile(s)}
-        onEdit={(parent) => {
-          setViewingParent(parent);
-          setIsParentFormOpen(true);
-        }}
+        onEdit={editParentFromProfile}
         schoolId={effectiveSchoolId}
       />
       <ParentFormModal
@@ -691,8 +668,8 @@ export default function StudentInformationPage() {
               await loadStudents();
               setIsParentFormOpen(false);
             } else {
-              const err = await res.json();
-              notify.error(err.message || "Failed to update parent details");
+              const err = await res.json().catch(() => null);
+              notify.error(err?.message || "Failed to update parent details");
             }
           } catch {
             notify.error("Network error. Please try again.");
@@ -700,14 +677,6 @@ export default function StudentInformationPage() {
             setIsParentLoading(false);
           }
         }}
-      />
-      <DeleteConfirmDialog
-        open={deleteDialog.open}
-        onOpenChange={(open) => setDeleteDialog({ open, id: null })}
-        onConfirm={handleDelete}
-        itemName={
-          deleteDialog.id ? students.find((s) => s._id === deleteDialog.id)?.fullName : ""
-        }
       />
 
       {/* Photo popup */}
@@ -749,5 +718,14 @@ export default function StudentInformationPage() {
           );
         })()}
     </div>
+  );
+}
+
+// Guard: page opens only with "Student Information → View"
+export default function Page() {
+  return (
+    <PageGuard module="studentInfo">
+      <StudentInformationPage />
+    </PageGuard>
   );
 }

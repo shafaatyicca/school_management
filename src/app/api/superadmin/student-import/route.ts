@@ -42,8 +42,6 @@ function makeDate(y: number, m: number, d: number) {
 const monthOf = (word: string) => MONTHS[word.toLowerCase().slice(0, 3)] || 0;
 
 /**
- * Reads almost any date format:
- * 14/12/2020, 12/14/2020, 14-12-2020, 2020-12-14,
  * 14 Dec 2020, 14th Dec 2020, Dec 14 2020, December 14, 2020
  * `ambiguous` = both day and month ≤ 12 (read as day/month)
  */

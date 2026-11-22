@@ -1,9 +1,20 @@
 import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db";
 import Plan from "@/models/Plan";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
-// 1. Saare plans get karna
+// Super Admin only
+async function isSuperAdmin() {
+  const session = await getServerSession(authOptions);
+  return (session?.user as any)?.role === "super_admin";
+}
+const forbidden = () =>
+  NextResponse.json({ error: "Only Super Admin", message: "Only Super Admin" }, { status: 403 });
+
+// 1. Get all plans
 export async function GET() {
+  if (!(await isSuperAdmin())) return forbidden();
   await connectDB();
   try {
     const plans = await Plan.find().sort({ createdAt: -1 }).lean();
@@ -13,8 +24,9 @@ export async function GET() {
   }
 }
 
-// 2. Naya plan create karna
+// 2. Create a plan
 export async function POST(req: Request) {
+  if (!(await isSuperAdmin())) return forbidden();
   await connectDB();
   try {
     const body = await req.json();
@@ -25,8 +37,9 @@ export async function POST(req: Request) {
   }
 }
 
-// 3. Plan Update karna
+// 3. Update a plan
 export async function PUT(req: Request) {
+  if (!(await isSuperAdmin())) return forbidden();
   await connectDB();
   try {
     const body = await req.json();
@@ -40,8 +53,9 @@ export async function PUT(req: Request) {
   }
 }
 
-// 4. Plan delete karna
+// 4. Delete a plan
 export async function DELETE(req: Request) {
+  if (!(await isSuperAdmin())) return forbidden();
   await connectDB();
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");

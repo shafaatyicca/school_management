@@ -6,6 +6,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { Dayjs } from "dayjs";
 import { notify } from "@/lib/notify";
 import { useForm } from "react-hook-form";
+import { toYMD } from "@/lib/pkTime";
 import {
   Dialog,
   DialogTitle,
@@ -19,6 +20,7 @@ import {
   Divider,
 } from "@mui/material";
 import { Close as CloseIcon, WarningAmber } from "@mui/icons-material";
+
 
 export default function InvoiceModal({
   isOpen,
@@ -89,7 +91,7 @@ export default function InvoiceModal({
             (initialData.feedingSplit?.month2 || 0),
           splitEnabled: initialData.feedingSplit?.month2 > 0 ? "yes" : "no",
           dueDate: initialData.dueDate
-            ? new Date(initialData.dueDate).toISOString().split("T")[0]
+            ? toYMD(initialData.dueDate)
             : getTodayDate(),
         });
         if (initialData.billingMonth) {

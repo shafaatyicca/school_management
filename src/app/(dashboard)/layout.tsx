@@ -5,6 +5,8 @@ import Topbar from "@/components/topbar";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import AccessDeniedModal from "@/components/AccessDeniedModal";
+import { PermissionsProvider } from "@/components/PermissionsProvider";
 
 export default function DashboardLayout({
   children,
@@ -38,12 +40,13 @@ export default function DashboardLayout({
   if (status !== "authenticated") return null;
 
   return (
-    // h-dvh = real visible height (h-screen can be taller on mobile / zoom)
+    <PermissionsProvider>
     <div className="flex h-dvh overflow-hidden bg-muted/40">
       <Sidebar />
       {/* min-h-0 → this column never grows taller than the screen */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0 h-full">
         <Topbar />
+        <AccessDeniedModal />
         {/* Only this area scrolls; the Topbar always stays on top */}
         <main className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 custom-scrollbar">
           <div className="max-w-[1600px] mx-auto w-full pt-3">{children}</div>
@@ -63,5 +66,6 @@ export default function DashboardLayout({
         }
       `}</style>
     </div>
+    </PermissionsProvider>
   );
 }

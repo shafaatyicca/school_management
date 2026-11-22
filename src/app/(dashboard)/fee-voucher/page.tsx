@@ -21,6 +21,8 @@ import {
 import { TextField } from "@mui/material";
 import dayjs from "dayjs";
 import PageHeader from "@/components/PageHeader";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { Button } from "@/components/ui/button";
 import StudentSearchBox, { StudentOption } from "@/components/StudentSearchBox";
 import { notify } from "@/lib/notify";
@@ -211,12 +213,15 @@ function IssueDateTile({
 // Page
 // ─────────────────────────────────────────────────────────────
 
-export default function FeeVoucherPage() {
+function FeeVoucherPage() {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
   const isDark = useIsDark();
+  const { can } = usePermissions();
+  const canPrint = can("vouchers", "export");
+  const canOpenSettings = can("settings", "view");
 
   const [issueDate, setIssueDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [settings, setSettings] = useState<any>(null);
@@ -369,7 +374,7 @@ export default function FeeVoucherPage() {
           studentIds: targetStudents.map((s) => s._id),
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok)
         throw new Error(data.message || "Failed to generate vouchers");
       setResult(data);
@@ -400,13 +405,15 @@ export default function FeeVoucherPage() {
         title="Voucher Details"
         subtitle="Due date, validity and late fee are managed in School Settings."
         right={
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <Settings2 className="w-3.5 h-3.5" /> Open Settings
-          </Link>
+          canOpenSettings ? (
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <Settings2 className="w-3.5 h-3.5" /> Open Settings
+            </Link>
+          ) : undefined
         }
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -706,16 +713,21 @@ export default function FeeVoucherPage() {
             Only pending and partially paid invoices are included ·{" "}
             {perPageText}
           </span>
-          <Button
-            onClick={handleGenerate}
-            disabled={generating || targetStudents.length === 0}
-            className="h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
-          >
-            <Zap className="w-3.5 h-3.5 mr-1" />
-            {generating
-              ? "Generating..."
-              : `Generate Fee Vouchers`}
-          </Button>
+          {canPrint ? (
+            <Button
+              onClick={handleGenerate}
+              disabled={generating || targetStudents.length === 0}
+              className="h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
+            >
+              <Zap className="w-3.5 h-3.5 mr-1" />
+              {generating ? "Generating..." : "Generate Fee Vouchers"}
+            </Button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              <CircleAlert className="w-3.5 h-3.5" />
+              You don&apos;t have permission to print vouchers
+            </span>
+          )}
         </div>
       </Card>
 
@@ -844,5 +856,12 @@ export default function FeeVoucherPage() {
         </Card>
       )}
     </div>
+  );
+}
+export default function Page() {
+  return (
+    <PageGuard module="vouchers">
+      <FeeVoucherPage />
+    </PageGuard>
   );
 }

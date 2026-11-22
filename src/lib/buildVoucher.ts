@@ -6,6 +6,7 @@ import "@/models/Parent";
 import { applyLateFines } from "@/lib/lateFine";
 import { getSchoolSettings, MAX_VOUCHER_ITEMS } from "@/lib/schoolSettings";
 import { computeVoucherDates, lateFeeAmount } from "@/lib/voucherDates";
+import { pkParts } from "@/lib/pkTime";
 
 // Sort by GR number (numeric when possible)
 const byGr = (a: any, b: any) => {
@@ -18,7 +19,7 @@ const byGr = (a: any, b: any) => {
 
 /**
  * Builds voucher data for one or many students.
- * Only students with pending / partial invoices get a voucher.
+ * Only studets with pending / partial invoices get a voucher.
  * Used by both the ledger "Print Voucher" button and the bulk Fee Voucher page.
  */
 export async function buildVouchers(
@@ -52,7 +53,8 @@ export async function buildVouchers(
     settings.voucher.dueDay,
     settings.voucher.validityDays,
   );
-  const mm = String(dueDate.getMonth() + 1).padStart(2, "0");
+  const due = pkParts(dueDate); // due month / year in Pakistan time
+  const mm = String(due.m).padStart(2, "0");
   const prefix = settings.voucher.prefix || "V";
   const maxItems = Math.min(
     MAX_VOUCHER_ITEMS,
@@ -126,7 +128,7 @@ export async function buildVouchers(
         parentName: s.parentId?.fullName || "",
         familyId: s.parentId?.p_id ?? "",
       },
-      voucherId: `${prefix}-${s.grNumber}-${mm}${dueDate.getFullYear()}`,
+      voucherId: `${prefix}-${s.grNumber}-${mm}${due.y}`,
       issueDate,
       dueDate,
       validTill,

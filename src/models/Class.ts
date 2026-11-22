@@ -8,6 +8,7 @@ export interface IClass {
   classFee: number;
 }
 
+
 const classSchema = new Schema<IClass>(
   {
     name: {

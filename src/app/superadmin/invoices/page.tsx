@@ -3,10 +3,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import PaymentModal from "@/components/superadmin/PaymentModal";
 import InvoiceModal from "@/components/superadmin/InvoiceModal";
 import { Select, MenuItem, FormControl, OutlinedInput } from "@mui/material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import { notify } from "@/lib/notify";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import SchoolInvoicePreviewModal from "@/components/superadmin/SchoolInvoicePreviewModal";
@@ -16,12 +13,15 @@ import {
   Trash2,
   CreditCard,
   Edit3,
-  X,
   Search,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
   Eye,
+  Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   Table,
@@ -35,8 +35,60 @@ import {
   IconButton,
   Chip,
   Box,
-  TablePagination,
 } from "@mui/material";
+
+type SortKey =
+  | "invoiceNumber"
+  | "school"
+  | "billingMonth"
+  | "planAmount"
+  | "feeding"
+  | "finalAmount"
+  | "discount"
+  | "amountPaid"
+  | "remaining"
+  | "status";
+type SortState = { key: SortKey; dir: "asc" | "desc" } | null;
+
+// Value used for sorting each column
+const feedingOf = (inv: any) =>
+  inv.feedingSplit?.month1 || inv.totalFeedingAmount || 0;
+const remainingOf = (inv: any) =>
+  inv.remainingAmount ?? inv.finalAmount - (inv.amountPaid || 0);
+const monthValue = (s: any) => {
+  const t = Date.parse(`1 ${String(s || "")}`);
+  return isNaN(t) ? null : t;
+};
+const NUMERIC: Partial<Record<SortKey, (inv: any) => number>> = {
+  planAmount: (i) => Number(i.planAmount || 0),
+  feeding: (i) => Number(feedingOf(i)),
+  finalAmount: (i) => Number(i.finalAmount || 0),
+  discount: (i) => Number(i.discount || 0),
+  amountPaid: (i) => Number(i.amountPaid || 0),
+  remaining: (i) => Number(remainingOf(i) || 0),
+};
+const compareBy = (key: SortKey, a: any, b: any) => {
+  const num = NUMERIC[key];
+  if (num) return num(a) - num(b);
+  if (key === "billingMonth") {
+    const x = monthValue(a.billingMonth);
+    const y = monthValue(b.billingMonth);
+    if (x !== null && y !== null) return x - y;
+  }
+  const text = (i: any) =>
+    key === "school" ? i.schoolId?.name : key === "status" ? i.status : i[key];
+  return String(text(a) || "").localeCompare(String(text(b) || ""), "en", {
+    numeric: true,
+    sensitivity: "base",
+  });
+};
+
+// Status chip colours
+const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }> = {
+  paid: { bg: "#ecfdf5", color: "#047857", border: "#d1fae5" },
+  partially_paid: { bg: "#eff6ff", color: "#1d4ed8", border: "#dbeafe" },
+  pending: { bg: "#fffbeb", color: "#b45309", border: "#fef3c7" },
+};
 
 export default function AllInvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -45,8 +97,9 @@ export default function AllInvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState<number | "all">(10);
+  const [rowsPerPage, setRowsPerPage] = useState<number | "all">(25);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [sort, setSort] = useState<SortState>(null);
 
   // Modals States
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -80,8 +133,18 @@ export default function AllInvoicesPage() {
     fetchInvoices();
   }, []);
 
+  // Click: asc → desc → original order
+  const toggleSort = (key: SortKey) => {
+    setSort((s) => {
+      if (!s || s.key !== key) return { key, dir: "asc" };
+      if (s.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+    setPage(0);
+  };
+
   const filtered = useMemo(() => {
-    return invoices.filter((inv) => {
+    const list = invoices.filter((inv) => {
       const name = inv.schoolId?.name || "";
       const invNum = inv.invoiceNumber || "";
       const billingMonth = inv.billingMonth || "";
@@ -92,7 +155,10 @@ export default function AllInvoicesPage() {
       const matchStatus = statusFilter === "all" || inv.status === statusFilter;
       return matchSearch && matchStatus;
     });
-  }, [invoices, searchTerm, statusFilter]);
+    if (!sort) return list;
+    const sign = sort.dir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => sign * compareBy(sort.key, a, b));
+  }, [invoices, searchTerm, statusFilter, sort]);
 
   const paginatedData = useMemo(() => {
     if (rowsPerPage === "all") return filtered;
@@ -119,7 +185,7 @@ export default function AllInvoicesPage() {
     );
   }, [paginatedData]);
 
-  // --- ACTIONS (LOGIC UNCHANGED) ---
+  // --- ACTIONS ---
   const handleInvoiceEditSubmit = async (formData: any) => {
     if (!selectedInvoice) return;
     setIsProcessing(true);
@@ -143,7 +209,7 @@ export default function AllInvoicesPage() {
           "Invoice has been updated successfully",
         );
       } else {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         notify.error("Update Failed!", err.error || "Could not update invoice");
       }
     } catch (error) {
@@ -170,7 +236,7 @@ export default function AllInvoicesPage() {
           dueDate: bulkData.dueDate,
         }),
       });
-      const result = await res.json();
+      const result = await res.json().catch(() => ({}));
       if (res.ok) {
         fetchInvoices();
         setIsBulkModalOpen(false);
@@ -181,8 +247,10 @@ export default function AllInvoicesPage() {
           notify.success("Invoices Generated!", result.message);
         }
       } else {
-        notify.error("Failed!", "Could not generate invoices");
+        notify.error("Failed!", result.error || "Could not generate invoices");
       }
+    } catch (error) {
+      notify.error("Error!", "Something went wrong");
     } finally {
       setIsProcessing(false);
     }
@@ -200,16 +268,23 @@ export default function AllInvoicesPage() {
         `/api/superadmin/invoices?ids=${selectedInvoices.join(",")}`,
         { method: "DELETE" },
       );
+      const result = await res.json().catch(() => ({}));
       if (res.ok) {
         setSelectedInvoices([]);
         fetchInvoices();
-        notify.success(
-          "Deleted!",
-          `${selectedInvoices.length} invoices deleted successfully`,
-        );
+        if (result.skipped?.length > 0) {
+          notify.warning("Partially Deleted!", result.message);
+        } else {
+          notify.success(
+            "Deleted!",
+            `${result.deleted ?? selectedInvoices.length} invoices deleted successfully`,
+          );
+        }
       } else {
-        notify.error("Failed!", "Could not delete invoices");
+        notify.error("Failed!", result.error || "Could not delete invoices");
       }
+    } catch (error) {
+      notify.error("Error!", "Something went wrong");
     } finally {
       setIsProcessing(false);
       setIsBulkDeleteDialogOpen(false);
@@ -218,17 +293,52 @@ export default function AllInvoicesPage() {
 
   const confirmDelete = async () => {
     if (!deletingId) return;
-    const res = await fetch(`/api/superadmin/invoices?id=${deletingId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      fetchInvoices();
-      notify.success("Deleted!", `Invoice ${deletingName} has been deleted`);
-    } else {
-      notify.error("Failed!", "Could not delete invoice");
+    try {
+      const res = await fetch(`/api/superadmin/invoices?id=${deletingId}`, {
+        method: "DELETE",
+      });
+      const result = await res.json().catch(() => ({}));
+      if (res.ok) {
+        fetchInvoices();
+        notify.success("Deleted!", `Invoice ${deletingName} has been deleted`);
+      } else {
+        notify.error("Can't Delete!", result.error || "Could not delete invoice");
+      }
+    } catch (error) {
+      notify.error("Error!", "Something went wrong");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingId(null);
     }
-    setDeleteDialogOpen(false);
-    setDeletingId(null);
+  };
+
+  // Sortable header cell (arrow always visible)
+  const headCell = (
+    label: string,
+    key: SortKey,
+    align: "left" | "center" = "left",
+    color = "#64748b",
+  ) => {
+    const active = sort?.key === key;
+    const Icon = !active ? ArrowUpDown : sort!.dir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <TableCell
+        align={align}
+        sx={{ fontSize: "10px", fontWeight: "bold", color }}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className="inline-flex items-center gap-1 cursor-pointer select-none hover:opacity-80"
+        >
+          {label}
+          <Icon
+            size={11}
+            className={active ? "text-indigo-500" : "text-slate-300"}
+          />
+        </button>
+      </TableCell>
+    );
   };
 
   return (
@@ -245,14 +355,20 @@ export default function AllInvoicesPage() {
               type="text"
               placeholder="Search by School Name, Invoice Number, & Billing Months"
               className="w-full pl-8 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-md text-sm font-medium outline-none focus:border-indigo-400 focus:bg-white transition-all"
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(0);
+              }}
             />
           </div>
           <FormControl size="small" sx={{ minWidth: 100 }}>
             {" "}
             <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
               displayEmpty
               IconComponent={() => (
                 <ChevronDown
@@ -297,6 +413,9 @@ export default function AllInvoicesPage() {
               <MenuItem sx={{ fontSize: "12px" }} value="paid">
                 Paid
               </MenuItem>
+              <MenuItem sx={{ fontSize: "12px" }} value="partially_paid">
+                Partially Paid
+              </MenuItem>
               <MenuItem sx={{ fontSize: "12px" }} value="pending">
                 Pending
               </MenuItem>
@@ -322,7 +441,7 @@ export default function AllInvoicesPage() {
             onClick={() => setIsBulkModalOpen(true)}
             className="bg-slate-900 text-white px-2 py-2.5 rounded-md text-xs hover:bg-indigo-600 transition-all flex items-center gap-2 shadow-lg cursor-pointer"
           >
-            <Zap size={16} fill="white" /> Bulk Generate
+            <Zap size={16} fill="white" /> Generate Bulk Invoices
           </button>
         </div>
       </div>
@@ -359,103 +478,16 @@ export default function AllInvoicesPage() {
                   }
                 />
               </TableCell>
-              <TableCell
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                INV #
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                SCHOOL
-              </TableCell>
-              <TableCell
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                MONTH
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                PLAN FEE
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                FEEDING
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                TOTAL
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                DISCOUNT
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#10b981",
-                }}
-              >
-                PAID
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#e11d48",
-                }}
-              >
-                REMAINING
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  color: "#64748b",
-                }}
-              >
-                STATUS
-              </TableCell>
+              {headCell("INV #", "invoiceNumber")}
+              {headCell("SCHOOL", "school")}
+              {headCell("MONTH", "billingMonth")}
+              {headCell("PLAN FEE", "planAmount", "center")}
+              {headCell("FEEDING", "feeding", "center")}
+              {headCell("TOTAL", "finalAmount", "center")}
+              {headCell("DISCOUNT", "discount", "center")}
+              {headCell("PAID", "amountPaid", "center", "#10b981")}
+              {headCell("REMAINING", "remaining", "center", "#e11d48")}
+              {headCell("STATUS", "status", "center")}
               <TableCell
                 align="center"
                 sx={{
@@ -482,7 +514,10 @@ export default function AllInvoicesPage() {
                     fontWeight: "bold",
                   }}
                 >
-                  Fetching latest data...
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin text-indigo-500" />
+                    Fetching latest data...
+                  </span>
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
@@ -496,213 +531,208 @@ export default function AllInvoicesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedData.map((inv) => (
-                <TableRow
-                  key={inv._id}
-                  hover
-                  sx={{
-                    "&:hover": { bgcolor: "#f8fafc" },
-                    transition: "colors 0.2s",
-                    "& td": { py: 0.3, px: 0.8 },
-                  }}
-                >
-                  <TableCell padding="checkbox" align="center">
-                    <Checkbox
-                      size="small"
-                      checked={selectedInvoices.includes(inv._id)}
+              paginatedData.map((inv) => {
+                const st = STATUS_STYLE[inv.status] || STATUS_STYLE.pending;
+                return (
+                  <TableRow
+                    key={inv._id}
+                    hover
+                    sx={{
+                      "&:hover": { bgcolor: "#f8fafc" },
+                      transition: "colors 0.2s",
+                      "& td": { py: 0.3, px: 0.8 },
+                    }}
+                  >
+                    <TableCell padding="checkbox" align="center">
+                      <Checkbox
+                        size="small"
+                        checked={selectedInvoices.includes(inv._id)}
+                        sx={{
+                          color: "#6366f1",
+                          "&.Mui-checked": { color: "#6366f1" },
+                        }}
+                        onChange={() =>
+                          setSelectedInvoices((prev) =>
+                            prev.includes(inv._id)
+                              ? prev.filter((id) => id !== inv._id)
+                              : [...prev, inv._id],
+                          )
+                        }
+                      />
+                    </TableCell>
+                    <TableCell
                       sx={{
-                        color: "#6366f1",
-                        "&.Mui-checked": { color: "#6366f1" },
-                      }}
-                      onChange={() =>
-                        setSelectedInvoices((prev) =>
-                          prev.includes(inv._id)
-                            ? prev.filter((id) => id !== inv._id)
-                            : [...prev, inv._id],
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      color: "#4f46e5",
-                      fontSize: "10px",
-                    }}
-                  >
-                    {inv.invoiceNumber}
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      fontWeight: 600,
-                      color: "#4f46e5",
-                      fontSize: "10px",
-                      cursor: "pointer",
-                      "&:hover": { textDecoration: "underline" },
-                    }}
-                    onClick={() => {
-                      setSelectedInvoice(inv);
-                      setIsViewModalOpen(true);
-                    }}
-                    title="Click to view invoice preview"
-                  >
-                    {inv.schoolId?.name || "N/A"}
-                  </TableCell>
-                  <TableCell
-                    sx={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}
-                  >
-                    {inv.billingMonth}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ fontWeight: 500, color: "#475569", fontSize: "10px" }}
-                  >
-                    {inv.planAmount?.toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ color: "#6366f1", fontWeight: 500, fontSize: "10px" }}
-                  >
-                    {(
-                      inv.feedingSplit?.month1 ||
-                      inv.totalFeedingAmount ||
-                      0
-                    ).toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ fontWeight: 700, color: "#0f172a", fontSize: "10px" }}
-                  >
-                    {inv.finalAmount?.toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{ color: "#fb923c", fontWeight: 500, fontSize: "10px" }}
-                  >
-                    {(inv.discount || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{
-                      fontWeight: "bold",
-                      color: "#059669",
-                      bgcolor: "rgba(16, 185, 129, 0.05)",
-                      fontSize: "10px",
-                    }}
-                  >
-                    {(inv.amountPaid || 0).toLocaleString()}
-                  </TableCell>
-                  <TableCell
-                    align="center"
-                    sx={{
-                      fontWeight: "bold",
-                      fontSize: "10px",
-                      color: inv.status === "paid" ? "#cbd5e1" : "#e11d48",
-                      bgcolor:
-                        inv.status === "paid"
-                          ? "transparent"
-                          : "rgba(225, 29, 72, 0.05)",
-                    }}
-                  >
-                    {(
-                      inv.remainingAmount ??
-                      inv.finalAmount - (inv.amountPaid || 0)
-                    ).toLocaleString()}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={inv.status}
-                      size="small"
-                      sx={{
-                        fontSize: "9px",
-                        fontWeight: "bold",
-                        textTransform: "uppercase",
-                        borderRadius: "10px",
-                        border: "1px solid",
-                        bgcolor: inv.status === "paid" ? "#ecfdf5" : "#fffbeb",
-                        color: inv.status === "paid" ? "#047857" : "#b45309",
-                        borderColor:
-                          inv.status === "paid" ? "#d1fae5" : "#fef3c7",
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        gap: 0.5,
+                        color: "#4f46e5",
+                        fontSize: "10px",
                       }}
                     >
-                      {/* View Button - Always visible & centered */}
-                      <IconButton
+                      {inv.invoiceNumber}
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontWeight: 600,
+                        color: "#4f46e5",
+                        fontSize: "10px",
+                        cursor: "pointer",
+                        "&:hover": { textDecoration: "underline" },
+                      }}
+                      onClick={() => {
+                        setSelectedInvoice(inv);
+                        setIsViewModalOpen(true);
+                      }}
+                      title="Click to view invoice preview"
+                    >
+                      {inv.schoolId?.name || "N/A"}
+                    </TableCell>
+                    <TableCell
+                      sx={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}
+                    >
+                      {inv.billingMonth}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ fontWeight: 500, color: "#475569", fontSize: "10px" }}
+                    >
+                      {inv.planAmount?.toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ color: "#6366f1", fontWeight: 500, fontSize: "10px" }}
+                    >
+                      {feedingOf(inv).toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ fontWeight: 700, color: "#0f172a", fontSize: "10px" }}
+                    >
+                      {inv.finalAmount?.toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{ color: "#fb923c", fontWeight: 500, fontSize: "10px" }}
+                    >
+                      {(inv.discount || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{
+                        fontWeight: "bold",
+                        color: "#059669",
+                        bgcolor: "rgba(16, 185, 129, 0.05)",
+                        fontSize: "10px",
+                      }}
+                    >
+                      {(inv.amountPaid || 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell
+                      align="center"
+                      sx={{
+                        fontWeight: "bold",
+                        fontSize: "10px",
+                        color: inv.status === "paid" ? "#cbd5e1" : "#e11d48",
+                        bgcolor:
+                          inv.status === "paid"
+                            ? "transparent"
+                            : "rgba(225, 29, 72, 0.05)",
+                      }}
+                    >
+                      {remainingOf(inv).toLocaleString()}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={String(inv.status || "").replace("_", " ")}
                         size="small"
-                        onClick={() => {
-                          setSelectedInvoice(inv);
-                          setIsViewModalOpen(true);
-                        }}
                         sx={{
-                          color: "#64748b",
-                          "&:hover": { bgcolor: "#f1f5f9" },
+                          fontSize: "9px",
+                          fontWeight: "bold",
+                          textTransform: "uppercase",
+                          borderRadius: "10px",
+                          border: "1px solid",
+                          bgcolor: st.bg,
+                          color: st.color,
+                          borderColor: st.border,
                         }}
-                        title="View / Print Invoice"
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          gap: 0.5,
+                        }}
                       >
-                        <Eye size={15} />
-                      </IconButton>
+                        {/* View Button - Always visible & centered */}
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSelectedInvoice(inv);
+                            setIsViewModalOpen(true);
+                          }}
+                          sx={{
+                            color: "#64748b",
+                            "&:hover": { bgcolor: "#f1f5f9" },
+                          }}
+                          title="View / Print Invoice"
+                        >
+                          <Eye size={15} />
+                        </IconButton>
 
-                      {/* Paid na hone par baaki buttons show honge */}
-                      {inv.status !== "paid" && (
-                        <>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setSelectedInvoice(inv);
-                              setIsPaymentModalOpen(true);
-                            }}
-                            sx={{
-                              color: "#10b981",
-                              "&:hover": { bgcolor: "#ecfdf5" },
-                            }}
-                            title="Record Payment"
-                          >
-                            <CreditCard size={15} />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setSelectedInvoice(inv);
-                              setIsInvoiceModalOpen(true);
-                            }}
-                            sx={{
-                              color: "#2563eb",
-                              "&:hover": { bgcolor: "#eff6ff" },
-                            }}
-                            title="Edit Invoice"
-                          >
-                            <Edit3 size={14} />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => {
-                              setDeletingId(inv._id);
-                              setDeletingName(
-                                inv.invoiceNumber || "this invoice",
-                              );
-                              setDeleteDialogOpen(true);
-                            }}
-                            sx={{
-                              color: "#e11d48",
-                              "&:hover": { bgcolor: "#fff1f2" },
-                            }}
-                            title="Delete Invoice"
-                          >
-                            <Trash2 size={14} />
-                          </IconButton>
-                        </>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))
+                        {/* Paid na hone par baaki buttons show honge */}
+                        {inv.status !== "paid" && (
+                          <>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSelectedInvoice(inv);
+                                setIsPaymentModalOpen(true);
+                              }}
+                              sx={{
+                                color: "#10b981",
+                                "&:hover": { bgcolor: "#ecfdf5" },
+                              }}
+                              title="Record Payment"
+                            >
+                              <CreditCard size={15} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSelectedInvoice(inv);
+                                setIsInvoiceModalOpen(true);
+                              }}
+                              sx={{
+                                color: "#2563eb",
+                                "&:hover": { bgcolor: "#eff6ff" },
+                              }}
+                              title="Edit Invoice"
+                            >
+                              <Edit3 size={14} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setDeletingId(inv._id);
+                                setDeletingName(
+                                  inv.invoiceNumber || "this invoice",
+                                );
+                                setDeleteDialogOpen(true);
+                              }}
+                              sx={{
+                                color: "#e11d48",
+                                "&:hover": { bgcolor: "#fff1f2" },
+                              }}
+                              title="Delete Invoice"
+                            >
+                              <Trash2 size={14} />
+                            </IconButton>
+                          </>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
 
@@ -736,7 +766,7 @@ export default function AllInvoicesPage() {
                       }}
                       className="border border-slate-200 rounded px-1.5 py-0.5 text-[11px] bg-white outline-none cursor-pointer font-medium"
                     >
-                      {[10, 25, 50, 75, 100, "all"].map((opt) => (
+                      {[25, 50, 75, 100, "all"].map((opt) => (
                         <option key={opt} value={opt}>
                           {opt === "all" ? "All" : opt}
                         </option>

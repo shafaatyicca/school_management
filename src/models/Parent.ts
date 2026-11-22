@@ -1,4 +1,5 @@
 import { Schema, model, models, Document } from "mongoose";
+import { randomPassword } from "@/lib/password";
 
 export interface IParent extends Document {
   schoolId: string;
@@ -61,7 +62,7 @@ parentSchema.pre<IParent>("save", async function () {
       doc.email = `${shortPrefix}${nextId}p@myschoolapp.com`.toLowerCase();
 
       if (!doc.password) {
-        doc.password = `${shortPrefix}${nextId}123`;
+        doc.password = randomPassword();
       }
     } catch (error: any) {
       console.error("Hook Error:", error);

@@ -12,6 +12,7 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import { printFeeVoucher } from "@/lib/printFeeVoucher";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 const MONTHS = [
   "", "January", "February", "March", "April", "May", "June",
@@ -34,6 +35,13 @@ export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, o
     open: false, id: null,
   });
 
+  // Permissions (each button has its own row in User Access)
+  const { can } = usePermissions();
+  const canTakePayment = can("takePayment", "create");
+  const canEditInvoice = can("invoices", "edit");
+  const canDeleteInvoice = can("invoices", "delete");
+  const canExport = can("fees", "export"); // Excel / PDF / Print + Print Voucher
+
   const fetchInvoices = () => {
     if (!studentId) return;
     setLoading(true);
@@ -54,14 +62,17 @@ export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, o
       const res = await fetch("/api/Fee_Management/invoices", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: deleteDialog.id }),
+        body: JSON.stringify({ id: deleteDialog.id, schoolId }),
       });
+      const data = await res.json().catch(() => null);
       if (res.ok) {
         notify.success("Invoice deleted!");
         setDeleteDialog({ open: false, id: null });
         fetchInvoices();
       } else {
-        notify.error("Failed to delete");
+        // API's own message (e.g. permission) — same text as the Access Denied modal
+        notify.error(data?.message || "Failed to delete");
+        setDeleteDialog({ open: false, id: null });
       }
     } catch {
       notify.error("Something went wrong");
@@ -80,14 +91,16 @@ export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, o
       </span>
     );
   };
+
   // Totals calculate karo
-const totals = useMemo(() => ({
-  baseFee:         invoices.reduce((sum, inv) => sum + (inv.baseFee || 0), 0),
-  discount:        invoices.reduce((sum, inv) => sum + (inv.discount || 0), 0),
-  netPayable:      invoices.reduce((sum, inv) => sum + (inv.netPayable || 0), 0),
-  paidAmount:      invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0),
-  remainingAmount: invoices.reduce((sum, inv) => sum + (inv.remainingAmount || 0), 0),
-}), [invoices]);
+  const totals = useMemo(() => ({
+    baseFee:         invoices.reduce((sum, inv) => sum + (inv.baseFee || 0), 0),
+    discount:        invoices.reduce((sum, inv) => sum + (inv.discount || 0), 0),
+    netPayable:      invoices.reduce((sum, inv) => sum + (inv.netPayable || 0), 0),
+    paidAmount:      invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0),
+    remainingAmount: invoices.reduce((sum, inv) => sum + (inv.remainingAmount || 0), 0),
+  }), [invoices]);
+
   const columns = useMemo<MRT_ColumnDef<any>[]>(
     () => [
       {
@@ -118,13 +131,13 @@ const totals = useMemo(() => ({
         size: 160,
         Footer: () => <span className="font-bold text-xs" style={{ color: "var(--muted-foreground)" }}>GRAND TOTAL</span>,
         Cell: ({ cell, row }) => (
-        <span
-          className="text-blue-500 hover:text-blue-700 hover:underline cursor-pointer text-xs"
-          onClick={() => onDetailClick(row.original)}
-        >
-          {cell.getValue<string>()}
-        </span>
-      ),
+          <span
+            className="text-blue-500 hover:text-blue-700 hover:underline cursor-pointer text-xs"
+            onClick={() => onDetailClick(row.original)}
+          >
+            {cell.getValue<string>()}
+          </span>
+        ),
       },
       {
         id: "month_year",
@@ -209,7 +222,7 @@ const totals = useMemo(() => ({
         Cell: ({ cell }) => statusBadge(cell.getValue<string>()),
       },
     ],
-    [totals, onDetailClick ],
+    [totals, onDetailClick],
   );
 
   const table = useMaterialReactTable({
@@ -219,7 +232,7 @@ const totals = useMemo(() => ({
     enableDensityToggle: false,
     enablePagination: false,
     enableColumnActions: false,
-    enableRowActions: true,
+    enableRowActions: true, // "Recent Payment" link is always shown for paid rows
     enableBottomToolbar: false,
     positionActionsColumn: "last",
     enableKeyboardShortcuts: false,
@@ -230,66 +243,78 @@ const totals = useMemo(() => ({
       density: "compact",
       pagination: { pageSize: 10, pageIndex: 0 },
     },
-   renderRowActions: ({ row }) => {
-  const isPaid = row.original.status === "paid";
-  const isPartial = row.original.status === "partial";
+    renderRowActions: ({ row }) => {
+      const isPaid = row.original.status === "paid";
+      const isPartial = row.original.status === "partial";
 
-  return (
-    <div className="flex items-center gap-1">
-      {isPaid ? (
-        <button
-          onClick={() => onDetailClick(row.original)}
-          className="text-xs text-blue-500 hover:text-blue-700 hover:underline font-medium bg-transparent border-none p-0 cursor-pointer"
-        >
-          Recent Payment
-        </button>
-      ) : (
-        <>
-          <Button size="icon" variant="ghost" title="Take Payment" className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-sky-500/10 cursor-pointer" onClick={() => onPayClick(row.original)}>
-            <CreditCard className="w-4 h-4" />
-          </Button>
-          
-          {/* ✅ CHANGE 3: Edit button ab onEditClick call karta hai */}
-          <Button size="icon" variant="ghost" title="Edit Invoice" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer" onClick={() => onEditClick?.(row.original)}>
-            <Pencil className="w-4 h-4" />
-          </Button>
+      return (
+        <div className="flex items-center gap-1">
+          {isPaid ? (
+            <button
+              onClick={() => onDetailClick(row.original)}
+              className="text-xs text-blue-500 hover:text-blue-700 hover:underline font-medium bg-transparent border-none p-0 cursor-pointer"
+            >
+              Recent Payment
+            </button>
+          ) : (
+            <>
+              {/* Take Payment → "Take Payment → Create" */}
+              {canTakePayment && (
+                <Button size="icon" variant="ghost" title="Take Payment" className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-sky-500/10 cursor-pointer" onClick={() => onPayClick(row.original)}>
+                  <CreditCard className="w-4 h-4" />
+                </Button>
+              )}
 
-          {!isPartial && (
-            <Button size="icon" variant="ghost" title="Delete Invoice" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" onClick={() => setDeleteDialog({ open: true, id: row.original._id, title: row.original.title })}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              {/* Edit → "Invoices → Edit" */}
+              {canEditInvoice && (
+                <Button size="icon" variant="ghost" title="Edit Invoice" className="h-6 w-6 text-blue-500 hover:text-blue-600 hover:bg-blue-50 cursor-pointer" onClick={() => onEditClick?.(row.original)}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+
+              {/* Delete → "Invoices → Delete" (not for partially paid invoices) */}
+              {!isPartial && canDeleteInvoice && (
+                <Button size="icon" variant="ghost" title="Delete Invoice" className="h-6 w-6 text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer" onClick={() => setDeleteDialog({ open: true, id: row.original._id, title: row.original.title })}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </>
           )}
-        </>
-      )}
-    </div>
-  );
-},
+        </div>
+      );
+    },
     renderTopToolbarCustomActions: ({ table }) => (
       <div className="flex items-center gap-2">
-        <Button
-          onClick={() => handleExportRows(table, "excel", "Invoice Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-7 text-[11px]"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
-        </Button>
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Invoice Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-7 text-[11px]"
-        >
-          <FileText className="h-3.5 w-3.5 mr-1" /> PDF
-        </Button>
-        <Button
-          onClick={() => handlePrintTable(table, "Invoice Report", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-7 text-[11px] dark:text-slate-300"
-        >
-          <Printer className="h-3.5 w-3.5 mr-1" /> Print
-        </Button>
+        {/* Excel / PDF / Print → "Student Fee Ledger → Export / Print" */}
+        {canExport && (
+          <>
+            <Button
+              onClick={() => handleExportRows(table, "excel", "Invoice Report", exportHeader)}
+              variant="outline"
+              size="sm"
+              className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-7 text-[11px]"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 mr-1" /> Excel
+            </Button>
+            <Button
+              onClick={() => handleExportRows(table, "pdf", "Invoice Report", exportHeader)}
+              variant="outline"
+              size="sm"
+              className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-7 text-[11px]"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1" /> PDF
+            </Button>
+            <Button
+              onClick={() => handlePrintTable(table, "Invoice Report", exportHeader)}
+              variant="outline"
+              size="sm"
+              className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-7 text-[11px] dark:text-slate-300"
+            >
+              <Printer className="h-3.5 w-3.5 mr-1" /> Print
+            </Button>
+          </>
+        )}
+
         <Button
           onClick={fetchInvoices}
           variant="outline"
@@ -298,14 +323,18 @@ const totals = useMemo(() => ({
         >
           <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh
         </Button>
-        <Button
-  onClick={() => printFeeVoucher(studentId, schoolId)}
-  variant="outline"
-  size="sm"
-  className="text-sky-600 border-sky-200 hover:bg-sky-50 dark:hover:bg-sky-900/20 cursor-pointer h-7 text-[11px]"
->
-  <Ticket className="h-3.5 w-3.5 mr-1" /> Print Voucher
-</Button>
+
+        {/* Print Voucher → "Student Fee Ledger → Export / Print" */}
+        {canExport && (
+          <Button
+            onClick={() => printFeeVoucher(studentId, schoolId)}
+            variant="outline"
+            size="sm"
+            className="text-sky-600 border-sky-200 hover:bg-sky-50 dark:hover:bg-sky-900/20 cursor-pointer h-7 text-[11px]"
+          >
+            <Ticket className="h-3.5 w-3.5 mr-1" /> Print Voucher
+          </Button>
+        )}
       </div>
     ),
     muiTablePaperProps: {
@@ -332,14 +361,14 @@ const totals = useMemo(() => ({
       },
     },
     muiTableFooterCellProps: {
-  sx: {
-    fontSize: "11px",
-    padding: "4px 6px",
-    fontWeight: "700",
-    backgroundColor: "var(--muted)",
-    borderTop: "1px solid var(--border)",
-  },
-},
+      sx: {
+        fontSize: "11px",
+        padding: "4px 6px",
+        fontWeight: "700",
+        backgroundColor: "var(--muted)",
+        borderTop: "1px solid var(--border)",
+      },
+    },
   });
 
   return (

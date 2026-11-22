@@ -50,6 +50,28 @@ export async function proxy(req: NextRequest) {
   const role = token.role;
   const userSchoolSlug = token.schoolSlug;
 
+    // ── Super-admin APIs: other roles may only READ their OWN school ──
+  if (pathname.startsWith("/api/superadmin") && role !== "super_admin") {
+    const sp = req.nextUrl.searchParams;
+    const ownSchoolId = String(token.schoolId || "");
+    const isRead = req.method === "GET";
+
+    const ownSchool =
+      (sp.get("id") && sp.get("id") === ownSchoolId) ||
+      (sp.get("slug") && sp.get("slug") === userSchoolSlug);
+
+    const allowed =
+      isRead &&
+      // School info (Topbar, logo, export headers, forms) — own school only
+      ((pathname === "/api/superadmin/schools" && ownSchool) ||
+        // Dashboard payment warning — own invoices only
+        (pathname === "/api/superadmin/invoices" && sp.get("schoolId") === ownSchoolId));
+
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   if (role === "super_admin") {
     return NextResponse.next();
   }

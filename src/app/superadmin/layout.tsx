@@ -13,6 +13,7 @@ import {
   UserCircle,
   Loader2,
   FileText,
+  Wallet,
 } from "lucide-react";
 
 export default function SuperAdminLayout({
@@ -42,6 +43,7 @@ export default function SuperAdminLayout({
   const router = useRouter();
   const pathname = usePathname();
 
+  
   if (status === "loading") {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#f8fafc]">
@@ -72,6 +74,12 @@ export default function SuperAdminLayout({
       label: "Invoices",
       icon: FileText,
       path: "/superadmin/invoices",
+    },
+     {
+      id: "collections",
+      label: "Collections",
+      icon: Wallet,
+      path: "/superadmin/collections",
     },
     {
       id: "subscriptions",
@@ -178,6 +186,7 @@ export default function SuperAdminLayout({
               {pathname.startsWith("/superadmin/schools") &&
                 "School Management"}
               {pathname.startsWith("/superadmin/invoices") && "Global Invoices"}
+              {pathname.startsWith("/superadmin/collections") && "Collections"}
               {pathname.startsWith("/superadmin/subscriptions") &&
                 "Subscription Plans"}
             </h1>

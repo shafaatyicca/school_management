@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { FileText, Printer, Settings2 } from "lucide-react";
+import { FileText, Printer, Settings2, CircleAlert } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notify";
@@ -13,12 +13,19 @@ import {
   printAdmissionForm,
   type AdmissionFormData,
 } from "@/lib/printFeeVoucher";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
 
-export default function AdmissionFormPage() {
+function AdmissionFormPage() {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
+
+  // Permissions
+  const { can } = usePermissions();
+  const canPrint = can("admissionForm", "export"); // Print Admission Form
+  const canEditSettings = can("settings", "edit"); // Edit Undertaking (opens Settings)
 
   const [school, setSchool] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
@@ -29,7 +36,7 @@ export default function AdmissionFormPage() {
     if (!isSuperAdmin) return;
     const host = window.location.hostname;
     if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}`)
+      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }
@@ -83,21 +90,33 @@ export default function AdmissionFormPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link
-            href="/settings"
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 h-9 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <Settings2 className="w-3.5 h-3.5" /> Edit Undertaking
-          </Link>
-          <Button
-            onClick={() => printAdmissionForm(formData)}
-            disabled={loading}
-            className="h-9 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5 mr-1" />
-            Print Admission Form
-          </Button>
+          {/* Edit Undertaking → "Settings → Edit" */}
+          {canEditSettings && (
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 h-9 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <Settings2 className="w-3.5 h-3.5" /> Edit Undertaking
+            </Link>
+          )}
+
+          {/* Print → "Admission Form → Export / Print" */}
+          {canPrint ? (
+            <Button
+              onClick={() => printAdmissionForm(formData)}
+              disabled={loading}
+              className="h-9 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 mr-1" />
+              Print Admission Form
+            </Button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+              <CircleAlert className="w-3.5 h-3.5" />
+              You don&apos;t have permission to print this form
+            </span>
+          )}
         </div>
       </div>
 
@@ -120,5 +139,14 @@ export default function AdmissionFormPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Guard: page opens only with "Admission Form → View"
+export default function Page() {
+  return (
+    <PageGuard module="admissionForm">
+      <AdmissionFormPage />
+    </PageGuard>
   );
 }

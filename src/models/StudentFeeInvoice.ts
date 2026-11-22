@@ -43,6 +43,7 @@ export interface IStudentFeeInvoice extends Document {
   updatedAt: Date;
 }
 
+
 const StudentFeeInvoiceSchema = new Schema<IStudentFeeInvoice>(
   {
     studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },

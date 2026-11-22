@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Clock, Pencil, Trash2, Users } from "lucide-react";
+import { Clock, Pencil, Trash2, Users, X } from "lucide-react";
 import EmployeeFormModal from "@/components/EmployeeFormModal";
 import PageHeader from "@/components/PageHeader";
 import type { IEmployee } from "@/models/Employee";
-import { FileSpreadsheet, FileText, Printer, X } from "lucide-react";
-import { handleExportRows, handlePrintTable, type ExportHeader } from "@/lib/exportUtils";
+import { type ExportHeader } from "@/lib/exportUtils";
+import ExportButtons from "@/components/ExportButtons";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { showAccessDenied } from "@/lib/accessDenied";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
 import { notify } from "@/lib/notify";
@@ -20,12 +23,18 @@ import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 import { calculateTenure, formatDate } from "@/lib/tenureUtils";
 import { useEmployeeModal } from "@/hooks/useEmployeeModal";
 
-export default function EmployeesPage() {
+function EmployeesPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const effectiveSchoolId = isSuperAdmin ? viewSchoolId : schoolId;
+
+  // Permissions ("Employees" row)
+  const { can } = usePermissions();
+  const canCreate = can("employees", "create");
+  const canEdit = can("employees", "edit");
+  const canDelete = can("employees", "delete");
 
   const [employees, setEmployees] = useState<IEmployee[]>([]);
   const [openPhotoId, setOpenPhotoId] = useState<string | null>(null);
@@ -47,7 +56,7 @@ export default function EmployeesPage() {
       hostname.includes(".lvh.me") || hostname.includes(".localhost");
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) setViewSchoolId(data._id);
@@ -60,21 +69,21 @@ export default function EmployeesPage() {
   }, [effectiveSchoolId]);
 
   useEffect(() => {
-  if (!effectiveSchoolId) return;
-  fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => d && setSchoolInfo(d))
-    .catch(() => {});
-}, [effectiveSchoolId]);
+    if (!effectiveSchoolId) return;
+    fetch(`/api/superadmin/schools?id=${effectiveSchoolId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSchoolInfo(d))
+      .catch(() => {});
+  }, [effectiveSchoolId]);
 
-// Export header: school only
-const exportHeader: ExportHeader = {
-  school: {
-    name: schoolInfo?.name,
-    address: schoolInfo?.address,
-    logo: schoolInfo?.logo,
-  },
-};
+  // Export header: school only
+  const exportHeader: ExportHeader = {
+    school: {
+      name: schoolInfo?.name,
+      address: schoolInfo?.address,
+      logo: schoolInfo?.logo,
+    },
+  };
 
   const fetchEmployees = async () => {
     if (!effectiveSchoolId) return;
@@ -84,9 +93,14 @@ const exportHeader: ExportHeader = {
       const response = await fetch(
         `/api/employees?schoolId=${effectiveSchoolId}`,
       );
-      if (!response.ok) throw new Error("Failed to fetch");
-      const data = await response.json();
-      setEmployees(data);
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setEmployees([]);
+        setError("Failed to fetch employees");
+        notify.error(data?.message || "Failed to fetch employees");
+        return;
+      }
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
       setError("Failed to fetch employees");
       notify.error("Failed to fetch employees");
@@ -106,7 +120,11 @@ const exportHeader: ExportHeader = {
           schoolId: effectiveSchoolId,
         }),
       });
-      if (!response.ok) throw new Error("Failed to delete");
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        notify.error(data?.message || "Failed to delete employee");
+        return;
+      }
       setEmployees((prev) => prev.filter((emp) => emp._id !== deleteDialog.id));
       notify.success("Employee deleted successfully");
     } catch (error) {
@@ -129,6 +147,15 @@ const exportHeader: ExportHeader = {
     isLoading,
     handleFormSubmit,
   } = useEmployeeModal(employees, setEmployees, effectiveSchoolId);
+
+  // Edit from the profile popup — blocked without permission
+  const editFromProfile = () => {
+    if (!canEdit) {
+      showAccessDenied("You don't have permission to edit employees.");
+      return;
+    }
+    handleEditFromProfile();
+  };
 
   // --- MRT COLUMNS DEFINITION ---
   const columns = useMemo<MRT_ColumnDef<IEmployee>[]>(
@@ -380,62 +407,45 @@ const exportHeader: ExportHeader = {
         subject: false,
       },
     },
-    enableRowActions: true,
+    // Actions column only when the user can edit or delete
+    enableRowActions: canEdit || canDelete,
     positionActionsColumn: "last",
     renderRowActions: ({ row }) => (
       <div className="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => {
-            setSelectedEmployee(row.original);
-            setIsModalOpen(true);
-          }}
-          className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <Pencil className="h-4 w-4 text-sky-500" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setDeleteDialog({ open: true, id: row.original._id! })}
-          className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
-        >
-          <Trash2 className="h-4 w-4 text-red-500" />
-        </Button>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSelectedEmployee(row.original);
+              setIsModalOpen(true);
+            }}
+            className="h-8 w-8 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <Pencil className="h-4 w-4 text-sky-500" />
+          </Button>
+        )}
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDeleteDialog({ open: true, id: row.original._id! })}
+            className="h-8 w-8 cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20"
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </Button>
+        )}
       </div>
     ),
 
-    // --- Export Buttons Add  ---
+    // --- Export Buttons (only with "Employees → Export / Print") ---
     renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => handleExportRows(table, "excel", "Employees List", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 h-8 cursor-pointer"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Employees List", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 h-8 cursor-pointer"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-
-        <Button
-          onClick={() => handlePrintTable(table, "Employees List", exportHeader)}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 h-8 cursor-pointer dark:text-slate-200"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
-      </div>
+      <ExportButtons
+        table={table}
+        module="employees"
+        title="Employees List"
+        header={exportHeader}
+      />
     ),
     muiTablePaperProps: {
       elevation: 0,
@@ -467,11 +477,15 @@ const exportHeader: ExportHeader = {
     <div className="container mx-auto space-y-2">
       <PageHeader
         title="Employees Management"
-        buttonLabel="Add Employee"
-        onButtonClick={() => {
-          setSelectedEmployee(null);
-          setIsModalOpen(true);
-        }}
+        buttonLabel={canCreate ? "Add Employee" : undefined}
+        onButtonClick={
+          canCreate
+            ? () => {
+                setSelectedEmployee(null);
+                setIsModalOpen(true);
+              }
+            : undefined
+        }
         icon={<Users className="w-3.5 h-3.5" />}
       />
       <div className="w-full border border-border rounded-xl shadow-sm bg-background overflow-hidden">
@@ -502,7 +516,7 @@ const exportHeader: ExportHeader = {
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         staff={viewingStaff}
-        onEdit={handleEditFromProfile}
+        onEdit={editFromProfile}
       />
 
       {/* Picture Pop-up */}
@@ -560,5 +574,14 @@ const exportHeader: ExportHeader = {
           );
         })()}
     </div>
+  );
+}
+
+// Guard: page opens only with "Employees → View"
+export default function Page() {
+  return (
+    <PageGuard module="employees">
+      <EmployeesPage />
+    </PageGuard>
   );
 }

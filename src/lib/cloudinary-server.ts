@@ -26,7 +26,7 @@ export const uploadImage = async (
   }
 };
 
-// ✅ Ek hi delete function — students aur employees dono ke liye
+//  Ek hi delete function — students aur employees dono ke liye
 export const deleteImage = async (imageUrl: string) => {
   const parts = imageUrl.split("/upload/");
   const withVersion = parts[1];

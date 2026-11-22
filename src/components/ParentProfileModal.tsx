@@ -8,7 +8,9 @@ import {
   Chip,
   Zoom,
 } from "@mui/material";
-import { User, Users, KeyRound, Edit } from "lucide-react";
+import { User, Users, KeyRound, Edit, Eye, EyeOff } from "lucide-react";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { notify } from "@/lib/notify";
 
 interface Props {
   isOpen: boolean;
@@ -39,27 +41,66 @@ export default function ParentProfileModal({
   onEdit,
   schoolId,
 }: Props) {
+  // Permissions (hooks must stay above the early return below)
+  const { can } = usePermissions();
+  const canEdit = can("parents", "edit"); // Edit Profile + see password
+  const canOpenStudent = can("students", "view") || can("studentInfo", "view");
+
   const [siblings, setSiblings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Password hidden by default; the eye icon loads + shows it (only for users who can edit parents)
+  const [showPass, setShowPass] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passLoading, setPassLoading] = useState(false);
+
   useEffect(() => {
-    if (isOpen && parent?._id && schoolId) {
-      const fetchSiblings = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch(
-            `/api/students?parentId=${parent._id}&schoolId=${schoolId}`,
-          );
-          const data = await res.json();
-          setSiblings(Array.isArray(data) ? data : []);
-        } catch (error) {
-          console.error("Failed to fetch siblings:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchSiblings();
+    setShowPass(false); // hide again when the modal opens / another parent is shown
+    setPassword("");
+  }, [isOpen, parent?._id]);
+
+  const togglePassword = async () => {
+    if (showPass) return setShowPass(false);
+    if (password || parent?.password) return setShowPass(true);
+
+    // Opened from the Students page → the password is not loaded yet
+    setPassLoading(true);
+    try {
+      const res = await fetch(`/api/parents?id=${parent._id}&schoolId=${schoolId}`);
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.password) {
+        setPassword(data.password);
+        setShowPass(true);
+      } else {
+        notify.error(data?.message || "Password not available");
+      }
+    } catch {
+      notify.error("Failed to load password");
+    } finally {
+      setPassLoading(false);
     }
+  };
+
+  const shownPassword = password || parent?.password || "";
+
+  useEffect(() => {
+    if (!isOpen || !parent?._id || !schoolId) return;
+    setSiblings([]); // don't show the previous parent's children
+    const fetchSiblings = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/students?parentId=${parent._id}&schoolId=${schoolId}`,
+        );
+        const data = await res.json().catch(() => null);
+        setSiblings(Array.isArray(data) ? data : []);
+      } catch {
+        setSiblings([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSiblings();
   }, [isOpen, parent, schoolId]);
 
   if (!parent) return null;
@@ -136,7 +177,7 @@ export default function ParentProfileModal({
               </div>
             </div>
 
-            {/* Login Credentials */}
+            {/* Login Credentials (password only for users who can edit parents) */}
             <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="flex items-center gap-2 mb-2">
                 <KeyRound className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -149,8 +190,21 @@ export default function ParentProfileModal({
                 <InfoItem
                   label="Password"
                   value={
-                    <span className="font-mono text-xs">
-                      {parent.password || "••••••••"}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="font-mono text-xs">
+                        {canEdit && showPass && shownPassword ? shownPassword : "••••••••"}
+                      </span>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          onClick={togglePassword}
+                          disabled={passLoading}
+                          title={showPass ? "Hide password" : "Show password"}
+                          className="text-muted-foreground hover:text-purple-600 cursor-pointer disabled:opacity-50"
+                        >
+                          {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
                     </span>
                   }
                 />
@@ -187,8 +241,13 @@ export default function ParentProfileModal({
                 siblings.map((child: any) => (
                   <div
                     key={child._id}
-                    onClick={() => onStudentClick(child)}
-                    className="flex items-center justify-between gap-2 px-1.5 py-1 rounded-lg border border-sky-100 dark:border-sky-800 bg-white dark:bg-sky-950/30 cursor-pointer hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/40 transition-all duration-150 group"
+                    // Opens the student profile only with student "View"
+                    onClick={canOpenStudent ? () => onStudentClick(child) : undefined}
+                    className={`flex items-center justify-between gap-2 px-1.5 py-1 rounded-lg border border-sky-100 dark:border-sky-800 bg-white dark:bg-sky-950/30 transition-all duration-150 group ${
+                      canOpenStudent
+                        ? "cursor-pointer hover:border-sky-400 dark:hover:border-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/40"
+                        : ""
+                    }`}
                   >
                     <img
                       src={
@@ -201,7 +260,13 @@ export default function ParentProfileModal({
                       className="w-9 h-9 rounded-full object-cover border border-sky-200 dark:border-sky-700 shrink-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-foreground group-hover:text-sky-700 dark:group-hover:text-sky-400 leading-tight truncate">
+                      <p
+                        className={`text-xs font-bold text-foreground leading-tight truncate ${
+                          canOpenStudent
+                            ? "group-hover:text-sky-700 dark:group-hover:text-sky-400"
+                            : ""
+                        }`}
+                      >
                         {child.fullName}
                       </p>
                       <p className="text-[9px] text-muted-foreground mt-0.5">
@@ -266,22 +331,24 @@ export default function ParentProfileModal({
           Cancel
         </Button>
 
-        {/* Edit */}
-        <Button
-          onClick={() => onEdit && onEdit(parent)}
-          variant="contained"
-          startIcon={<Edit className="w-4 h-4" />}
-          size="small"
-          sx={{
-            backgroundColor: "#1e293b",
-            "&:hover": { backgroundColor: "#334155" },
-            textTransform: "none",
-            px: 1.5,
-            py: 0.5,
-          }}
-        >
-          Edit Profile
-        </Button>
+        {/* Edit Profile → "Parents → Edit" */}
+        {canEdit && onEdit && (
+          <Button
+            onClick={() => onEdit(parent)}
+            variant="contained"
+            startIcon={<Edit className="w-4 h-4" />}
+            size="small"
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 1.5,
+              py: 0.5,
+            }}
+          >
+            Edit Profile
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

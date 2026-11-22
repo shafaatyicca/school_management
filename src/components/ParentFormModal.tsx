@@ -25,6 +25,7 @@ interface Props {
   schoolId: string | null;
 }
 
+
 export default function ParentFormModal({
   isOpen,
   onClose,

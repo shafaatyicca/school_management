@@ -15,11 +15,14 @@ import {
   Edit,
   Printer,
   KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { calculateTenure, calculateAge, formatDate } from "@/lib/tenureUtils";
 import { printBioData } from "@/lib/printFeeVoucher";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
 import { notify } from "@/lib/notify";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 interface Props {
   isOpen: boolean;
@@ -29,6 +32,7 @@ interface Props {
   schoolId?: string;
 }
 
+
 export default function StudentProfileModal({
   isOpen,
   onClose,
@@ -36,12 +40,17 @@ export default function StudentProfileModal({
   onEdit,
   schoolId,
 }: Props) {
+  // Permissions (hooks must stay above the early return below)
+  const { can } = usePermissions();
+  const canPrint = can("bioData", "export"); // Print Bio Data
+  const canEdit = can("students", "edit"); // Edit Profile + see password
+
   // School details + settings for the Bio Data print (loaded when the modal opens)
   const [printData, setPrintData] = useState<any>(null);
   const sid = schoolId || student?.schoolId;
 
   useEffect(() => {
-    if (!isOpen || !sid || printData?.sid === sid) return;
+    if (!isOpen || !sid || !canPrint || printData?.sid === sid) return;
     Promise.all([
       fetch(`/api/superadmin/schools?id=${sid}`).then((r) => (r.ok ? r.json() : null)),
       fetch(`/api/settings?schoolId=${sid}`).then((r) => (r.ok ? r.json() : null)),
@@ -60,11 +69,18 @@ export default function StudentProfileModal({
         }),
       )
       .catch(() => {});
-  }, [isOpen, sid, printData?.sid]);
+  }, [isOpen, sid, canPrint, printData?.sid]);
+
+    // Password hidden by default; the eye icon shows it (only for users who can edit)
+  const [showPass, setShowPass] = useState(false);
+  useEffect(() => {
+    setShowPass(false); // hide again when the modal opens / another student is shown
+  }, [isOpen, student?._id]);
 
   if (!student) return null;
 
   const handlePrintBio = () => {
+    if (!canPrint) return;
     if (!printData) {
       notify.error("Loading school details — please try again in a moment");
       return;
@@ -285,7 +301,7 @@ export default function StudentProfileModal({
             </div>
           </div>
 
-          {/* Login Credentials */}
+          {/* Login Credentials (password only for users who can edit students) */}
           <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
             <div className="flex items-center gap-2 mb-2">
               <KeyRound className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -295,11 +311,23 @@ export default function StudentProfileModal({
             </div>
             <div className="flex gap-6">
               <InfoItem label="Email" value={student.email} />
-              <InfoItem
+                <InfoItem
                 label="Password"
                 value={
-                  <span className="font-mono text-xs">
-                    {student.password || "••••••••"}
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="font-mono text-xs">
+                      {canEdit && student.password && showPass ? student.password : "••••••••"}
+                    </span>
+                    {canEdit && student.password && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPass((v) => !v)}
+                        title={showPass ? "Hide password" : "Show password"}
+                        className="text-muted-foreground hover:text-purple-600 cursor-pointer"
+                      >
+                        {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
                   </span>
                 }
               />
@@ -318,26 +346,28 @@ export default function StudentProfileModal({
           gap: 1,
         }}
       >
-        {/* Left: Print Bio Data (style from Settings) */}
-        <Button
-          onClick={handlePrintBio}
-          disabled={!printData}
-          variant="outlined"
-          size="small"
-          startIcon={<Printer className="w-4 h-4" />}
-          sx={{
-            textTransform: "none",
-            borderColor: "var(--border)",
-            color: "var(--foreground)",
-            marginRight: "auto",
-            "&:hover": {
-              backgroundColor: "var(--muted)",
+        {/* Left: Print Bio Data → "Student Bio Data → Export / Print" */}
+        {canPrint && (
+          <Button
+            onClick={handlePrintBio}
+            disabled={!printData}
+            variant="outlined"
+            size="small"
+            startIcon={<Printer className="w-4 h-4" />}
+            sx={{
+              textTransform: "none",
               borderColor: "var(--border)",
-            },
-          }}
-        >
-          {printData ? "Print Bio Data" : "Loading..."}
-        </Button>
+              color: "var(--foreground)",
+              marginRight: "auto",
+              "&:hover": {
+                backgroundColor: "var(--muted)",
+                borderColor: "var(--border)",
+              },
+            }}
+          >
+            {printData ? "Print Bio Data" : "Loading..."}
+          </Button>
+        )}
 
         {/* Right: Cancel & Edit */}
         <Button
@@ -352,21 +382,24 @@ export default function StudentProfileModal({
           Cancel
         </Button>
 
-        <Button
-          onClick={onEdit}
-          variant="contained"
-          startIcon={<Edit className="w-4 h-4" />}
-          size="small"
-          sx={{
-            backgroundColor: "#1e293b",
-            "&:hover": { backgroundColor: "#334155" },
-            textTransform: "none",
-            px: 1,
-            py: 0.5,
-          }}
-        >
-          Edit Profile
-        </Button>
+        {/* Edit Profile → "Add Student (Students) → Edit" */}
+        {canEdit && (
+          <Button
+            onClick={onEdit}
+            variant="contained"
+            startIcon={<Edit className="w-4 h-4" />}
+            size="small"
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 1,
+              py: 0.5,
+            }}
+          >
+            Edit Profile
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

@@ -1,4 +1,5 @@
 import mongoose, { Schema, model, models } from "mongoose";
+import { randomPassword } from "@/lib/password";
 
 export interface IEmployee {
   [x: string]: any;
@@ -8,7 +9,6 @@ export interface IEmployee {
   image: string;
   email: string;
   password?: string; // New Field
-  role: string; // New Field
   phone: string;
   dateOfBirth: Date;
   gender: "male" | "female" | "other";
@@ -62,10 +62,6 @@ const EmployeeSchema = new Schema<IEmployee>(
     password: {
       type: String,
       required: false,
-    },
-    role: {
-      type: String,
-      default: "employee",
     },
     phone: { type: String, required: [true, "Phone is required"], trim: true },
     dateOfBirth: { type: Date, required: [true, "Date of birth is required"] },
@@ -166,10 +162,8 @@ EmployeeSchema.pre<IEmployee>("save", async function () {
       doc.email = `${prefix}${nextId}emp@schoolapp.com`.toLowerCase();
 
       if (!doc.password) {
-        doc.password = `${prefix}${nextId}123`;
+        doc.password = randomPassword();
       }
-
-      if (!doc.role) doc.role = "employee";
     } catch (error: any) {
       throw error;
     }

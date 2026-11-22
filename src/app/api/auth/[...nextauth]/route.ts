@@ -4,8 +4,42 @@ import { connectDB } from "@/lib/db";
 import { UserModel } from "@/models/User";
 import { SchoolModel } from "@/models/School";
 import bcrypt from "bcryptjs";
+import { ActivityLogModel, LOG_RETENTION_MONTHS } from "@/models/ActivityLog";
+import { toYMD } from "@/lib/pkTime";
 
-// --- AUTH OPTIONS KO EXPORT KIYA TAAKE CLASSES API MEIN USE HO SAKAY ---
+// Same message for wrong email AND wrong password (don't reveal which emails exist)
+const INVALID_LOGIN = "Your email or password is incorrect.";
+
+// Too many wrong passwords → wait before trying again
+const LOCK_LIMIT = 10;
+const LOCK_MINUTES = 15;
+
+
+// Login / failed-login log (background, never blocks the login)
+function logAuth(user: any, action: "login" | "login_failed", req: any, summary?: string) {
+  const expireAt = new Date();
+  expireAt.setMonth(expireAt.getMonth() + LOG_RETENTION_MONTHS);
+  const headers = req?.headers || {};
+  const get = (k: string) => (typeof headers.get === "function" ? headers.get(k) : headers[k]) || "";
+  const ip = String(get("x-forwarded-for") || get("x-real-ip")).split(",")[0].trim();
+
+  (ActivityLogModel as any)
+    .create({
+      schoolId: user.schoolId ? String(user.schoolId) : null,
+      userId: String(user._id),
+      userName: user.name || "",
+      userRole: user.role || "",
+      action,
+      module: "auth",
+      summary: summary || (action === "login" ? "Logged in" : "Wrong password"),
+      ip,
+      userAgent: get("user-agent"),
+      expireAt,
+    })
+    .catch(() => {});
+}
+
+// --- authOptions is exported so other APIs can use it ---
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -14,61 +48,71 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         await connectDB();
 
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email aur Password dono zaroori hain!");
+        const email = String(credentials?.email || "").trim().toLowerCase();
+        const password = String(credentials?.password || "");
+
+        if (!email || !password) {
+          throw new Error("Your email and password are required!");
         }
 
-        const user = await (UserModel as any).findOne({
-          email: credentials.email.toLowerCase(),
+        const user = await (UserModel as any).findOne({ email });
+        if (!user || !user.password) {
+          throw new Error(INVALID_LOGIN);
+        }
+
+        // Too many wrong passwords in the last few minutes → locked for a while
+        const recentFails = await (ActivityLogModel as any).countDocuments({
+          userId: String(user._id),
+          action: "login_failed",
+          createdAt: { $gte: new Date(Date.now() - LOCK_MINUTES * 60 * 1000) },
         });
-
-        if (!user) {
-          throw new Error("User nahi mila!");
+        if (recentFails >= LOCK_LIMIT) {
+          throw new Error(`Too many wrong attempts. Please try again after ${LOCK_MINUTES} minutes.`);
         }
 
-        const isPasswordCorrect = await bcrypt.compare(
-          credentials.password,
-          user.password,
-        );
-
+        const isPasswordCorrect = await bcrypt.compare(password, user.password);
         if (!isPasswordCorrect) {
-          throw new Error("Password galat hai!");
+          logAuth(user, "login_failed", req);
+          throw new Error(INVALID_LOGIN);
+        }
+
+        // Login switched off by the Super Admin
+        if (user.isActive === false) {
+          logAuth(user, "login_failed", req, "Login blocked (account deactivated)");
+          throw new Error("Your account is deactivated. Please contact the Super Admin.");
         }
 
         let schoolSlug: string | null = null;
 
-        if (
-          user.role !== "super-admin" &&
-          user.role !== "super_admin" &&
-          user.schoolId
-        ) {
+        if (user.role !== "super-admin" && user.role !== "super_admin" && user.schoolId) {
           const school = await SchoolModel.findById(user.schoolId);
 
           if (!school) {
             throw new Error("Institution records not found!");
           }
 
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const expiry = new Date(school.expiryDate);
-          expiry.setHours(0, 0, 0, 0);
-
-          if (today > expiry && school.status === "active") {
-            await SchoolModel.findByIdAndUpdate(school._id, {
-              status: "inactive",
-            });
+                    // Expired? (compare Pakistan days, works on any server)
+          if (school.expiryDate && toYMD() > toYMD(school.expiryDate) && school.status === "active") {
+            await SchoolModel.findByIdAndUpdate(school._id, { status: "inactive" });
             school.status = "inactive";
           }
 
           if (school.status === "inactive") {
-            throw new Error("Aapka school account expire ho chuka hay!");
+            throw new Error("Your institution's subscription has expired. Please contact the Super Admin.");
           }
 
           schoolSlug = school.slug || null;
         }
+
+        // Last login time (updateOne → no validation, never blocks the login)
+        (UserModel as any)
+          .updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } })
+          .catch(() => {});
+
+        logAuth(user, "login", req);
 
         return {
           id: user._id.toString(),

@@ -9,7 +9,6 @@ import {
   DialogActions,
   Button,
   TextField,
-  MenuItem,
   IconButton,
   Zoom,
 } from "@mui/material";
@@ -18,6 +17,7 @@ import type { IEmployee } from "@/models/Employee";
 import ImageUploadWithCrop from "./ImageUploadWithCrop";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { employeeValidationSchema } from "@/lib/validation";
+import { toYMD } from "@/lib/pkTime";
 
 interface Props {
   isOpen: boolean;
@@ -41,7 +41,6 @@ export default function EmployeeFormModal({
       image: "",
       fullName: "",
       phone: "",
-      role: "employee",
       dateOfBirth: "",
       gender: "male",
       nicNumber: "",
@@ -52,7 +51,7 @@ export default function EmployeeFormModal({
       subject: "",
       address: "",
       salary: 0,
-      joiningDate: new Date().toISOString().split("T")[0],
+      joiningDate: toYMD(),
       status: "active",
       inactiveDate: "",
       inactiveReason: "",
@@ -76,7 +75,6 @@ export default function EmployeeFormModal({
   });
   const staffCategory = watch("staffCategory");
   const currentStatus = watch("status");
-  const currentRole = watch("role");
   const currentGender = watch("gender");
   const currentImage = watch("image") as string;
 
@@ -87,22 +85,17 @@ export default function EmployeeFormModal({
     [setValue],
   );
 
+  // Fill the form when the modal opens (empty for a new employee)
   useEffect(() => {
-    if (!isOpen) return; // Modal band hai to skip karo
+    if (!isOpen) return;
 
     if (employee) {
       reset({
         ...employee,
         image: employee.image || "",
-        dateOfBirth: employee.dateOfBirth
-          ? new Date(employee.dateOfBirth).toISOString().split("T")[0]
-          : "",
-        joiningDate: employee.joiningDate
-          ? new Date(employee.joiningDate).toISOString().split("T")[0]
-          : "",
-        inactiveDate: employee.inactiveDate
-          ? new Date(employee.inactiveDate).toISOString().split("T")[0]
-          : "",
+        dateOfBirth: employee.dateOfBirth ? toYMD(employee.dateOfBirth) : "",
+        joiningDate: employee.joiningDate ? toYMD(employee.joiningDate) : "",
+        inactiveDate: employee.inactiveDate ? toYMD(employee.inactiveDate) : "",
         inactiveReason: employee.inactiveReason || "",
         emergencyContactName: employee.emergencyContact?.name || "",
         emergencyContactPhone: employee.emergencyContact?.phone || "",
@@ -113,11 +106,7 @@ export default function EmployeeFormModal({
     }
   }, [employee?._id, isOpen, reset, defaultValues]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!employee) return;
-  }, [isOpen, employee]);
-
+  // Keep the default avatar in line with the gender
   useEffect(() => {
     if (!currentGender) return;
     if (!employee) return;
@@ -164,13 +153,11 @@ export default function EmployeeFormModal({
       delete formattedData.emergencyContactPhone;
       delete formattedData.emergencyContactRelation;
 
+      // The form is NOT cleared here: if saving fails, the typed data stays.
+      // It is cleared automatically the next time the modal opens.
       onSubmit(formattedData);
-
-      if (!employee) {
-        reset(defaultValues);
-      }
     },
-    [employee, onSubmit, reset, defaultValues, currentGender],
+    [onSubmit, currentGender, schoolId],
   );
 
   return (
@@ -244,7 +231,7 @@ export default function EmployeeFormModal({
                   </p>
 
                   {currentImage === "loading" ? (
-                    // ✅ Uploading spinner
+                    // Uploading spinner
                     <div
                       className="w-30 h-30 rounded-full flex flex-col items-center justify-center"
                       style={{ border: "4px solid var(--border)" }}
@@ -320,6 +307,7 @@ export default function EmployeeFormModal({
                   helperText={errors.fullName?.message as string}
                 />
 
+                {/* Phone + NIC */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
                     {...register("phone")}
@@ -329,35 +317,22 @@ export default function EmployeeFormModal({
                     helperText={errors.phone?.message as string}
                   />
                   <TextField
-                    {...register("role")}
-                    select
-                    label="System Role"
-                    size="small"
-                    value={currentRole || "employee"}
-                    onChange={(e) => setValue("role", e.target.value)}
-                    SelectProps={{ native: true }}
-                    InputLabelProps={{ shrink: true }}
-                  >
-                    <option value="helpdesk">Helpdesk Staff</option>
-                    <option value="employee">Employee</option>
-                    <option value="accountant">Accountant</option>
-                  </TextField>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <TextField
                     {...register("nicNumber")}
                     label="NIC Number"
                     size="small"
                   />
+                </div>
+
+                {/* Gender */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <TextField
-                    {...register("gender")} // register ko spread karein
+                    {...register("gender")}
                     select
                     label="Gender"
                     size="small"
                     value={currentGender || "male"}
                     onChange={(e) => {
-                      setValue("gender", e.target.value); // state update
+                      setValue("gender", e.target.value);
                     }}
                     SelectProps={{ native: true }}
                     InputLabelProps={{ shrink: true }}
@@ -365,6 +340,20 @@ export default function EmployeeFormModal({
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </TextField>
+                  <TextField
+                {...register("status")}
+                select
+                label="Employment Status"
+                fullWidth
+                size="small"
+                value={currentStatus || "active"}
+                onChange={(e) => setValue("status", e.target.value)}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </TextField>
                 </div>
               </div>
             </div>
@@ -448,23 +437,6 @@ export default function EmployeeFormModal({
                   InputLabelProps={{ shrink: true }}
                 />
               </div>
-            </div>
-
-            <div className="w-full">
-              <TextField
-                {...register("status")}
-                select
-                label="Employment Status"
-                fullWidth
-                size="small"
-                value={currentStatus || "active"}
-                onChange={(e) => setValue("status", e.target.value)}
-                SelectProps={{ native: true }}
-                InputLabelProps={{ shrink: true }}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </TextField>
             </div>
 
             {currentStatus === "inactive" && (

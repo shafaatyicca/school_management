@@ -18,12 +18,14 @@ export interface ISchoolInvoice extends Document {
   status: "pending" | "partially_paid" | "paid" | "cancelled";
   paidAt?: Date; // Last payment date
   paymentHistory: {
+    paymentNo?: string;
     amount: number;
     date: Date;
     note?: string;
   }[];
   createdAt: Date;
 }
+
 
 const SchoolInvoiceSchema = new Schema<ISchoolInvoice>({
   // Auto-increment ke liye hum string use karenge jo API generate karegi
@@ -50,6 +52,7 @@ const SchoolInvoiceSchema = new Schema<ISchoolInvoice>({
   // Har baar jab partial payment ho, uska record yahan save hoga
   paymentHistory: [
     {
+      paymentNo: { type: String, default: "" },
       amount: Number,
       date: { type: Date, default: Date.now },
       note: String,

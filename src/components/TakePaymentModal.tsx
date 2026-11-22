@@ -13,12 +13,16 @@ import {
 import { Close as CloseIcon } from "@mui/icons-material";
 import { CreditCard } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { showAccessDenied } from "@/lib/accessDenied";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { toYMD } from "@/lib/pkTime";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   invoice: any;
   onSuccess: () => void;
+  schoolId?: string; // optional — falls back to invoice.schoolId
 }
 
 const METHODS = [
@@ -28,9 +32,14 @@ const METHODS = [
 ];
 
 export default function TakePaymentModal({
-  isOpen, onClose, invoice, onSuccess,
+  isOpen, onClose, invoice, onSuccess, schoolId,
 }: Props) {
-  const now = new Date().toISOString().split("T")[0];
+  // Confirm Payment → "Take Payment → Create"
+  // (hooks must stay above the early return below)
+  const { can } = usePermissions();
+  const canTakePayment = can("takePayment", "create");
+
+  const now = toYMD(); // today in Pakistan
 
   const [amount,  setAmount]  = useState<number | "">(invoice?.remainingAmount || "");
   const [method,  setMethod]  = useState("cash");
@@ -41,6 +50,11 @@ export default function TakePaymentModal({
   if (!invoice) return null;
 
   const handleSubmit = async () => {
+    if (loading) return; // no double payment on a double click
+    if (!canTakePayment) {
+      showAccessDenied("You don't have permission to take payments.");
+      return;
+    }
     if (!amount || Number(amount) <= 0) {
       notify.error("Please enter a valid amount");
       return;
@@ -57,6 +71,7 @@ export default function TakePaymentModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invoiceId: invoice._id,
+          schoolId: schoolId || invoice.schoolId,
           amount: Number(amount),
           method,
           date,
@@ -64,16 +79,16 @@ export default function TakePaymentModal({
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (res.ok) {
-        // ✅ Receipt number ke saath message
+        // Success message with the receipt number
         notify.success(
-          `Payment recorded! Receipt: ${data.payment?.paymentNo || ""}`,
+          `Payment recorded! Receipt: ${data?.payment?.paymentNo || ""}`,
         );
         onSuccess();
       } else {
-        notify.error(data.message || "Failed to record payment");
+        notify.error(data?.message || "Failed to record payment");
       }
     } catch {
       notify.error("Something went wrong");
@@ -179,6 +194,7 @@ export default function TakePaymentModal({
             fullWidth
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            inputProps={{ max: toYMD() }}
             InputLabelProps={{ shrink: true }}
           />
 
@@ -284,7 +300,7 @@ export default function TakePaymentModal({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={loading}
+          disabled={loading || !canTakePayment}
           size="small"
           sx={{
             backgroundColor: "#1e293b", 

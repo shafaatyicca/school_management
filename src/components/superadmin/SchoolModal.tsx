@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import { toYMD } from "@/lib/pkTime";
 import {
   Dialog,
   DialogTitle,
@@ -28,6 +29,7 @@ interface Props {
   plans: any[];
   isLoading?: boolean;
 }
+
 
 export default function SchoolFormModal({
   isOpen,
@@ -74,12 +76,8 @@ export default function SchoolFormModal({
       reset({
         ...school,
         planId: school.planId?._id || school.planId || "",
-        expiryDate: school.expiryDate
-          ? new Date(school.expiryDate).toISOString().split("T")[0]
-          : "",
-        joiningDate: school.joiningDate
-          ? new Date(school.joiningDate).toISOString().split("T")[0]
-          : "",
+        expiryDate: school.expiryDate ? toYMD(school.expiryDate) : "",
+        joiningDate: school.joiningDate ? toYMD(school.joiningDate) : "",
         slug: school.slug || "",
       });
     } else {

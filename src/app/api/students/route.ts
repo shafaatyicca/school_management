@@ -1,56 +1,87 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
+import { checkStudentDelete, deleteStudentLinks } from "@/lib/dataLinks";
 import { connectDB } from "@/lib/db";
 import Student from "@/models/Student";
 import { ParentModel } from "@/models/Parent";
 import cloudinary, { deleteImage } from "@/lib/cloudinary-server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getAccess, requirePermission, schoolIdFor, logActivity, diffChanges } from "@/lib/access";
+
+// Never shown in the log as values (password is logged only as "Changed")
+const NOT_LOGGED = ["_id", "id", "schoolId", "createdAt", "updatedAt", "__v", "password"];
+
+// "Ali Khan (GR 1045)"
+const labelOf = (s: any) => `${s?.fullName || "Student"}${s?.grNumber != null ? ` (GR ${s.grNumber})` : ""}`;
+
+// Populated refs → plain ids, so the log compares ids (not whole objects)
+const plain = (s: any) => ({
+  ...(s || {}),
+  classId: s?.classId?._id ? String(s.classId._id) : s?.classId ? String(s.classId) : "",
+  parentId: s?.parentId?._id ? String(s.parentId._id) : s?.parentId ? String(s.parentId) : "",
+});
 
 // --- GET: Fetch Students ---
 export async function GET(req: Request) {
   try {
-    await connectDB();
-    const session = await getServerSession(authOptions);
-    const isSuperAdmin = session?.user?.role === "super_admin";
-    const urlSchoolId = new URL(req.url).searchParams.get("schoolId");
-    const schoolId = isSuperAdmin ? urlSchoolId : session?.user?.schoolId;
-
-    if (!schoolId) {
-      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    }
+    const access = await getAccess();
+    if (!access) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     const { searchParams } = new URL(req.url);
     const parentId = searchParams.get("parentId");
     const classId = searchParams.get("classId");
     const section = searchParams.get("section");
     const ids = searchParams.get("ids");
-    
+
+    // Pages that list students + parent profile (only its own children)
+    const canStudents =
+      access.can("students", "view") ||
+      access.can("studentInfo", "view") ||
+      access.can("bioData", "view") ||
+      access.can("admissionForm", "view");
+    const canParentChildren = !!parentId && access.can("parents", "view");
+    if (!canStudents && !canParentChildren) {
+      return NextResponse.json({ message: "You don't have permission to view students" }, { status: 403 });
+    }
+
+    await connectDB();
+    const schoolId = schoolIdFor(access, searchParams.get("schoolId"));
+    if (!schoolId) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
     const filter: any = { schoolId }; // Always only this school's data
     if (parentId) filter.parentId = parentId;
     if (classId) filter.classId = classId; // Student Information page
     if (section) filter.section = section;
     if (ids) filter._id = { $in: ids.split(",").filter(Boolean) };
 
-        const students = await Student.find(filter)
+    // Student password only for users who can edit students; parent password never
+    const hide = access.can("students", "edit") ? "" : "-password";
+
+    const students = await (Student as any)
+      .find(filter)
+      .select(hide)
       .populate("classId", "name")
-      .populate("parentId")
+      .populate("parentId", "-password")
       .sort(parentId ? { fullName: 1 } : { grNumber: -1 })
       .lean();
 
     return NextResponse.json(students);
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("Students GET error:", error?.message);
+    return NextResponse.json({ message: "Failed to load students" }, { status: 500 });
   }
 }
 
-// --- POST: Create Student & Parent ---
+// -- POST: Create Student & Parent (Add Student → Create) ---
 export async function POST(req: Request) {
   try {
+    const { access, error } = await requirePermission("students", "create");
+    if (error) return error;
+
     await connectDB();
-    const session = await getServerSession(authOptions);
     const body = await req.json();
-    const isSuperAdmin = session?.user?.role === "super_admin";
-    const schoolId = isSuperAdmin ? body.schoolId : session?.user?.schoolId;
+    const schoolId = schoolIdFor(access!, body.schoolId);
 
     if (!schoolId) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -60,22 +91,31 @@ export async function POST(req: Request) {
 
     let finalParentId = studentData.parentId;
 
-    // 1. Agar naya parent hai toh create karein
+    // 1. New parent → create it
     if (isNewParent && parentData) {
-      const newParent = await ParentModel.create({
+      const newParent: any = await ParentModel.create({
         ...parentData,
-        schoolId: schoolId, // Session se schoolId li
+        schoolId: schoolId, // always the server's school
       });
       finalParentId = newParent._id;
+
+      logActivity(access!, req, {
+        action: "create",
+        module: "parents",
+        schoolId: String(schoolId),
+        entityId: newParent._id,
+        entityLabel: `${newParent.fullName || "Parent"}${newParent.p_id ? ` (P-ID ${newParent.p_id})` : ""}`,
+        summary: "Added parent (from the student form)",
+      });
     }
 
-    const newStudent = await Student.create({
+    const newStudent: any = await Student.create({
       ...studentData,
-      schoolId: schoolId, // Forcefully session wali ID
+      schoolId: schoolId, // always the server's school
       parentId: finalParentId || undefined,
     });
 
-    // 3. Cloudinary Tag Management
+    // 2. Cloudinary tag management
     if (newStudent.image && newStudent.image.includes("cloudinary")) {
       const decodedUrl = decodeURIComponent(newStudent.image);
       const publicId = decodedUrl
@@ -88,24 +128,36 @@ export async function POST(req: Request) {
         .catch((err) => console.error("Tag remove failed:", err));
     }
 
-    const populated = await Student.findById(newStudent._id)
+    logActivity(access!, req, {
+      action: "create",
+      module: "students",
+      schoolId: String(schoolId),
+      entityId: newStudent._id,
+      entityLabel: labelOf(newStudent),
+      summary: "Added student",
+    });
+
+    const populated = await (Student as any)
+      .findById(newStudent._id)
       .populate("classId")
-      .populate("parentId");
+      .populate("parentId", "-password");
 
     return NextResponse.json(populated, { status: 201 });
   } catch (error: any) {
+    console.error("Students POST error:", error?.message);
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }
 
-// --- PUT: Update Student & Parent ---
+// --- PUT: Update Student & Parent (Add Student → Edit) ---
 export async function PUT(req: Request) {
   try {
+    const { access, error } = await requirePermission("students", "edit");
+    if (error) return error;
+
     await connectDB();
-    const session = await getServerSession(authOptions);
-    const body = await req.json(); // pehle body lo
-    const isSuperAdmin = session?.user?.role === "super_admin";
-    const schoolId = isSuperAdmin ? body.schoolId : session?.user?.schoolId;
+    const body = await req.json();
+    const schoolId = schoolIdFor(access!, body.schoolId);
 
     if (!schoolId) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -113,36 +165,51 @@ export async function PUT(req: Request) {
 
     const { id, isNewParent, parentData, email, ...updateData } = body;
 
+    // Old values (for the log)
+    const before: any = await (Student as any).findOne({ _id: id, schoolId }).lean();
+    if (!before) {
+      return NextResponse.json({ message: "Student not found" }, { status: 404 });
+    }
+
     let finalParentId = updateData.parentId;
 
     if (isNewParent && parentData) {
-      const newParent = await ParentModel.create({
+      const newParent: any = await ParentModel.create({
         ...parentData,
         schoolId: schoolId,
       });
       finalParentId = newParent._id;
+
+      logActivity(access!, req, {
+        action: "create",
+        module: "parents",
+        schoolId: String(schoolId),
+        entityId: newParent._id,
+        entityLabel: `${newParent.fullName || "Parent"}${newParent.p_id ? ` (P-ID ${newParent.p_id})` : ""}`,
+        summary: "Added parent (from the student form)",
+      });
     }
 
-    // 2. Student Update (Security: Filter by ID and schoolId)
-    const updatedDoc = await Student.findOneAndUpdate(
-      { _id: id, schoolId },
-      {
-        ...updateData,
-        parentId: finalParentId,
-      },
-      { new: true, runValidators: true },
-    )
+
+    // Student update (only this school's student)
+    const updatedDoc: any = await (Student as any)
+      .findOneAndUpdate(
+        { _id: id, schoolId },
+        {
+          ...updateData,
+          schoolId,
+          parentId: finalParentId,
+        },
+        { new: true, runValidators: true },
+      )
       .populate("classId")
-      .populate("parentId");
+      .populate("parentId", "-password");
 
     if (!updatedDoc) {
-      return NextResponse.json(
-        { message: "Student not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ message: "Student not found" }, { status: 404 });
     }
 
-    // 3. Cloudinary logic for updated image
+    // Cloudinary logic for the updated image
     if (updatedDoc.image && updatedDoc.image.includes("cloudinary")) {
       const decodedUrl = decodeURIComponent(updatedDoc.image);
       const publicId = decodedUrl
@@ -155,44 +222,98 @@ export async function PUT(req: Request) {
         .catch((err) => console.error("Tag remove failed:", err));
     }
 
+    // What changed: every field that was sent (password only as "Changed")
+    const fields = Object.keys({ ...updateData, parentId: 1 }).filter((k) => !NOT_LOGGED.includes(k));
+    const changes: any[] = diffChanges(plain(before), plain(updatedDoc.toObject()), fields) || [];
+    if (updateData.password !== undefined && String(updateData.password) !== String(before.password ?? "")) {
+      changes.push({ field: "Password", from: "••••••", to: "Changed" });
+    }
+
+    if (changes.length) {
+      logActivity(access!, req, {
+        action: "update",
+        module: "students",
+        schoolId: String(schoolId),
+        entityId: id,
+        entityLabel: labelOf(updatedDoc),
+        summary: "Updated student",
+        changes,
+      });
+    }
+
     return NextResponse.json(updatedDoc);
   } catch (error: any) {
+    console.error("Students PUT error:", error?.message);
     return NextResponse.json({ message: error.message }, { status: 400 });
   }
 }
 
+// --- DELETE: Delete Student (Add Student → Delete) ---
+//     { id, schoolId, preview?: true }
+//     preview → only says what will be deleted (nothing is removed)
+//     Student with fee payments → not allowed (mark Inactive instead)
 export async function DELETE(req: Request) {
   try {
+    const { access, error } = await requirePermission("students", "delete");
+    if (error) return error;
+
     await connectDB();
-    const session = await getServerSession(authOptions);
-    const { id, schoolId: bodySchoolId } = await req.json();
-    const isSuperAdmin = session?.user?.role === "super_admin";
-    const schoolId = isSuperAdmin ? bodySchoolId : session?.user?.schoolId;
+    const body = await req.json().catch(() => null);
+    const id = body?.id;
+    const schoolId = schoolIdFor(access!, body?.schoolId);
 
     if (!schoolId) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      return NextResponse.json({ message: "Student ID is required" }, { status: 400 });
+    }
 
-    // Pehle check ke student isi school ka hai
-    const student = await Student.findOne({ _id: id, schoolId });
+    // The student must belong to this school
+    const student: any = await (Student as any).findOne({ _id: id, schoolId });
     if (!student) {
+      return NextResponse.json({ message: "Student not found" }, { status: 404 });
+    }
+
+    // Payments (and later marks / attendance) → keep the record
+    const { blockers, willDelete } = await checkStudentDelete(String(id));
+    if (blockers.length) {
       return NextResponse.json(
-        { message: "Student not found" },
-        { status: 404 },
+        {
+          message: `This student has ${blockers.join(" and ")}, so it can't be deleted. Mark the student as Inactive instead.`,
+          blockers,
+        },
+        { status: 409 },
       );
     }
 
-    await Student.deleteOne({ _id: id, schoolId });
+    // Confirm dialog asks first: what will be removed with the student?
+    if (body?.preview) {
+      return NextResponse.json({ canDelete: true, willDelete });
+    }
+
+    // Linked records first, then the student
+    await deleteStudentLinks(String(id));
+    await (Student as any).deleteOne({ _id: id, schoolId });
 
     // Cloudinary cleanup
     if (student.image && student.image.includes("cloudinary")) {
-      deleteImage(student.image).catch((err) =>
-        console.error("Cloudinary delete failed:", err),
-      );
+      deleteImage(student.image).catch((err) => console.error("Cloudinary delete failed:", err));
     }
+
+    const extra = willDelete.map((w) => `${w.count} ${w.label}`).join(", ");
+    logActivity(access!, req, {
+      action: "delete",
+      module: "students",
+      schoolId: String(schoolId),
+      entityId: id,
+      entityLabel: labelOf(student),
+      summary: extra ? `Deleted student · Also removed ${extra}` : "Deleted student",
+    });
 
     return NextResponse.json({ message: "Student Deleted" });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 400 });
+    console.error("Students DELETE error:", error?.message);
+    return NextResponse.json({ message: "Failed to delete student" }, { status: 400 });
   }
 }

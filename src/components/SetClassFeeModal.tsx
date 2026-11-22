@@ -20,6 +20,7 @@ interface SetFeeModalProps {
   loading: boolean;
 }
 
+
 export default function SetFeeModal({
   isOpen,
   onClose,

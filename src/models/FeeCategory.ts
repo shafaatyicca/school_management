@@ -14,6 +14,7 @@ export interface IFeeCategory extends Document {
   updatedAt: Date;
 }
 
+
 const FeeCategorySchema = new Schema<IFeeCategory>(
   {
     name: {

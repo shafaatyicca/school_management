@@ -8,10 +8,10 @@ import {
   CalendarCheck,
   GraduationCap,
 } from "lucide-react";
-import { FileSpreadsheet, FileText, Printer } from "lucide-react";
-import { handleExportRows, handlePrintTable } from "@/lib/exportUtils";
+import ExportButtons from "@/components/ExportButtons";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
+import PageGuard from "@/components/PageGuard";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -40,7 +40,7 @@ type CategoryFormValues = {
   feeSource: FeeSource;
 };
 
-export default function FeeCategoryPage() {
+function FeeCategoriesPage() {
   const { data: session } = useSession();
   const schoolId = session?.user?.schoolId;
   const isSuperAdmin = session?.user?.role === "super_admin";
@@ -81,7 +81,11 @@ export default function FeeCategoryPage() {
       const res = await fetch(
         `/api/Fee_Management/fee-categories?schoolId=${effectiveSchoolId}`,
       );
-      const data = await res.json();
+            const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        notify.error(data?.message || "Failed to load fee categories");
+        return;
+      }
       if (Array.isArray(data)) {
         setCategories(data);
       }
@@ -100,7 +104,7 @@ export default function FeeCategoryPage() {
       hostname.includes(".lvh.me") || hostname.includes(".localhost");
     if (isSubdomain) {
       const slug = hostname.split(".")[0];
-      fetch(`/api/superadmin/schools?slug=${slug}`)
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
           if (data?._id) setViewSchoolId(data._id);
@@ -170,11 +174,17 @@ export default function FeeCategoryPage() {
         { method: "DELETE" },
       );
       if (res.ok) {
+        notify.success("Category deleted");
         fetchCategories();
-        setDeleteDialog({ open: false, id: null });
+      } else {
+        const err = await res.json().catch(() => null);
+        notify.error(err?.error || err?.message || "Delete failed");
       }
     } catch (error) {
       console.error("Delete failed", error);
+      notify.error("Something went wrong");
+    } finally {
+      setDeleteDialog({ open: false, id: null });
     }
   };
 
@@ -274,34 +284,7 @@ export default function FeeCategoryPage() {
       ) : null,
 
     renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() =>
-            handleExportRows(table, "excel", "Fee Categories List")
-          }
-          variant="outline"
-          size="sm"
-          className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 cursor-pointer h-8"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
-        </Button>
-        <Button
-          onClick={() => handleExportRows(table, "pdf", "Fee Categories List")}
-          variant="outline"
-          size="sm"
-          className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-900/20 cursor-pointer h-8"
-        >
-          <FileText className="h-4 w-4 mr-1" /> PDF
-        </Button>
-        <Button
-          onClick={() => handlePrintTable(table, "Fee Categories List")}
-          variant="outline"
-          size="sm"
-          className="text-slate-600 border-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer h-8 dark:text-slate-300"
-        >
-          <Printer className="h-4 w-4 mr-1" /> Print
-        </Button>
-      </div>
+      <ExportButtons table={table} module="feeCategories" title="Fee Categories List" />
     ),
     muiTablePaperProps: {
       elevation: 0,
@@ -347,6 +330,13 @@ export default function FeeCategoryPage() {
         itemName="Fee Category"
       />
     </div>
+  );
+}
+export default function Page() {
+  return (
+    <PageGuard module="feeCategories">
+      <FeeCategoriesPage />
+    </PageGuard>
   );
 }
 

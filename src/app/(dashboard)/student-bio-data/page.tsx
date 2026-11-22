@@ -10,9 +10,12 @@ import {
   Search,
   Users,
   Filter,
+  Lock,
 } from "lucide-react";
 import { TextField } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
+import PageGuard from "@/components/PageGuard";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { Button } from "@/components/ui/button";
 import StudentSearchBox, { StudentOption } from "@/components/StudentSearchBox";
 import { notify } from "@/lib/notify";
@@ -23,16 +26,20 @@ const SEARCH_MODE = "__search__";
 const ALL = "all";
 type StatusFilter = "active" | "inactive" | "all";
 
-export default function StudentBioDataPage() {
+function StudentBioDataPage() {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
 
+  // Print → "Student Bio Data → Export/Print"
+  const { can } = usePermissions();
+  const canPrint = can("bioData", "export");
+
   const [school, setSchool] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
-    const [classesLoading, setClassesLoading] = useState(true);
+  const [classesLoading, setClassesLoading] = useState(true);
 
   // "" = nothing, SEARCH_MODE = search, "all" = all classes, otherwise classId
   const [mode, setMode] = useState("");
@@ -58,13 +65,13 @@ export default function StudentBioDataPage() {
     if (!isSuperAdmin) return;
     const host = window.location.hostname;
     if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}`)
+      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }
   }, [isSuperAdmin]);
 
-    // Classes — loaded on their own so the dropdown is ready quickly
+  // Classes — loaded on their own so the dropdown is ready quickly
   useEffect(() => {
     if (!schoolId) return;
     setClassesLoading(true);
@@ -75,7 +82,7 @@ export default function StudentBioDataPage() {
       .finally(() => setClassesLoading(false));
   }, [schoolId]);
 
-  // School details + settings (needed only when printing)
+  // School details + settings (needed only when printing — full record for logo/address)
   useEffect(() => {
     if (!schoolId) return;
     Promise.all([
@@ -161,6 +168,8 @@ export default function StudentBioDataPage() {
   };
 
   const handlePrint = async () => {
+    if (!canPrint) return;
+
     const opts = {
       school: {
         name: school?.name,
@@ -185,7 +194,11 @@ export default function StudentBioDataPage() {
     try {
       const ids = picked.map((p) => p._id).join(",");
       const res = await fetch(`/api/students?schoolId=${schoolId}&ids=${ids}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        notify.error(data?.message || "Failed to load student details");
+        return;
+      }
       printBioData(Array.isArray(data) ? data : [], opts);
     } catch {
       notify.error("Failed to load student details");
@@ -216,7 +229,7 @@ export default function StudentBioDataPage() {
         style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
       >
         <div className="flex flex-wrap items-center gap-3">
-                    <TextField
+          <TextField
             select
             label="Select By"
             size="small"
@@ -384,14 +397,24 @@ export default function StudentBioDataPage() {
                   </Button>
                 </>
               )}
-              <Button
-                onClick={handlePrint}
-                disabled={targetCount === 0 || printing || !school}
-                className="h-8 ml-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5 mr-1" />
-                {printing ? "Preparing..." : `Print Bio Data (${targetCount})`}
-              </Button>
+
+              {canPrint ? (
+                <Button
+                  onClick={handlePrint}
+                  disabled={targetCount === 0 || printing || !school}
+                  className="h-8 ml-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 mr-1" />
+                  {printing ? "Preparing..." : `Print Bio Data (${targetCount})`}
+                </Button>
+              ) : (
+                <span
+                  className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
+                  <Lock className="w-3.5 h-3.5" /> No print permission
+                </span>
+              )}
             </div>
           </div>
 
@@ -483,5 +506,14 @@ export default function StudentBioDataPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Guard: page opens only with "Student Bio Data → View"
+export default function Page() {
+  return (
+    <PageGuard module="bioData">
+      <StudentBioDataPage />
+    </PageGuard>
   );
 }

@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { wasJustDenied } from "@/lib/accessDenied";
 
 export const notify = {
   success: (message: string, description?: string) =>
@@ -8,12 +9,15 @@ export const notify = {
       style: { "--duration": "3000ms" } as React.CSSProperties,
     }),
 
-  error: (message: string, description?: string) =>
-    toast.error(message, {
+  error: (message: string, description?: string) => {
+    // The Access Denied modal is already showing this exact message → no toast
+    if (wasJustDenied(message)) return;
+    return toast.error(message, {
       description,
       duration: 5000,
       style: { "--duration": "5000ms" } as React.CSSProperties,
-    }),
+    });
+  },
 
   warning: (message: string, description?: string) =>
     toast.warning(message, {

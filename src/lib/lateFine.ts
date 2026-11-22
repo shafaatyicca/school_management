@@ -1,11 +1,9 @@
 import { StudentFeeInvoice } from "@/models/StudentFeeInvoice";
 import { FeeCategoryModel } from "@/models/FeeCategory";
 import Student from "@/models/Student";
-import {
-  getSchoolSettings,
-  billingDueDate,
-  lateFeeAmount,
-} from "@/lib/schoolSettings";
+import { getSchoolSettings } from "@/lib/schoolSettings";
+import { billingDueDate, lateFeeAmount } from "@/lib/voucherDates";
+import { pkToday } from "@/lib/pkTime";
 
 const MONTHS = [
   "", "January", "February", "March", "April", "May", "June",
@@ -13,10 +11,10 @@ const MONTHS = [
 ];
 
 /**
- * Settings mein "Apply" tick ho to:
- * - sirf "Apply from" mahine aur us ke baad ki invoices
- * - due date guzar jaye aur us mahine ki invoices pending/partial hon
- * → us mahine ka EK fine invoice banao (dobara nahi banega)
+ * When "Apply" is ticked in Settings:
+ * - only invoices of the "Apply from" month and later
+ * - the due date has passed and that month's invoices are pending / partial
+ * → ONE fine invoice for that month (never created twice)
  */
 export async function applyLateFines(studentId: string) {
   const student: any = await Student.findById(studentId).select("schoolId").lean();
@@ -26,10 +24,11 @@ export async function applyLateFines(studentId: string) {
   const lf = settings.lateFee;
   if (!lf.autoApply || !lf.categoryId || !(lf.value > 0)) return;
 
-  // Start month na ho to safe default: is mahine se (purane mahine kabhi nahi)
+  // No start month → safe default: this month (Pakistan), never older months
   const now = new Date();
-  const startYear = Number(lf.startYear) || now.getFullYear();
-  const startMonth = Number(lf.startMonth) || now.getMonth() + 1;
+  const today = pkToday();
+  const startYear = Number(lf.startYear) || today.y;
+  const startMonth = Number(lf.startMonth) || today.m;
   const startKey = startYear * 12 + startMonth;
 
   const fineCat: any = await FeeCategoryModel.findOne({
@@ -38,7 +37,7 @@ export async function applyLateFines(studentId: string) {
   } as any).lean();
   if (!fineCat) return;
 
-  // Fine wali invoices ko chhod kar baqi unpaid invoices
+  // Unpaid invoices, except the fine invoices themselves
   const unpaid: any[] = await StudentFeeInvoice.find({
     studentId,
     status: { $in: ["pending", "partial"] },
@@ -50,11 +49,12 @@ export async function applyLateFines(studentId: string) {
   const overdue = new Map<string, { month: number; year: number; due: number }>();
 
   for (const inv of unpaid) {
-    // "Apply from" se pehle ke mahine → skip
+    // Months before "Apply from" → skip
     if (inv.year * 12 + inv.month < startKey) continue;
 
+    // Due day 11:59:59 PM Pakistan time
     const dueDate = billingDueDate(inv.year, inv.month, settings.voucher.dueDay);
-    if (now <= dueDate) continue; // abhi due date nahi guzri
+    if (now <= dueDate) continue; // due date not passed yet
 
     const key = `${inv.year}-${inv.month}`;
     const g = overdue.get(key) || { month: inv.month, year: inv.year, due: 0 };
@@ -63,7 +63,7 @@ export async function applyLateFines(studentId: string) {
   }
 
   for (const g of overdue.values()) {
-    // Is mahine ka fine pehle se hai? → skip
+    // This month's fine already exists → skip
     const exists = await StudentFeeInvoice.exists({
       studentId,
       feeCategoryId: fineCat._id,

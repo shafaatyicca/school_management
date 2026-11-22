@@ -24,14 +24,14 @@ export default function LoginPage() {
 
       if (res?.error) {
         if (
-          res.error.includes("User nahi mila") ||
-          res.error.includes("Password galat")
+          res.error.includes("user not found") ||
+          res.error.includes("Password is incorrect")
         ) {
-          notify.error("Login Failed", "Email ya Password galat hai!");
+          notify.error("Login Failed", "Email or Password is incorrect!");
         } else {
           notify.error(
             "Login Error",
-            "Login nahi ho saka. Meharbani karke dubara koshish karein.",
+            "Unable to log in. Please try again.",
           );
         }
         setLoading(false);
@@ -68,7 +68,7 @@ export default function LoginPage() {
         }
       }
     } catch (err) {
-      notify.error("System Error", "System mein koi masla hua hai.");
+      notify.error("System Error", "Something went wrong. Please try again.");
       setLoading(false);
     }
   };

@@ -9,6 +9,8 @@ import {
 import { Close as CloseIcon } from "@mui/icons-material";
 import { Receipt } from "lucide-react";
 import { notify } from "@/lib/notify";
+import { showAccessDenied } from "@/lib/accessDenied";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 interface ModalProps {
   isOpen: boolean;
@@ -28,6 +30,10 @@ export default function DiscountAddModal({
 }: ModalProps) {
   const isEditMode = !!editDiscount;
 
+  // Apply → "Fee Discounts → Create", Update → "Fee Discounts → Edit"
+  const { can } = usePermissions();
+  const canSave = can("discounts", isEditMode ? "edit" : "create");
+
   const [categories,      setCategories]      = useState<any[]>([]);
   const [discountMap,     setDiscountMap]     = useState<Record<string, any>>({});
   const [selectedBaseFee, setSelectedBaseFee] = useState(0);
@@ -37,7 +43,7 @@ export default function DiscountAddModal({
   const [remarks,         setRemarks]         = useState("");
   const [loading,         setLoading]         = useState(false);
 
-  // Category ka base fee: locked record → class fee → category fee
+  // Category base fee: locked record → class fee → category fee
   const getBaseFee = (catId: string, map: Record<string, any>) => {
     const record = map[catId];
     if (record) return record.baseFee || 0;
@@ -45,13 +51,13 @@ export default function DiscountAddModal({
     return cat?.feeSource === "class_fee" ? classFee : cat?.maxBaseFee || 0;
   };
 
-  // Categories + student ke existing records fetch
+  // Categories + the student's existing records
   useEffect(() => {
     if (!isOpen || !schoolId) return;
     Promise.all([
-      fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}`).then((r) => r.json()),
+      fetch(`/api/Fee_Management/fee-categories?schoolId=${schoolId}&for=fees`).then((r) => r.json()),
       studentId
-        ? fetch(`/api/Fee_Management/discounts?studentId=${studentId}`).then((r) => r.json())
+        ? fetch(`/api/Fee_Management/discounts?studentId=${studentId}&schoolId=${schoolId}`).then((r) => r.json())
         : Promise.resolve([]),
     ])
       .then(([cats, discs]) => {
@@ -66,13 +72,16 @@ export default function DiscountAddModal({
       .catch(() => notify.error("Failed to load categories"));
   }, [isOpen, schoolId, studentId]);
 
-  // Edit data fill
+  // Fill edit data
   useEffect(() => {
     if (!isOpen) return;
     if (isEditMode && editDiscount && categories.length > 0) {
       const baseFee = editDiscount.baseFee || 0;
       const netFee  = editDiscount.customNetFee ?? baseFee;
-      setFeeCategoryId(editDiscount.feeCategoryId?._id || "");
+      // feeCategoryId can be an object (populated) or a plain id
+      setFeeCategoryId(
+        String(editDiscount.feeCategoryId?._id || editDiscount.feeCategoryId || ""),
+      );
       setSelectedBaseFee(baseFee);
       setDiscountType(editDiscount.discountType || "fixed");
       setDiscountValue(editDiscount.discountValue ?? baseFee - netFee);
@@ -94,7 +103,7 @@ export default function DiscountAddModal({
     }
     setSelectedBaseFee(getBaseFee(catId, discountMap));
 
-    // Record pehle se hai to us ki values bhar do
+    // A record already exists → fill its values
     const record = discountMap[catId];
     if (record && !isEditMode) {
       setDiscountType(record.discountType || "fixed");
@@ -110,9 +119,22 @@ export default function DiscountAddModal({
   };
 
   const handleSubmit = async () => {
+    if (loading) return;
+    if (!canSave) {
+      showAccessDenied(`You don't have permission to ${isEditMode ? "edit" : "add"} discounts.`);
+      return;
+    }
     if (!feeCategoryId) return notify.error("Please select a category");
     if (discountValue === "" || discountValue === 0)
       return notify.error("Please enter discount value");
+
+    // Limits
+    const val = Number(discountValue);
+    if (val < 0) return notify.error("Discount cannot be negative");
+    if (discountType === "percentage" && val > 100)
+      return notify.error("Discount cannot be more than 100%");
+    if (discountType === "fixed" && val > selectedBaseFee)
+      return notify.error(`Discount cannot be more than Rs. ${selectedBaseFee.toLocaleString()}`);
 
     setLoading(true);
     const payload = {
@@ -120,7 +142,7 @@ export default function DiscountAddModal({
       baseFee: selectedBaseFee,
       customNetFee: calculateNetFee(),
       discountType,
-      discountValue: Number(discountValue),
+      discountValue: val,
       remarks,
     };
 
@@ -132,11 +154,14 @@ export default function DiscountAddModal({
           isEditMode ? { id: editDiscount._id, ...payload } : payload
         ),
       });
+      // Read the API's own message (e.g. permission or "Student not found")
+      const data = await res.json().catch(() => null);
+
       if (res.ok) {
         notify.success(isEditMode ? "Discount updated!" : "Discount applied!");
         onSuccess();
       } else {
-        notify.error("Error saving discount");
+        notify.error(data?.message || "Error saving discount");
       }
     } catch {
       notify.error("Something went wrong");
@@ -231,6 +256,10 @@ export default function DiscountAddModal({
               onChange={(e) =>
                 setDiscountValue(e.target.value === "" ? "" : Number(e.target.value))
               }
+              inputProps={{
+                min: 0,
+                max: discountType === "percentage" ? 100 : selectedBaseFee || undefined,
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -346,20 +375,26 @@ export default function DiscountAddModal({
         >
           Cancel
         </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={loading}
-          size="small"
-          sx={{
-            backgroundColor: "#1e293b",
-            "&:hover": { backgroundColor: "#334155" },
-            textTransform: "none",
-            px: 2,
-          }}
-        >
-          {loading ? "Saving..." : isEditMode ? "Update Discount" : "Apply Discount"}
-        </Button>
+        {canSave ? (
+          <Button
+            onClick={handleSubmit}
+            variant="contained"
+            disabled={loading}
+            size="small"
+            sx={{
+              backgroundColor: "#1e293b",
+              "&:hover": { backgroundColor: "#334155" },
+              textTransform: "none",
+              px: 2,
+            }}
+          >
+            {loading ? "Saving..." : isEditMode ? "Update Discount" : "Apply Discount"}
+          </Button>
+        ) : (
+          <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 px-2">
+            You don&apos;t have permission to {isEditMode ? "edit" : "add"} discounts
+          </span>
+        )}
       </DialogActions>
     </Dialog>
   );
