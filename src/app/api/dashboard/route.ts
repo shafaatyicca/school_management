@@ -472,7 +472,6 @@ export async function GET(req: Request) {
     if (!access) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
     await connectDB();
-    // Super Admin: school from ?schoolId=, otherwise from the subdomain (e.g. abc.lvh.me)
     let requested = new URL(req.url).searchParams.get("schoolId");
     if (access.isSuperAdmin && !requested) {
       const host = (req.headers.get("host") || "").split(":")[0];
