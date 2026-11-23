@@ -5,6 +5,11 @@ import { getSchoolSettings } from "@/lib/schoolSettings";
 import { billingDueDate, lateFeeAmount } from "@/lib/voucherDates";
 import { pkToday } from "@/lib/pkTime";
 
+// "as any" avoids Mongoose union-type errors on Vercel builds
+const StudentM = Student as any;
+const FeeCategoryM = FeeCategoryModel as any;
+const InvoiceM = StudentFeeInvoice as any;
+
 const MONTHS = [
   "", "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -17,7 +22,7 @@ const MONTHS = [
  * → ONE fine invoice for that month (never created twice)
  */
 export async function applyLateFines(studentId: string) {
-  const student: any = await Student.findById(studentId).select("schoolId").lean();
+  const student: any = await StudentM.findById(studentId).select("schoolId").lean();
   if (!student) return;
 
   const settings = await getSchoolSettings(student.schoolId);
@@ -31,18 +36,18 @@ export async function applyLateFines(studentId: string) {
   const startMonth = Number(lf.startMonth) || today.m;
   const startKey = startYear * 12 + startMonth;
 
-  const fineCat: any = await FeeCategoryModel.findOne({
+  const fineCat: any = await FeeCategoryM.findOne({
     _id: lf.categoryId,
     schoolId: student.schoolId,
-  } as any).lean();
+  }).lean();
   if (!fineCat) return;
 
   // Unpaid invoices, except the fine invoices themselves
-  const unpaid: any[] = await StudentFeeInvoice.find({
+  const unpaid: any[] = await InvoiceM.find({
     studentId,
     status: { $in: ["pending", "partial"] },
     feeCategoryId: { $ne: fineCat._id },
-  } as any)
+  })
     .select("month year remainingAmount")
     .lean();
 
@@ -64,18 +69,18 @@ export async function applyLateFines(studentId: string) {
 
   for (const g of overdue.values()) {
     // This month's fine already exists → skip
-    const exists = await StudentFeeInvoice.exists({
+    const exists = await InvoiceM.exists({
       studentId,
       feeCategoryId: fineCat._id,
       month: g.month,
       year: g.year,
-    } as any);
+    });
     if (exists) continue;
 
     const amount = lateFeeAmount(g.due, lf.mode, lf.value);
     if (amount <= 0) continue;
 
-    await StudentFeeInvoice.create({
+    await InvoiceM.create({
       studentId,
       schoolId: student.schoolId,
       feeCategoryId: fineCat._id,
