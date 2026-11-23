@@ -15,6 +15,8 @@ import {
 } from "@/lib/printFeeVoucher";
 import PageGuard from "@/components/PageGuard";
 import { usePermissions } from "@/components/PermissionsProvider";
+import { getSubdomain } from "@/lib/host";
+
 
 function AdmissionFormPage() {
   const { data: session } = useSession();
@@ -34,9 +36,9 @@ function AdmissionFormPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }

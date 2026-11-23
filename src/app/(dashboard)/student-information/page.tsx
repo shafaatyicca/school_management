@@ -18,6 +18,7 @@ import { calculateAge, calculateTenure, formatDate } from "@/lib/tenureUtils";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { useStudentModal } from "@/hooks/useStudentModal";
+import { getSubdomain } from "@/lib/host";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
@@ -67,9 +68,9 @@ function StudentInformationPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    if (hostname.includes(".lvh.me") || hostname.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${hostname.split(".")[0]}&fields=basic`)
+       const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => data?._id && setViewSchoolId(data._id));
     }
@@ -720,6 +721,7 @@ function StudentInformationPage() {
     </div>
   );
 }
+
 
 // Guard: page opens only with "Student Information → View"
 export default function Page() {

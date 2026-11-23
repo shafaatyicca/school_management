@@ -17,6 +17,7 @@ import TodoForm from "@/components/TodoForm";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
 import { WidgetCard, EmptyNote, timeAgo } from "./ui";
+import { toYMD } from "@/lib/pkTime";
 
 const MAX_ASSIGNEES = 5; // chips shown per task, the rest as "+N"
 
@@ -38,8 +39,57 @@ const rankOf = (t: any) => PRIORITY[t.priority]?.rank ?? 2;
 const empLabel = (e: any) =>
   e ? `(${e.emp_id ?? "-"}) ${e.fullName}${e.designation ? ` (${e.designation})` : ""}` : "Removed employee";
 
-
 const userLabel = (u: any) => (u ? `${u.name}${u.roleName ? ` (${u.roleName})` : ""}` : "Removed user");
+
+// Due date → badge (Overdue / Today / Upcoming)
+type DueBadge = { text: string; date: string; cls: string; dot?: string } | null;
+
+const fmtDay = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
+const dueInfo = (t: any, today: string): DueBadge => {
+  if (!t.deadline) return null;
+  const ymd = toYMD(new Date(t.deadline));
+  const date = fmtDay(ymd);
+
+  // Completed → plain grey, no blink
+  if (t.status === "completed")
+    return { text: date, date, cls: "border-slate-200 text-muted-foreground dark:border-slate-700" };
+
+  // Past date → red, blinking
+  if (ymd < today)
+    return {
+      text: `${date} · Overdue`,
+      date,
+      cls: "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-400",
+      dot: "bg-rose-500",
+    };
+
+  // Today → orange, blinking
+  if (ymd === today)
+    return {
+      text: `${date} · Today`,
+      date,
+      cls: "border-orange-200 bg-orange-50 text-orange-600 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-400",
+      dot: "bg-orange-500",
+    };
+
+  // Future → blue, blinking
+  return {
+    text: date,
+    date,
+    cls: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-300",
+    dot: "bg-sky-500",
+  };
+};
+const dueKey = (t: any) => (t.deadline ? new Date(t.deadline).getTime() : Infinity);
 
 export default function TasksWidget({
   todos,
@@ -66,13 +116,17 @@ export default function TasksWidget({
   const userById = useMemo(() => new Map(users.map((u) => [String(u._id), u])), [users]);
   const activeEmployees = useMemo(() => employees.filter((e) => e.status !== "inactive"), [employees]);
 
-    // Pending first → Urgent, High, Normal → newest first. Completed at the bottom.
+  // Today (Pakistan) — for due badges
+  const today = toYMD();
+
+  // Pending first → Urgent, High, Normal → nearest due date → newest. Completed at the bottom.
   const sorted = useMemo(
     () =>
       [...todos].sort(
         (a, b) =>
           (a.status === "completed" ? 1 : 0) - (b.status === "completed" ? 1 : 0) ||
           rankOf(a) - rankOf(b) ||
+          dueKey(a) - dueKey(b) ||
           new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
       ),
     [todos],
@@ -167,6 +221,7 @@ export default function TasksWidget({
                 const id = String(todo._id);
                 const done = todo.status === "completed";
                 const busy = busyId === id;
+                const due = dueInfo(todo, today);
 
                 // Login users (violet) first, then employees (sky)
                 const chips = [
@@ -229,7 +284,7 @@ export default function TasksWidget({
                                 PRIORITY[todo.priority]?.cls || ""
                               }`}
                             >
-                              {PRIORITY[todo.priority]?.label || todo.priority}
+                              Priority: {PRIORITY[todo.priority]?.label || todo.priority}
                             </span>
                           )}
                           <span
@@ -239,33 +294,53 @@ export default function TasksWidget({
                                 : "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400"
                             }`}
                           >
-                            {todo.status}
+                            Status: {todo.status}
                           </span>
+
+                          {/* Due date badge (blinks until completed) */}
+                          {due && (
+                            <span
+                              className={`inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-[8px] font-bold uppercase ${due.cls} ${
+                                due.dot ? "motion-safe:animate-pulse" : ""
+                              }`}
+                              title={`Due date: ${due.date}`}
+                            >
+                              {due.dot && (
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span
+                                    className={`absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping ${due.dot}`}
+                                  />
+                                  <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${due.dot}`} />
+                                </span>
+                              )}
+                              Due Date: {due.text}
+                            </span>
+                          )}
                         </div>
 
                         {/* Edit / delete (admins, on hover) */}
                         {isAdmin && (
                           <div className="-mt-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditing(todo);
-                              setFormOpen(true);
-                            }}
-                            title="Edit task"
-                            className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:text-slate-400 dark:hover:bg-sky-500/15 dark:hover:text-sky-400 cursor-pointer"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleting(todo)}
-                            title="Delete task"
-                            className="rounded-md p-1.5 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/15 dark:hover:text-rose-300 cursor-pointer"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditing(todo);
+                                setFormOpen(true);
+                              }}
+                              title="Edit task"
+                              className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:text-slate-400 dark:hover:bg-sky-500/15 dark:hover:text-sky-400 cursor-pointer"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleting(todo)}
+                              title="Delete task"
+                              className="rounded-md p-1.5 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:text-rose-400 dark:hover:bg-rose-500/15 dark:hover:text-rose-300 cursor-pointer"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -314,7 +389,9 @@ export default function TasksWidget({
                                 : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
                             }`}
                           >
-                            {done ? "Reopen" : (
+                            {done ? (
+                              "Reopen"
+                            ) : (
                               <>
                                 <CheckCircle2 className="h-3 w-3" /> Mark as completed
                               </>

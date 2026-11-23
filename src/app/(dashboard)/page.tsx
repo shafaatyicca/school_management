@@ -27,6 +27,7 @@ import Admissions from "@/components/dashboard/Admissions";
 import LoginActivity from "@/components/dashboard/LoginActivity";
 import MyActivity from "@/components/dashboard/MyActivity";
 import TasksWidget from "@/components/dashboard/TasksWidget";
+import { getSubdomain, isSchoolHost, schoolUrl } from "@/lib/host";
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -63,28 +64,18 @@ export default function DashboardPage() {
       return;
     }
 
-    if (status === "authenticated") {
+        if (status === "authenticated") {
       if (session?.user?.role === "super_admin") {
-        const hostname = window.location.hostname;
-        const isSubdomain = hostname.includes(".lvh.me") || hostname.includes(".localhost");
-        if (!isSubdomain) router.push("/superadmin");
+        if (!isSchoolHost(window.location.hostname)) router.push("/superadmin");
         return;
       }
 
-      const hostname = window.location.hostname;
-      const isLocalhost = hostname.includes("localhost");
       const schoolSlug = session?.user?.schoolSlug;
       if (!schoolSlug) return;
 
-      const currentSubdomain = hostname.split(".")[0];
-      const isCorrectSubdomain = isLocalhost
-        ? currentSubdomain === schoolSlug
-        : hostname.startsWith(`${schoolSlug}.`);
-
-      if (!isCorrectSubdomain) {
-        window.location.href = isLocalhost
-          ? `http://${schoolSlug}.localhost:3000`
-          : `https://${schoolSlug}.${process.env.NEXT_PUBLIC_MAIN_DOMAIN}`;
+      // Wrong subdomain → go to the user's own school
+      if (getSubdomain(window.location.hostname) !== schoolSlug) {
+        window.location.href = schoolUrl(schoolSlug);
       }
     }
   }, [status, session, router]);
@@ -92,9 +83,9 @@ export default function DashboardPage() {
   // ── Super Admin: school _id from the subdomain ──────────────
   useEffect(() => {
     if (status === "loading" || !isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    if (hostname.includes(".lvh.me") || hostname.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${hostname.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+    fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => (d?._id ? setViewSchoolId(d._id) : setLoading(false)))
         .catch(() => setLoading(false));
@@ -184,6 +175,7 @@ export default function DashboardPage() {
       </div>
     );
   }
+
   // ── Blocks this user has (only allowed widgets arrive from the API) ──
   const w = data?.widgets || {};
   const blocks: Record<string, React.ReactNode> = {};

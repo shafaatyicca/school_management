@@ -31,6 +31,8 @@ import { usePermissions } from "@/components/PermissionsProvider";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notify";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
+import { getSubdomain } from "@/lib/host";
+
 
 const MAX_ITEMS = 15; // Keeps the voucher within a single printed page
 const ACCENT = "#0284c7";
@@ -257,9 +259,9 @@ function SettingsPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }

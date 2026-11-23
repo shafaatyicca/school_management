@@ -23,6 +23,7 @@ import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
+import { getSubdomain } from "@/lib/host";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -206,6 +207,7 @@ export default function ActivityLogsPage() {
   const [deleteMonth, setDeleteMonth] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+
   // School id (super admin → from subdomain)
   useEffect(() => {
     if (session?.user?.schoolId) {
@@ -213,9 +215,9 @@ export default function ActivityLogsPage() {
       return;
     }
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setSchoolId(d._id))
         .catch(() => {});

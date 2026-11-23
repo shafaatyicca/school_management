@@ -15,6 +15,7 @@ import StudentSearchBox from "@/components/StudentSearchBox";
 import RecentPaymentsModal from "@/components/RecentPaymentsModal";
 import PageGuard from "@/components/PageGuard";
 import { usePermissions } from "@/components/PermissionsProvider";
+import { getSubdomain } from "@/lib/host";
 
 function StudentFeeLedgerPage() {
   const { data: session } = useSession();
@@ -48,11 +49,8 @@ function StudentFeeLedgerPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    const isSubdomain =
-      hostname.includes(".lvh.me") || hostname.includes(".localhost");
-    if (isSubdomain) {
-      const slug = hostname.split(".")[0];
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
@@ -131,6 +129,7 @@ function StudentFeeLedgerPage() {
       urlStudentLoaded.current = id;
       loadStudent(id);
     }
+
 
     const onOpen = (e: Event) => loadStudent((e as CustomEvent).detail);
     window.addEventListener("ledger:open-student", onOpen);
@@ -221,9 +220,12 @@ function StudentFeeLedgerPage() {
                           <td className="p-1">Admission Date</td>
                           <td className="p-1">
                             {studentInfo.enrollmentDate
-                              ? new Date(
-                                  studentInfo.enrollmentDate,
-                                ).toLocaleDateString()
+                              ? new Date(studentInfo.enrollmentDate).toLocaleDateString("en-GB", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  timeZone: "Asia/Karachi",
+                                })
                               : "---"}
                           </td>
                         </tr>

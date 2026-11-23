@@ -21,6 +21,7 @@ import StudentSearchBox, { StudentOption } from "@/components/StudentSearchBox";
 import { notify } from "@/lib/notify";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
 import { printBioData } from "@/lib/printFeeVoucher";
+import { getSubdomain } from "@/lib/host";
 
 const SEARCH_MODE = "__search__";
 const ALL = "all";
@@ -31,6 +32,7 @@ function StudentBioDataPage() {
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
+
 
   // Print → "Student Bio Data → Export/Print"
   const { can } = usePermissions();
@@ -63,9 +65,9 @@ function StudentBioDataPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }

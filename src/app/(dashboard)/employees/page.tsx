@@ -22,6 +22,8 @@ import {
 import EmployeeProfileModal from "@/components/EmployeeProfileModal";
 import { calculateTenure, formatDate } from "@/lib/tenureUtils";
 import { useEmployeeModal } from "@/hooks/useEmployeeModal";
+import { getSubdomain } from "@/lib/host";
+
 
 function EmployeesPage() {
   const { data: session } = useSession();
@@ -51,11 +53,8 @@ function EmployeesPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    const isSubdomain =
-      hostname.includes(".lvh.me") || hostname.includes(".localhost");
-    if (isSubdomain) {
-      const slug = hostname.split(".")[0];
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {

@@ -19,6 +19,8 @@ import {
 } from "material-react-table";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { useSession } from "next-auth/react";
+import { getSubdomain } from "@/lib/host";
+
 
 function ClassPage() {
   const { data: session } = useSession();
@@ -72,11 +74,8 @@ function ClassPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    const isSubdomain =
-      hostname.includes(".lvh.me") || hostname.includes(".localhost");
-    if (isSubdomain) {
-      const slug = hostname.split(".")[0];
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {

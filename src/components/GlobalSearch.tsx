@@ -23,6 +23,7 @@ import { showAccessDenied } from "@/lib/accessDenied";
 import { printBioData } from "@/lib/printFeeVoucher";
 import { DEFAULT_UNDERTAKING } from "@/lib/voucherDates";
 import { notify } from "@/lib/notify";
+import { getSubdomain } from "@/lib/host";
 
 type Results = { students: any[]; parents: any[]; employees: any[] };
 const EMPTY: Results = { students: [], parents: [], employees: [] };
@@ -80,9 +81,9 @@ export default function GlobalSearch({
       return;
     }
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setSchoolId(d._id))
         .catch(() => {});

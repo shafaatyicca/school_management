@@ -27,6 +27,7 @@ import {
 import { ThemeToggle } from "@/components/siteTheme/ThemeToggle";
 import { useRouter } from "next/navigation";
 import GlobalSearch from "@/components/GlobalSearch";
+import { getSubdomain, mainUrl } from "@/lib/host";
 
 type SchoolInfo = { _id?: string; name: string; updatedAt?: string };
 
@@ -52,11 +53,8 @@ export default function Topbar() {
       if (currentSchoolId) {
         url = `/api/superadmin/schools?id=${currentSchoolId}&fields=basic`;
       } else {
-        const hostname = window.location.hostname;
-        const isSubdomain =
-          hostname.includes(".lvh.me") || hostname.includes(".localhost");
-        const slug = hostname.split(".")[0];
-        if (isSubdomain && slug) {
+       const slug = getSubdomain(window.location.hostname);
+        if (slug) {
           url = `/api/superadmin/schools?slug=${slug}&fields=basic`;
         }
       }
@@ -161,7 +159,7 @@ export default function Topbar() {
           <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1.5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 animate-in fade-in zoom-in duration-500">
             <button
               onClick={() =>
-                window.location.replace("http://lvh.me:3000/superadmin")
+                 window.location.replace(mainUrl("/superadmin"))
               }
               className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-100 hover:text-indigo-600 transition-colors group cursor-pointer"
             >

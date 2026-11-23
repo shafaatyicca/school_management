@@ -262,7 +262,7 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* Charts (unchanged components) */}
+      {/* Charts components */}
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-3 items-stretch">
         <div className="lg:col-span-7 [&>*]:h-full">
           <IncomeComposedChart />
@@ -271,6 +271,7 @@ export default function SuperAdminDashboard() {
           <YearlySummaryChart data={revenueData} />
         </div>
       </div>
+
 
       {/* Plans + Largest schools */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">

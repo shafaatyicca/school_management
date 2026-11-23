@@ -19,9 +19,10 @@ import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
+import { getSubdomain } from "@/lib/host";
 
 // ─────────────────────────────────────────────────────────────
-// Template columns (header text must match the uploaded sheet)
+// Template columns(header text must match the uploaded sheet)
 // ─────────────────────────────────────────────────────────────
 type Col = { key: string; header: string; required?: boolean; text?: boolean };
 
@@ -105,9 +106,9 @@ export default function StudentImportPage() {
   // School from subdomain (super admin only)
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}`)
+        const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}`)
         .then((r) => r.json())
         .then((d) => d?._id && setSchoolId(d._id));
     }
@@ -529,7 +530,7 @@ export default function StudentImportPage() {
             <tbody>
               {history.map((h) => (
                 <tr key={h._id} className="border-t" style={{ borderColor: "var(--border)" }}>
-                  <td className="p-2">{new Date(h.createdAt).toLocaleString("en-GB")}</td>
+                  <td className="p-2">{new Date(h.createdAt).toLocaleString("en-GB", { timeZone: "Asia/Karachi" })}</td>
                   <td className="p-2">{h.fileName || "—"}</td>
                   <td className="p-2">{h.totalRows}</td>
                   <td className="p-2">{h.students}</td>

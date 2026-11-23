@@ -6,6 +6,7 @@ import SchoolFormModal from "@/components/superadmin/SchoolModal";
 import { UserModal } from "@/components/superadmin/UserModal";
 import SchoolDetailPanel from "@/components/superadmin/SchoolDetailPanel";
 import { expiryInfo, isExpiring, TONE_TEXT } from "@/components/superadmin/schoolUtils";
+import { schoolUrl } from "@/lib/host";
 
 type Filter = "all" | "active" | "expiring" | "inactive";
 
@@ -189,11 +190,7 @@ export default function SchoolsPage() {
       notify.error("Failed!", "This school has no slug");
       return;
     }
-    const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "lvh.me:3000";
-    const isLocal =
-      window.location.hostname.includes("lvh.me") || window.location.hostname.includes("localhost");
-    const protocol = isLocal ? "http" : "https";
-    window.location.href = `${protocol}://${slug}.${mainDomain}`;
+    window.location.href = schoolUrl(slug);
   };
 
   const FILTERS: { key: Filter; label: string; on: string }[] = [
@@ -347,6 +344,7 @@ export default function SchoolsPage() {
             }}
             onDeleteUser={handleDeleteAdmin}
           />
+
         ) : (
           <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-200 bg-white text-sm text-slate-400">
             {loading ? (

@@ -15,6 +15,7 @@ import {
   Autocomplete,
 } from "@mui/material";
 import { notify } from "@/lib/notify";
+import { toYMD } from "@/lib/pkTime";
 
 type Option = { kind: "user" | "employee"; id: string; label: string };
 
@@ -35,6 +36,7 @@ export default function TodoForm({
       assignedUsers: [] as string[], // login users
       status: "pending",
       priority: "normal",
+      deadline: "",
     },
   });
 
@@ -50,9 +52,10 @@ export default function TodoForm({
         assignedUsers: (editData.assignedUsers || []).map((a: any) => String(a?._id || a)),
         status: editData.status,
         priority: editData.priority || "normal",
+        deadline: editData.deadline ? toYMD(new Date(editData.deadline)) : "",
       });
     } else {
-      reset({ title: "", description: "", assignedTo: [], assignedUsers: [], status: "pending", priority: "normal" });
+      reset({ title: "", description: "", assignedTo: [], assignedUsers: [], status: "pending", priority: "normal", deadline: "" });
     }
   }, [editData, reset, isOpen]);
 
@@ -125,7 +128,7 @@ export default function TodoForm({
           <TextField {...register("description")} label="Description" multiline rows={8} fullWidth size="small" />
 
           {/* Login users + employees: type to search, or open the list with the arrow */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_160px]">
+         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_160px_160px]">
           <Autocomplete
             multiple
             size="small"
@@ -188,6 +191,14 @@ export default function TodoForm({
               <MenuItem value="urgent">Urgent</MenuItem>
             </Select>
           </FormControl>
+          <TextField
+            {...register("deadline")}
+            type="date"
+            label="Due Date"
+            size="small"
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+          />
           </div>
 
           {/* Status (only when editing) */}

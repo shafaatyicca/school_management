@@ -20,20 +20,29 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const currentHost = hostname
-    .replace(".lvh.me:3000", "")
-    .replace(".localhost:3000", "")
-    .replace("localhost:3000", "")
-    .replace("lvh.me:3000", "");
-
-  const isLocal = hostname.includes("lvh.me") || hostname.includes("localhost");
+  // ── Domain (from env: "lvh.me:3000" locally, "myschoolapp.com" online)
+  const host = hostname.toLowerCase();
+  const mainDomain = (process.env.MAIN_DOMAIN || "lvh.me:3000").toLowerCase();
+  const isLocal = host.includes("lvh.me") || host.includes("localhost");
   const protocol = isLocal ? "http" : "https";
-  const mainDomain = process.env.MAIN_DOMAIN || "lvh.me:3000";
 
   const isMainDomain =
-    hostname === "localhost:3000" ||
-    hostname === "lvh.me:3000" ||
-    hostname === mainDomain;
+    host === mainDomain ||
+    host === `www.${mainDomain}` ||
+    host === "localhost:3000" ||
+    host === "lvh.me:3000" ||
+    host.endsWith(".vercel.app"); // Vercel's own link → main (Super Admin)
+
+  // School slug from the subdomain ("" on the main domain)
+  let currentHost = "";
+  if (!isMainDomain) {
+    for (const root of [mainDomain, "localhost:3000"]) {
+      if (host.endsWith(`.${root}`)) {
+        currentHost = host.slice(0, -(root.length + 1));
+        break;
+      }
+    }
+  }
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
@@ -50,7 +59,7 @@ export async function proxy(req: NextRequest) {
   const role = token.role;
   const userSchoolSlug = token.schoolSlug;
 
-    // ── Super-admin APIs: other roles may only READ their OWN school ──
+  // ── Super-admin APIs: other roles may only READ their OWN school ──
   if (pathname.startsWith("/api/superadmin") && role !== "super_admin") {
     const sp = req.nextUrl.searchParams;
     const ownSchoolId = String(token.schoolId || "");

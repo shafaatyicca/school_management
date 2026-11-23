@@ -28,8 +28,10 @@ import StudentSearchBox, { StudentOption } from "@/components/StudentSearchBox";
 import { notify } from "@/lib/notify";
 import { computeVoucherDates } from "@/lib/voucherDates";
 import { printVouchers } from "@/lib/printFeeVoucher";
+import { getSubdomain } from "@/lib/host";
+import { toYMD } from "@/lib/pkTime";
 
-// ─────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
@@ -223,7 +225,7 @@ function FeeVoucherPage() {
   const canPrint = can("vouchers", "export");
   const canOpenSettings = can("settings", "view");
 
-  const [issueDate, setIssueDate] = useState(dayjs().format("YYYY-MM-DD"));
+  const [issueDate, setIssueDate] = useState(toYMD());
   const [settings, setSettings] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
 
@@ -251,9 +253,9 @@ function FeeVoucherPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-     fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+        const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => d?._id && setViewSchoolId(d._id));
     }

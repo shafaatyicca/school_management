@@ -28,6 +28,9 @@ const TodoSchema = new Schema(
       enum: ["normal", "high", "urgent"],
       default: "normal",
     },
+
+    deadline: { type: Date, default: null },
+    
     schoolId: {
       type: String,
       required: true,

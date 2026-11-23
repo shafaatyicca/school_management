@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { ShieldCheck, ShieldAlert, Users, KeyRound, Loader2, CircleAlert } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { notify } from "@/lib/notify";
+import { getSubdomain } from "@/lib/host";
 import UsersTab from "@/components/user-access/UsersTab";
 import RolesTab from "@/components/user-access/RolesTab";
 import { card, border, muted } from "@/components/user-access/ui";
@@ -35,6 +36,7 @@ export default function UserAccessPage() {
         setFitHeight(null); // small screens: normal scroll
         return;
       }
+
       // Bottom padding/border of the layout containers below this page
       let bottom = 0;
       let p = el.parentElement;
@@ -55,9 +57,9 @@ export default function UserAccessPage() {
   // ── School from the subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const host = window.location.hostname;
-    if (host.includes(".lvh.me") || host.includes(".localhost")) {
-      fetch(`/api/superadmin/schools?slug=${host.split(".")[0]}&fields=basic`)
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
+      fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((d) => {
           if (d?._id) {

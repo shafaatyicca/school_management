@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify";
+import { getSubdomain, schoolUrl } from "@/lib/host";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,7 +12,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -23,30 +23,18 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        if (
-          res.error.includes("user not found") ||
-          res.error.includes("Password is incorrect")
-        ) {
-          notify.error("Login Failed", "Email or Password is incorrect!");
-        } else {
-          notify.error(
-            "Login Error",
-            "Unable to log in. Please try again.",
-          );
-        }
+        notify.error(
+          "Login Failed",
+          res.error === "CredentialsSignin"
+            ? "Your email or password is incorrect."
+            : res.error,
+        );
         setLoading(false);
       } else {
         notify.success("Welcome!", "Login Successfully.");
 
         const sessionRes = await fetch("/api/auth/session");
         const session = await sessionRes.json();
-
-        const isLocal =
-          window.location.hostname.includes("lvh.me") ||
-          window.location.hostname.includes("localhost");
-        const protocol = window.location.protocol.replace(":", "");
-
-        const mainDomain = process.env.NEXT_PUBLIC_MAIN_DOMAIN || "lvh.me:3000";
 
         if (
           session?.user?.role === "super_admin" ||
@@ -56,12 +44,10 @@ export default function LoginPage() {
           window.location.href = `${currentOrigin}/superadmin`;
         } else if (session?.user?.schoolSlug) {
           const slug = session.user.schoolSlug;
-          const currentHostname = window.location.hostname;
-
-          if (currentHostname.startsWith(`${slug}.`)) {
+          if (getSubdomain(window.location.hostname) === slug) {
             router.push("/");
           } else {
-            window.location.href = `${protocol}://${slug}.${mainDomain}`;
+            window.location.href = schoolUrl(slug);
           }
         } else {
           router.push("/");

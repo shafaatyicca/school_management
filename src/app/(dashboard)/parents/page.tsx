@@ -13,11 +13,13 @@ import { useParentModal } from "@/hooks/useParentModal";
 import ParentFormModal from "@/components/ParentFormModal";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
+import { getSubdomain } from "@/lib/host";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
   useMaterialReactTable,
 } from "material-react-table";
+
 
 function ParentsPage() {
   const { data: session } = useSession();
@@ -42,11 +44,8 @@ function ParentsPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    const isSubdomain =
-      hostname.includes(".lvh.me") || hostname.includes(".localhost");
-    if (isSubdomain) {
-      const slug = hostname.split(".")[0];
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {

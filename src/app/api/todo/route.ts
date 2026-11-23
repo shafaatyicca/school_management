@@ -80,6 +80,18 @@ async function cleanTask(body: any, schoolId: string, partial: boolean) {
     if (!["normal", "high", "urgent"].includes(p)) throw new BadRequest("Invalid priority");
     out.priority = p;
   }
+    // Due date (optional): "YYYY-MM-DD", or empty to remove it
+  if (body.deadline !== undefined) {
+    const s = String(body.deadline || "").trim();
+    if (!s) {
+      out.deadline = null;
+    } else {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new BadRequest("Invalid due date");
+      const d = new Date(`${s}T00:00:00.000Z`);
+      if (isNaN(d.getTime())) throw new BadRequest("Invalid due date");
+      out.deadline = d;
+    }
+  }
   return out;
 }
 
@@ -164,6 +176,7 @@ export async function PUT(req: Request) {
       { new: true, lean: true },
     );
 
+
     logActivity(access!, req, {
       action: "update",
       module: "tasks",
@@ -171,7 +184,7 @@ export async function PUT(req: Request) {
       entityId: id,
       entityLabel: updated?.title || before.title,
       summary: "Updated task",
-      changes: diffChanges(before, updated, ["title", "description", "assignedTo", "assignedUsers", "status", "priority"]),
+      changes: diffChanges(before, updated, ["title", "description", "assignedTo", "assignedUsers", "status", "priority", "deadline"]),
     });
 
     return NextResponse.json({ success: true, data: updated });

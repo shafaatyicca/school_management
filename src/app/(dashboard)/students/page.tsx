@@ -18,6 +18,7 @@ import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { useStudentModal } from "@/hooks/useStudentModal";
+import { getSubdomain } from "@/lib/host";
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
@@ -52,11 +53,8 @@ function StudentsPage() {
 
   useEffect(() => {
     if (!isSuperAdmin) return;
-    const hostname = window.location.hostname;
-    const isSubdomain =
-      hostname.includes(".lvh.me") || hostname.includes(".localhost");
-    if (isSubdomain) {
-      const slug = hostname.split(".")[0];
+    const slug = getSubdomain(window.location.hostname);
+    if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
         .then((data) => {
@@ -745,6 +743,7 @@ function StudentsPage() {
     </div>
   );
 }
+
 
 // Guard: page opens only with "Add Student (Students) → View"
 export default function Page() {
