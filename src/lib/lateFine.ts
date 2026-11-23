@@ -68,7 +68,7 @@ export async function applyLateFines(studentId: string) {
   }
 
   for (const g of overdue.values()) {
-    // This month's fine already exists → skip
+    // This month's fine already exists → skip just in case
     const exists = await InvoiceM.exists({
       studentId,
       feeCategoryId: fineCat._id,
