@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { Loader2, Search, Plus, Building2, Users, MousePointerClick } from "lucide-react";
+import { Search, Plus, Building2, Users, MousePointerClick } from "lucide-react";
 import { notify } from "@/lib/notify";
 import SchoolFormModal from "@/components/superadmin/SchoolModal";
 import { UserModal } from "@/components/superadmin/UserModal";
@@ -9,6 +9,8 @@ import { expiryInfo, isExpiring, TONE_TEXT } from "@/components/superadmin/schoo
 import { schoolUrl } from "@/lib/host";
 
 type Filter = "all" | "active" | "expiring" | "inactive";
+
+const CACHE_KEY = "sa_schools_v1"; // last list, shown instantly on the next visit
 
 const EMPTY_USER = {
   name: "",
@@ -19,6 +21,18 @@ const EMPTY_USER = {
   role: "school_admin",
   securityQuestion: { question: "", answer: "" },
 };
+
+// Save the list for the next visit (without logos if it is too big)
+function saveCache(s: any[], p: any[]) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ s, p }));
+  } catch {
+    try {
+      const light = s.map(({ logo, ...rest }: any) => rest);
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ s: light, p }));
+    } catch {}
+  }
+}
 
 export default function SchoolsPage() {
   const [schools, setSchools] = useState<any[]>([]);
@@ -32,7 +46,8 @@ export default function SchoolsPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userEditId, setUserEditId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // fresh data not loaded yet
+  const [fromCache, setFromCache] = useState(false); // a saved list is on screen
   const [userForm, setUserForm] = useState(EMPTY_USER);
 
   const fetchInitialData = async () => {
@@ -43,10 +58,12 @@ export default function SchoolsPage() {
       ]);
       const schoolsData = await schoolsRes.json();
       const plansData = await plansRes.json();
-      setSchools(Array.isArray(schoolsData) ? schoolsData : []);
-      setPlans(Array.isArray(plansData) ? plansData : []);
+      const s = Array.isArray(schoolsData) ? schoolsData : [];
+      const p = Array.isArray(plansData) ? plansData : [];
+      setSchools(s);
+      setPlans(p as any);
+      saveCache(s, p);
     } catch {
-      setSchools([]);
       notify.error("Error!", "Failed to load data");
     }
   };
@@ -65,11 +82,28 @@ export default function SchoolsPage() {
   };
 
   useEffect(() => {
+    // 1) Saved list → show instantly
+    try {
+      const saved = sessionStorage.getItem(CACHE_KEY);
+      if (saved) {
+        const { s, p } = JSON.parse(saved);
+        if (Array.isArray(s)) {
+          setSchools(s);
+          setFromCache(true);
+        }
+        if (Array.isArray(p)) setPlans(p as any);
+      }
+    } catch {}
+
+    // 2) Fresh data in the background
     (async () => {
       await fetchInitialData();
       setLoading(false);
     })();
   }, []);
+
+  // Skeleton only when nothing is on screen yet
+  const busy = loading && !fromCache;
 
   // Selected school was deleted → close the panel
   useEffect(() => {
@@ -217,7 +251,7 @@ export default function SchoolsPage() {
               >
                 {f.label}
                 <span className={`rounded-full px-1.5 text-[10px] font-bold ${on ? "bg-white/25" : "bg-slate-100"}`}>
-                  {counts[f.key]}
+                  {busy ? "–" : counts[f.key]}
                 </span>
               </button>
             );
@@ -250,10 +284,10 @@ export default function SchoolsPage() {
         {/* Left: school list */}
         <div className="bg-white rounded-md border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-3 py-2 border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Schools ({visibleSchools.length})
+            Schools ({busy ? "–" : visibleSchools.length})
           </div>
           <div className="max-h-[calc(100vh-220px)] overflow-y-auto divide-y divide-slate-100">
-            {loading ? (
+            {busy ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 px-3 py-3 animate-pulse">
                   <div className="w-9 h-9 rounded-lg bg-slate-100" />
@@ -344,15 +378,9 @@ export default function SchoolsPage() {
             }}
             onDeleteUser={handleDeleteAdmin}
           />
-
         ) : (
           <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-200 bg-white text-sm text-slate-400">
-            {loading ? (
-              <>
-                <Loader2 size={24} className="animate-spin text-indigo-400" />
-                Loading schools…
-              </>
-            ) : schools.length ? (
+            {busy || schools.length ? (
               <>
                 <MousePointerClick size={28} className="text-indigo-300" />
                 Select a school to see its details

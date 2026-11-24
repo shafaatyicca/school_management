@@ -1,13 +1,15 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   X as CloseIcon,
   Calendar,
   CheckCircle2,
   AlertCircle,
+  Undo2,
 } from "lucide-react";
 import { Dialog, DialogTitle, DialogContent, IconButton } from "@mui/material";
 import Zoom from "@mui/material/Zoom";
+import { notify } from "@/lib/notify";
 
 // Date in Pakistan time, e.g. 20 Nov 2026
 const pkDate = (d: any) =>
@@ -23,19 +25,63 @@ export default function SchoolInvoicePreviewModal({
   onClose,
   invoice,
   school,
+  onReversed,
 }: {
   isOpen: boolean;
   onClose: () => void;
   invoice: any;
   school: any;
+  // Given → each payment gets a "Reverse" button (Super Admin pages)
+  onReversed?: (updatedInvoice: any) => void;
 }) {
+  const [reversingId, setReversingId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // Close the reverse box when another invoice opens / modal closes
+  useEffect(() => {
+    setReversingId(null);
+    setReason("");
+  }, [isOpen, invoice?._id]);
+
   if (!invoice) return null;
 
   const paymentLogs = invoice.paymentHistory || invoice.payments || [];
+  const reversals = invoice.reversals || [];
   const feedingAmount =
     invoice.feedingSplit?.month1 || invoice.totalFeedingAmount || 0;
   const discountAmount = invoice.discount || 0;
   const isPaid = invoice.status === "paid";
+  const canReverse = !!onReversed;
+
+  const reverse = async (paymentId: string) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/superadmin/invoices", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reverse",
+          invoiceId: invoice._id,
+          paymentId,
+          reason: reason.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify.error("Reverse Failed", data.error || "Could not reverse the payment");
+        return;
+      }
+      setReversingId(null);
+      setReason("");
+      onReversed?.(data);
+    } catch {
+      notify.error("Error!", "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Dialog
@@ -81,7 +127,7 @@ export default function SchoolInvoicePreviewModal({
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-col">
             <h2 className="font-bold text-white text-base leading-tight uppercase">
-              {school?.name}
+              {school?.name || "Deleted school"}
             </h2>
             <p className="text-[10px] text-indigo-200/60 mt-0.5">
               {school?.address}
@@ -235,27 +281,86 @@ export default function SchoolInvoicePreviewModal({
               <span className="flex-1 h-px bg-slate-200" />
             </div>
             <div className="flex flex-col gap-1.5">
-              {paymentLogs.map((pay: any, idx: number) => (
-                <div
-                  key={pay.paymentNo || idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block" />
-                    {pay.paymentNo && (
-                      <span className="font-mono text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">
-                        {pay.paymentNo}
-                      </span>
+              {paymentLogs.map((pay: any, idx: number) => {
+                const pid = pay._id ? String(pay._id) : "";
+                const open = !!pid && reversingId === pid;
+                const amount = pay.amount || pay.amountPaid || 0;
+                return (
+                  <div
+                    key={pid || pay.paymentNo || idx}
+                    className={`rounded-xl border overflow-hidden transition-colors ${
+                      open ? "border-rose-200" : "border-slate-200 bg-slate-50/60 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between p-2.5">
+                      <div className="flex items-center gap-2 text-xs font-medium text-slate-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 inline-block" />
+                        {pay.paymentNo && (
+                          <span className="font-mono text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5">
+                            {pay.paymentNo}
+                          </span>
+                        )}
+                        {pay.date || pay.paymentDate
+                          ? pkDate(pay.date || pay.paymentDate)
+                          : "—"}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-600 tabular-nums">
+                          {amount.toLocaleString()}
+                        </span>
+                        {canReverse && pid && !open && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReversingId(pid);
+                              setReason("");
+                            }}
+                            title="Reverse this payment"
+                            className="inline-flex items-center gap-0.5 rounded-md border border-rose-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          >
+                            <Undo2 size={10} /> Reverse
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Confirm box with reason */}
+                    {open && (
+                      <div className="border-t border-rose-100 bg-rose-50/60 p-2.5 space-y-2">
+                        <p className="text-[10px] text-rose-700">
+                          Reverse {pay.paymentNo || "this payment"} of Rs{" "}
+                          {amount.toLocaleString()}? The amount goes back to the balance.
+                        </p>
+                        <input
+                          autoFocus
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="Reason (e.g. wrong amount entered)"
+                          className="w-full rounded-md border border-rose-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-rose-400"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setReversingId(null)}
+                            disabled={busy}
+                            className="rounded-md px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-white cursor-pointer disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => reverse(pid)}
+                            disabled={busy || reason.trim().length < 3}
+                            className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {busy ? "Reversing..." : "Confirm Reverse"}
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    {pay.date || pay.paymentDate
-                      ? pkDate(pay.date || pay.paymentDate)
-                      : "—"}
                   </div>
-                  <span className="text-xs font-bold text-emerald-600 tabular-nums">
-                    {(pay.amount || pay.amountPaid || 0).toLocaleString()}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -266,6 +371,40 @@ export default function SchoolInvoicePreviewModal({
             <CheckCircle2 size={14} />
             Paid on:{" "}
             <strong className="text-emerald-900">{pkDate(invoice.paidAt)}</strong>
+          </div>
+        )}
+
+        {/* Reversed payments (record) */}
+        {reversals.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+              Reversed Payments
+              <span className="flex-1 h-px bg-slate-200" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {reversals.map((r: any, idx: number) => (
+                <div
+                  key={r._id || idx}
+                  className="rounded-xl border border-slate-200 bg-slate-50/60 p-2.5 text-[11px] text-slate-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      {r.paymentNo && (
+                        <span className="font-mono text-[10px] line-through">{r.paymentNo}</span>
+                      )}
+                      {r.date ? pkDate(r.date) : "—"}
+                    </span>
+                    <span className="font-bold line-through tabular-nums">
+                      {Number(r.amount || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1">
+                    Reversed {r.reversedAt ? pkDate(r.reversedAt) : ""}
+                    {r.by ? ` by ${r.by}` : ""} · {r.reason || "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </DialogContent>

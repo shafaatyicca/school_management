@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Loader2,
   Building2,
   Wallet,
   AlertCircle,
@@ -21,11 +20,25 @@ import { notify } from "@/lib/notify";
 import IncomeComposedChart from "@/components/superadmin/charts/IncomeComposedChart";
 import YearlySummaryChart from "@/components/superadmin/charts/YearlySummaryChart";
 
+const CACHE_KEY = "sa_dashboard_v1"; // last data, shown instantly on the next visit
+
 const rs = (n: any) => `Rs ${Number(n || 0).toLocaleString("en-US")}`;
 const pkDay = (d: any) =>
   d
     ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "Asia/Karachi" })
     : "";
+
+// Skeleton pieces (shown only until the first data arrives)
+const Sk = ({ w = "w-full", h = "h-3" }: { w?: string; h?: string }) => (
+  <span className={`block ${h} ${w} rounded bg-slate-100 animate-pulse`} />
+);
+const SkRows = ({ n = 4 }: { n?: number }) => (
+  <div className="space-y-3 py-1">
+    {Array.from({ length: n }).map((_, i) => (
+      <Sk key={i} w={i % 2 ? "w-2/3" : "w-full"} />
+    ))}
+  </div>
+);
 
 // Card with a header — fills the row height
 function Card({ title, icon, right, children }: any) {
@@ -50,7 +63,7 @@ const TILE: Record<string, string> = {
   amber: "bg-amber-50/60 border-amber-200 text-amber-700",
 };
 
-function Kpi({ title, value, sub, icon: Icon, theme, onClick }: any) {
+function Kpi({ title, value, sub, icon: Icon, theme, onClick, busy }: any) {
   return (
     <button
       type="button"
@@ -60,8 +73,17 @@ function Kpi({ title, value, sub, icon: Icon, theme, onClick }: any) {
       <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider opacity-80">
         <Icon size={14} /> {title}
       </div>
-      <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
-      <div className="text-[11px] opacity-80">{sub}</div>
+      {busy ? (
+        <div className="mt-2 space-y-1.5">
+          <Sk w="w-24" h="h-6" />
+          <Sk w="w-32" h="h-2.5" />
+        </div>
+      ) : (
+        <>
+          <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+          <div className="text-[11px] opacity-80">{sub}</div>
+        </>
+      )}
     </button>
   );
 }
@@ -73,27 +95,38 @@ export default function SuperAdminDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1) Last saved data → show instantly (no loader on revisit)
+    try {
+      const saved = sessionStorage.getItem(CACHE_KEY);
+      if (saved) {
+        const { d, rev } = JSON.parse(saved);
+        if (d) setData(d);
+        if (Array.isArray(rev)) setRevenueData(rev as any);
+      }
+    } catch {}
+
+    // 2) Fresh data in the background
     Promise.all([
       fetch("/api/superadmin/dashboard").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/superadmin/stats/revenue").then((r) => (r.ok ? r.json() : [])),
     ])
       .then(([d, rev]) => {
-        if (!d) notify.error("Dashboard Error", "Failed to load dashboard data");
+        if (!d) {
+          notify.error("Dashboard Error", "Failed to load dashboard data");
+          return;
+        }
         setData(d);
         if (Array.isArray(rev)) setRevenueData(rev as any);
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ d, rev }));
+        } catch {}
       })
       .catch(() => notify.error("Dashboard Error", "Failed to load dashboard data"))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
-        <p className="text-slate-500 font-medium italic">Loading Dashboard Stats...</p>
-      </div>
-    );
-  }
+  // Skeleton only until the first data (cached or fresh) is on screen
+  const busy = loading && !data;
 
   const k = data?.kpis || {};
   const hour = Number(
@@ -136,6 +169,7 @@ export default function SuperAdminDashboard() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 items-stretch">
         <Kpi
+          busy={busy}
           title="Schools"
           value={k.schools?.total ?? 0}
           sub={`${k.schools?.active ?? 0} active · ${k.schools?.inactive ?? 0} inactive`}
@@ -144,7 +178,8 @@ export default function SuperAdminDashboard() {
           onClick={() => router.push("/superadmin/schools")}
         />
         <Kpi
-          title={`Collected · ${String(data?.billingMonth || "").split(" ")[0]}`}
+          busy={busy}
+          title={`Collected${data?.billingMonth ? ` · ${String(data.billingMonth).split(" ")[0]}` : ""}`}
           value={rs(k.collected)}
           sub={`of ${rs(k.billed)} billed`}
           icon={Wallet}
@@ -152,6 +187,7 @@ export default function SuperAdminDashboard() {
           onClick={() => router.push("/superadmin/collections")}
         />
         <Kpi
+          busy={busy}
           title="Pending"
           value={rs(k.pending?.total)}
           sub={`${k.pending?.count ?? 0} unpaid invoice(s)`}
@@ -160,6 +196,7 @@ export default function SuperAdminDashboard() {
           onClick={() => router.push("/superadmin/invoices")}
         />
         <Kpi
+          busy={busy}
           title="Students"
           value={Number(k.students || 0).toLocaleString()}
           sub={`${k.employees ?? 0} staff · ${k.users ?? 0} logins`}
@@ -167,6 +204,7 @@ export default function SuperAdminDashboard() {
           theme="sky"
         />
         <Kpi
+          busy={busy}
           title="Expiring"
           value={k.expiring ?? 0}
           sub={`in the next 15 days`}
@@ -190,7 +228,9 @@ export default function SuperAdminDashboard() {
               ) : null
             }
           >
-            {data?.attention?.length ? (
+            {busy ? (
+              <SkRows n={5} />
+            ) : data?.attention?.length ? (
               <div className="divide-y divide-slate-100">
                 {data.attention.map((a: any, i: number) => {
                   const reason =
@@ -241,7 +281,9 @@ export default function SuperAdminDashboard() {
 
         <div className="lg:col-span-2">
           <Card title="Recent Payments" icon={<Banknote size={14} className="text-emerald-500" />}>
-            {data?.recentPayments?.length ? (
+            {busy ? (
+              <SkRows n={5} />
+            ) : data?.recentPayments?.length ? (
               <div className="divide-y divide-slate-100">
                 {data.recentPayments.map((p: any, i: number) => (
                   <div key={i} className="flex items-center justify-between gap-2 py-2">
@@ -272,11 +314,12 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
-
       {/* Plans + Largest schools */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
         <Card title="Schools by Plan" icon={<Crown size={14} className="text-violet-500" />}>
-          {data?.plans?.length ? (
+          {busy ? (
+            <SkRows n={4} />
+          ) : data?.plans?.length ? (
             <div className="space-y-2.5">
               {data.plans.map((p: any) => (
                 <div key={p.name}>
@@ -296,7 +339,9 @@ export default function SuperAdminDashboard() {
         </Card>
 
         <Card title="Largest Schools" icon={<Trophy size={14} className="text-sky-500" />}>
-          {data?.topSchools?.length ? (
+          {busy ? (
+            <SkRows n={5} />
+          ) : data?.topSchools?.length ? (
             <div className="divide-y divide-slate-100">
               {data.topSchools.map((s: any, i: number) => (
                 <div key={s.schoolId} className="flex items-center justify-between gap-2 py-2">

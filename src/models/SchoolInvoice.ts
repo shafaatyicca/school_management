@@ -23,6 +23,14 @@ export interface ISchoolInvoice extends Document {
     date: Date;
     note?: string;
   }[];
+    reversals?: {
+    paymentNo?: string;
+    amount: number;
+    date?: Date; // original payment date
+    reversedAt: Date;
+    reason: string;
+    by?: string;
+  }[];
   createdAt: Date;
 }
 
@@ -56,6 +64,17 @@ const SchoolInvoiceSchema = new Schema<ISchoolInvoice>({
       amount: Number,
       date: { type: Date, default: Date.now },
       note: String,
+    },
+  ],
+    // Reversed (cancelled) payments — kept for the record
+  reversals: [
+    {
+      paymentNo: { type: String, default: "" },
+      amount: Number,
+      date: Date,
+      reversedAt: { type: Date, default: Date.now },
+      reason: { type: String, default: "" },
+      by: { type: String, default: "" },
     },
   ],
   createdAt: { type: Date, default: Date.now },

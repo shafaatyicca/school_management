@@ -18,7 +18,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Eye,
-  Loader2,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -36,6 +35,8 @@ import {
   Chip,
   Box,
 } from "@mui/material";
+
+const CACHE_KEY = "sa_invoices_v1"; // last list, shown instantly on the next visit
 
 type SortKey =
   | "invoiceNumber"
@@ -55,6 +56,8 @@ const feedingOf = (inv: any) =>
   inv.feedingSplit?.month1 || inv.totalFeedingAmount || 0;
 const remainingOf = (inv: any) =>
   inv.remainingAmount ?? inv.finalAmount - (inv.amountPaid || 0);
+const hasPayments = (inv: any) =>
+  Number(inv.amountPaid || 0) > 0 || (inv.paymentHistory || []).length > 0;
 const monthValue = (s: any) => {
   const t = Date.parse(`1 ${String(s || "")}`);
   return isNaN(t) ? null : t;
@@ -92,7 +95,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; border: string }
 
 export default function AllInvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false); // something (cached or fresh) is on screen
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
@@ -116,20 +119,35 @@ export default function AllInvoicesPage() {
   const [bulkData, setBulkData] = useState({ month: "", dueDate: "" });
   const [bulkBillingDate, setBulkBillingDate] = useState<Dayjs | null>(null);
 
+  // Refresh in the background (the table is never blanked)
   const fetchInvoices = async () => {
     try {
-      setLoading(true);
       const res = await fetch("/api/superadmin/invoices");
       const data = await res.json();
-      setInvoices(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setInvoices(list);
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(list));
+      } catch {}
     } catch (error) {
       notify.error("Fetch Error", "Failed to load invoices");
     } finally {
-      setLoading(false);
+      setLoaded(true);
     }
   };
 
   useEffect(() => {
+    // Saved list → show instantly
+    try {
+      const saved = sessionStorage.getItem(CACHE_KEY);
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          setInvoices(list);
+          setLoaded(true);
+        }
+      }
+    } catch {}
     fetchInvoices();
   }, []);
 
@@ -184,6 +202,11 @@ export default function AllInvoicesPage() {
       { plan: 0, feeding: 0, discount: 0, total: 0, paid: 0, pending: 0 },
     );
   }, [paginatedData]);
+
+  const openPreview = (inv: any) => {
+    setSelectedInvoice(inv);
+    setIsViewModalOpen(true);
+  };
 
   // --- ACTIONS ---
   const handleInvoiceEditSubmit = async (formData: any) => {
@@ -289,6 +312,21 @@ export default function AllInvoicesPage() {
       setIsProcessing(false);
       setIsBulkDeleteDialogOpen(false);
     }
+  };
+
+  // Delete: only when no payment is left (else → reverse first)
+  const askDelete = (inv: any) => {
+    if (hasPayments(inv)) {
+      notify.warning(
+        "Reverse payments first",
+        `${inv.invoiceNumber} has payments. Reverse each payment, then delete.`,
+      );
+      openPreview(inv);
+      return;
+    }
+    setDeletingId(inv._id);
+    setDeletingName(inv.invoiceNumber || "this invoice");
+    setDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
@@ -502,24 +540,15 @@ export default function AllInvoicesPage() {
           </TableHead>
 
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={12}
-                  align="center"
-                  sx={{
-                    py: 5,
-                    color: "#94a3b8",
-                    fontStyle: "italic",
-                    fontWeight: "bold",
-                  }}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 size={16} className="animate-spin text-indigo-500" />
-                    Fetching latest data...
-                  </span>
-                </TableCell>
-              </TableRow>
+            {!loaded ? (
+              // Skeleton (first visit only)
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={`sk-${i}`}>
+                  <TableCell colSpan={12} sx={{ py: 1.2, px: 1 }}>
+                    <div className="h-3 w-full rounded bg-slate-100 animate-pulse" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell
@@ -533,6 +562,7 @@ export default function AllInvoicesPage() {
             ) : (
               paginatedData.map((inv) => {
                 const st = STATUS_STYLE[inv.status] || STATUS_STYLE.pending;
+                const paidSome = hasPayments(inv);
                 return (
                   <TableRow
                     key={inv._id}
@@ -571,18 +601,16 @@ export default function AllInvoicesPage() {
                     <TableCell
                       sx={{
                         fontWeight: 600,
-                        color: "#4f46e5",
+                        color: inv.schoolId?.name ? "#4f46e5" : "#94a3b8",
+                        fontStyle: inv.schoolId?.name ? "normal" : "italic",
                         fontSize: "10px",
                         cursor: "pointer",
                         "&:hover": { textDecoration: "underline" },
                       }}
-                      onClick={() => {
-                        setSelectedInvoice(inv);
-                        setIsViewModalOpen(true);
-                      }}
+                      onClick={() => openPreview(inv)}
                       title="Click to view invoice preview"
                     >
-                      {inv.schoolId?.name || "N/A"}
+                      {inv.schoolId?.name || "Deleted school"}
                     </TableCell>
                     <TableCell
                       sx={{ fontWeight: 500, color: "#64748b", fontSize: "10px" }}
@@ -662,13 +690,10 @@ export default function AllInvoicesPage() {
                           gap: 0.5,
                         }}
                       >
-                        {/* View Button - Always visible & centered */}
+                        {/* View (and reverse payments inside) */}
                         <IconButton
                           size="small"
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setIsViewModalOpen(true);
-                          }}
+                          onClick={() => openPreview(inv)}
                           sx={{
                             color: "#64748b",
                             "&:hover": { bgcolor: "#f1f5f9" },
@@ -678,7 +703,7 @@ export default function AllInvoicesPage() {
                           <Eye size={15} />
                         </IconButton>
 
-                        {/* Paid na hone par baaki buttons show honge */}
+                        {/* Pay + Edit: not for fully paid */}
                         {inv.status !== "paid" && (
                           <>
                             <IconButton
@@ -709,25 +734,21 @@ export default function AllInvoicesPage() {
                             >
                               <Edit3 size={14} />
                             </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                setDeletingId(inv._id);
-                                setDeletingName(
-                                  inv.invoiceNumber || "this invoice",
-                                );
-                                setDeleteDialogOpen(true);
-                              }}
-                              sx={{
-                                color: "#e11d48",
-                                "&:hover": { bgcolor: "#fff1f2" },
-                              }}
-                              title="Delete Invoice"
-                            >
-                              <Trash2 size={14} />
-                            </IconButton>
                           </>
                         )}
+
+                        {/* Delete: grey until all payments are reversed */}
+                        <IconButton
+                          size="small"
+                          onClick={() => askDelete(inv)}
+                          sx={{
+                            color: paidSome ? "#cbd5e1" : "#e11d48",
+                            "&:hover": { bgcolor: paidSome ? "#f8fafc" : "#fff1f2" },
+                          }}
+                          title={paidSome ? "Reverse payments first" : "Delete Invoice"}
+                        >
+                          <Trash2 size={14} />
+                        </IconButton>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -887,6 +908,11 @@ export default function AllInvoicesPage() {
           }}
           invoice={selectedInvoice}
           school={selectedInvoice.schoolId}
+          onReversed={(updated) => {
+            setSelectedInvoice(updated); // modal shows the new balance at once
+            fetchInvoices();
+            notify.success("Payment Reversed", "The amount is back in the balance");
+          }}
         />
       )}
 

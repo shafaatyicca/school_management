@@ -236,6 +236,64 @@ export async function PUT(req: Request) {
       return NextResponse.json(updated);
     }
 
+        // ── REVERSE one payment (wrong entry) — kept in "reversals" for the record
+    if (action === "reverse") {
+      const { paymentId, reason } = body;
+      const why = String(reason || "").trim();
+      if (!paymentId || !mongoose.isValidObjectId(paymentId)) return bad("Payment not found", 404);
+      if (why.length < 3) return bad("Please write a reason for the reversal");
+
+      const pay = (invoice.paymentHistory || []).find((p: any) => String(p._id) === String(paymentId));
+      if (!pay) return bad("Payment not found (maybe already reversed)", 404);
+      const amt = Number(pay.amount || 0);
+
+      const session = await getServerSession(authOptions);
+      const by = (session?.user as any)?.name || "Super Admin";
+
+      // Remove + log in ONE step → can't be reversed twice
+      const updated = await Invoice.findOneAndUpdate(
+        { _id: invoiceId, "paymentHistory._id": pay._id },
+        {
+          $pull: { paymentHistory: { _id: pay._id } },
+          $inc: { amountPaid: -amt },
+          $push: {
+            reversals: {
+              paymentNo: pay.paymentNo || "",
+              amount: amt,
+              date: pay.date,
+              reversedAt: new Date(),
+              reason: why,
+              by,
+            },
+          },
+        },
+        { new: true },
+      );
+      if (!updated) return bad("This payment was just changed. Please refresh and try again.", 409);
+
+      // Recalculate balance + status
+      const paid = Math.max(0, Number(updated.amountPaid || 0));
+      const left = Math.max(0, Number(updated.finalAmount || 0) - paid);
+      const history = updated.paymentHistory || [];
+      const lastDate = history.length ? history[history.length - 1].date : null;
+      const status =
+        updated.status === "cancelled"
+          ? "cancelled"
+          : left <= 0
+            ? "paid"
+            : paid > 0
+              ? "partially_paid"
+              : "pending";
+
+      await Invoice.updateOne(
+        { _id: invoiceId },
+        { $set: { amountPaid: paid, remainingAmount: left, status, paidAt: lastDate } },
+      );
+
+      const fresh = await Invoice.findById(invoiceId).populate("schoolId", "name address phone");
+      return NextResponse.json(fresh);
+    }
+
     // ── EDIT (only bill fields; payments are never edited here)
     if (action === "edit") {
       const EDITABLE = ["planAmount", "discount", "feedingSplit", "totalFeedingAmount", "billingMonth", "dueDate"];
@@ -320,6 +378,7 @@ export async function DELETE(req: Request) {
         skipped: blocked.map((b) => b.invoiceNumber),
       });
     }
+
 
     if (id) {
       if (!mongoose.isValidObjectId(id)) return bad("Invoice not found", 404);

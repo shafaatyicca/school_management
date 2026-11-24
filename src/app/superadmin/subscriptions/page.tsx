@@ -1,16 +1,18 @@
 "use client";
-import { useState, useEffect } from "react"; // useEffect add kiya
-import { Plus, Trash2, Edit3, CheckCircle2, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Edit3, CheckCircle2 } from "lucide-react";
 import { PlanModal } from "@/components/superadmin/PlanModal";
 import { notify } from "@/lib/notify";
 import DeleteConfirmDialog from "@/components/DeleteConfirmDialog";
+
+const CACHE_KEY = "sa_plans_v1"; // last list, shown instantly on the next visit
 
 export default function SubscriptionsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingName, setDeletingName] = useState("");
   const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false); // something (cached or fresh) is on screen
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [planEditId, setPlanEditId] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState({
@@ -21,22 +23,35 @@ export default function SubscriptionsPage() {
     interval: "month",
   });
 
-  // 2. Data Fetch karne ka function
+  // Load plans (refresh in the background — the page is never blanked)
   const fetchPlans = async () => {
     try {
-      setLoading(true);
       const res = await fetch("/api/superadmin/plans");
       const data = await res.json();
-      setPlans(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setPlans(list);
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(list));
+      } catch {}
     } catch (error) {
       notify.error("Error!", "Failed to load plans");
     } finally {
-      setLoading(false);
+      setLoaded(true);
     }
   };
 
-  // 3. Page load hote hi data mangwao
   useEffect(() => {
+    // Saved list → show instantly
+    try {
+      const saved = sessionStorage.getItem(CACHE_KEY);
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) {
+          setPlans(list);
+          setLoaded(true);
+        }
+      }
+    } catch {}
     fetchPlans();
   }, []);
 
@@ -90,7 +105,8 @@ export default function SubscriptionsPage() {
           : "New plan has been created",
       );
     } else {
-      notify.error("Failed!", "Could not save plan");
+      const err = await res.json().catch(() => ({}));
+      notify.error("Failed!", err.error || err.message || "Could not save plan");
     }
   };
 
@@ -102,28 +118,24 @@ export default function SubscriptionsPage() {
 
   const confirmDelete = async () => {
     if (!deletingId) return;
-    const res = await fetch(`/api/superadmin/plans?id=${deletingId}`, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      fetchPlans();
-      notify.success("Plan Deleted!", `${deletingName} has been deleted`);
-    } else {
-      notify.error("Failed!", "Could not delete plan");
+    try {
+      const res = await fetch(`/api/superadmin/plans?id=${deletingId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchPlans();
+        notify.success("Plan Deleted!", `${deletingName} has been deleted`);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        notify.error("Failed!", err.error || err.message || "Could not delete plan");
+      }
+    } catch {
+      notify.error("Error!", "Something went wrong");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingId(null);
     }
-    setDeleteDialogOpen(false);
-    setDeletingId(null);
   };
-
-  // Loading state handling
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="animate-spin text-indigo-600 mb-4" size={40} />
-        <p className="text-slate-500">Loading Subscription Plans...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
@@ -142,74 +154,94 @@ export default function SubscriptionsPage() {
 
       {/* Plans Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hover:gap-7 transition-all duration-300">
-        {plans.map((plan: any) => (
-          <div
-            key={plan._id}
-            className="group bg-white border border-slate-200 rounded-3xl p-4 relative flex flex-col hover:border-indigo-300 hover:shadow-xl transition-all duration-300"
-            style={{
-              transition: "all 0.3s ease-in-out",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-3px)";
-              e.currentTarget.style.boxShadow = "0 15px 30px rgba(0,0,0,0.20)";
-              e.currentTarget.style.filter = "brightness(1.05)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-              e.currentTarget.style.filter = "brightness(1)";
-            }}
-          >
-            <div className="absolute top-4 right-4 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
-              {plan.interval === "month" ? "Monthly" : "Yearly"}
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-slate-800 mb-1">
-                {plan.name}
-              </h3>
-              <div className="flex items-baseline gap-1">
-                <span className="text-2xl text-slate-900 font-bold">
-                  PKR {plan.price}
-                </span>
-                <span className="text-slate-400 text-sm font-medium">
-                  /{plan.interval}
-                </span>
+        {!loaded ? (
+          // Skeleton cards (first visit only)
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-3xl p-4 space-y-4 animate-pulse">
+              <div className="h-4 w-1/3 rounded bg-slate-100" />
+              <div className="h-7 w-1/2 rounded bg-slate-100" />
+              <div className="space-y-2 pt-4 border-t border-slate-50">
+                <div className="h-8 w-full rounded bg-slate-100" />
+                <div className="h-3 w-2/3 rounded bg-slate-100" />
+                <div className="h-3 w-1/2 rounded bg-slate-100" />
               </div>
+              <div className="h-9 w-full rounded bg-slate-100" />
             </div>
-
-            <div className="flex-1 space-y-3 mb-8 border-t border-slate-50 pt-6">
-              <div className="flex items-center gap-2 text-sm text-slate-600 font-medium bg-green-50 px-3 py-2 rounded-md">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span>Up to {plan.schoolLimit} Students </span>
+          ))
+        ) : plans.length === 0 ? (
+          <p className="col-span-full py-10 text-center text-sm text-slate-400">
+            No plans yet. Click &quot;New Plan&quot; to create one.
+          </p>
+        ) : (
+          plans.map((plan: any) => (
+            <div
+              key={plan._id}
+              className="group bg-white border border-slate-200 rounded-3xl p-4 relative flex flex-col hover:border-indigo-300 hover:shadow-xl transition-all duration-300"
+              style={{
+                transition: "all 0.3s ease-in-out",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-3px)";
+                e.currentTarget.style.boxShadow = "0 15px 30px rgba(0,0,0,0.20)";
+                e.currentTarget.style.filter = "brightness(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.filter = "brightness(1)";
+              }}
+            >
+              <div className="absolute top-4 right-4 bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                {plan.interval === "month" ? "Monthly" : "Yearly"}
               </div>
-              {plan.features?.slice(0, 3).map((f: string, i: number) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-2 text-sm text-slate-500"
-                >
-                  <div className="w-1.5 h-1.5 rounded-md bg-slate-300" />
-                  <span className="truncate">{f}</span>
+
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-slate-800 mb-1">
+                  {plan.name}
+                </h3>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl text-slate-900 font-bold">
+                    PKR {plan.price}
+                  </span>
+                  <span className="text-slate-400 text-sm font-medium">
+                    /{plan.interval}
+                  </span>
                 </div>
-              ))}
-            </div>
+              </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleOpenEdit(plan)}
-                className="flex-1 bg-slate-900 text-white py-2.5 rounded-md text-xs font-bold hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Edit3 size={14} /> Edit Plan
-              </button>
-              <button
-                onClick={() => handlePlanDelete(plan._id, plan.name)}
-                className="p-2.5 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
-              >
-                <Trash2 size={16} />
-              </button>
+              <div className="flex-1 space-y-3 mb-8 border-t border-slate-50 pt-6">
+                <div className="flex items-center gap-2 text-sm text-slate-600 font-medium bg-green-50 px-3 py-2 rounded-md">
+                  <CheckCircle2 size={16} className="text-emerald-500" />
+                  <span>Up to {plan.schoolLimit} Students </span>
+                </div>
+                {plan.features?.slice(0, 3).map((f: string, i: number) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-2 text-sm text-slate-500"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-md bg-slate-300" />
+                    <span className="truncate">{f}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleOpenEdit(plan)}
+                  className="flex-1 bg-slate-900 text-white py-2.5 rounded-md text-xs font-bold hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Edit3 size={14} /> Edit Plan
+                </button>
+                <button
+                  onClick={() => handlePlanDelete(plan._id, plan.name)}
+                  className="p-2.5 border border-rose-100 text-rose-500 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <PlanModal
