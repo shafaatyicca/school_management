@@ -49,7 +49,7 @@ export async function schoolExcel(schoolId: string, school: any): Promise<Buffer
   const userIds = new Set<string>();
   for (const inv of invoices) for (const p of inv.paymentHistory || []) if (p.receivedBy) userIds.add(key(p.receivedBy));
   const users: any[] = userIds.size
-    ? await UserModel.find({ _id: { $in: [...userIds] } }).select("name").lean()
+    ? await (UserModel as any).find({ _id: { $in: [...userIds] } }).select("name").lean()
     : [];
   const userName = new Map(users.map((u: any) => [key(u._id), u.name]));
 
