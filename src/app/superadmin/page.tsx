@@ -219,7 +219,7 @@ export default function SuperAdminDashboard() {
         <div className="lg:col-span-3">
           <Card
             title="Needs Attention"
-            icon={<AlertTriangle size={14} className="text-amber-500" />}
+            icon={<AlertTriangle size={16} className="text-amber-500" />}
             right={
               data?.attentionTotal > (data?.attention?.length || 0) ? (
                 <span className="text-[11px] text-slate-400">
@@ -249,19 +249,19 @@ export default function SuperAdminDashboard() {
                     );
                   return (
                     <div key={`${a.schoolId}-${a.kind}-${i}`} className="flex items-center gap-3 py-2">
-                      <span className="flex-1 min-w-0 truncate text-xs font-semibold text-slate-700 uppercase">{a.name}</span>
+                      <span className="flex-1 min-w-0 truncate text-xs text-slate-700 uppercase">{a.name}</span>
                       <span className="text-[11px] font-medium whitespace-nowrap">{reason}</span>
                       {a.kind === "unpaid" ? (
                         <button
                           onClick={() => router.push(`/superadmin/schools/${a.schoolId}`)}
-                          className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer whitespace-nowrap"
+                          className="text-[11px] text-indigo-600 hover:underline cursor-pointer whitespace-nowrap"
                         >
                           Invoices
                         </button>
                       ) : (
                         <button
                           onClick={() => router.push(`/superadmin/schools?edit=${a.schoolId}`)}
-                          className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer whitespace-nowrap"
+                          className="text-[11px] text-indigo-600 hover:underline cursor-pointer whitespace-nowrap"
                         >
                           Renew
                         </button>
@@ -280,20 +280,20 @@ export default function SuperAdminDashboard() {
         </div>
 
         <div className="lg:col-span-2">
-          <Card title="Recent Payments" icon={<Banknote size={14} className="text-emerald-500" />}>
+          <Card title="Recent Payments" icon={<Banknote size={18} className="text-emerald-500" />}>
             {busy ? (
               <SkRows n={5} />
             ) : data?.recentPayments?.length ? (
               <div className="divide-y divide-slate-100">
                 {data.recentPayments.map((p: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between gap-2 py-2">
+                  <div key={i} className="flex items-center justify-between gap-2 py-1">
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-slate-700 uppercase">{p.name}</p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="truncate text-xs text-slate-700 uppercase">{p.name}</p>
+                      <p className="text-[10px] text-slate-400">
                         {pkDay(p.date)} · {p.invoiceNumber} {p.paymentNo && <span className="font-mono"> · {p.paymentNo}</span>}
                       </p>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">{rs(p.amount)}</span>
+                    <span className="text-xs text-emerald-600 whitespace-nowrap">{rs(p.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -349,7 +349,7 @@ export default function SuperAdminDashboard() {
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-50 text-[10px] font-bold text-sky-600">
                       {i + 1}
                     </span>
-                    <span className="truncate text-xs font-semibold text-slate-700 uppercase">{s.name}</span>
+                    <span className="truncate text-xs text-slate-700 uppercase">{s.name}</span>
                   </span>
                   <span className="text-xs text-slate-500 whitespace-nowrap">
                     {Number(s.students).toLocaleString()} students

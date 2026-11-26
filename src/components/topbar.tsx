@@ -53,7 +53,7 @@ export default function Topbar() {
       if (currentSchoolId) {
         url = `/api/superadmin/schools?id=${currentSchoolId}&fields=basic`;
       } else {
-       const slug = getSubdomain(window.location.hostname);
+        const slug = getSubdomain(window.location.hostname);
         if (slug) {
           url = `/api/superadmin/schools?slug=${slug}&fields=basic`;
         }
@@ -86,8 +86,8 @@ export default function Topbar() {
 
   if (!mounted) {
     return (
-      <header className="h-20 w-full border-b border-border bg-background sticky top-0 z-50 flex items-center px-6">
-        <div className="animate-pulse bg-muted h-10 w-48 rounded-lg" />
+      <header className="h-16 sm:h-20 w-full border-b border-border bg-background sticky top-0 z-50 flex items-center pl-14 pr-3 lg:px-6">
+        <div className="animate-pulse bg-muted h-10 w-32 sm:w-48 rounded-lg" />
       </header>
     );
   }
@@ -114,11 +114,12 @@ export default function Topbar() {
       : "";
 
   return (
-          <header className="sticky top-0 z-50 h-18 w-full flex items-center justify-between px-6 border-b-2 border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
-      {/* --- LEFT SECTION --- */}
-      <div className="flex items-center gap-4 min-w-0">
+    // Mobile: left space for the sidebar ☰ button, smaller padding and gaps
+    <header className="sticky top-0 z-50 h-16 sm:h-18 w-full flex items-center justify-between gap-2 pl-14 pr-3 sm:pr-4 lg:px-6 border-b-2 border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.5)]">
+      {/* --- LEFT SECTION (takes the free space, name shortens with …) --- */}
+      <div className="flex flex-1 items-center gap-2 sm:gap-4 min-w-0">
         {/* Logo: any shape fits fully (contain + padding) */}
-        <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-border bg-white p-1 shadow-sm ring-1 ring-sky-500/10 overflow-hidden">
+        <div className="hidden sm:flex h-12 w-12 lg:h-14 lg:w-14 shrink-0 items-center justify-center rounded-xl border border-border bg-white p-1 shadow-sm ring-1 ring-sky-500/10 overflow-hidden">
           {logoUrl ? (
             <img
               src={logoUrl}
@@ -132,20 +133,21 @@ export default function Topbar() {
         </div>
 
         <div className="flex flex-col min-w-0">
-          <h3 className="truncate text-[11px] md:text-lg tracking-wider text-foreground leading-none">
+          <h3 className="truncate text-[11px] sm:text-sm lg:text-lg tracking-wider text-foreground leading-none">
             {schoolData?.name ? schoolData.name.toUpperCase() : "School Name"}
           </h3>
 
-          <div className="flex items-center gap-2 mt-2">
-            <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-border">
+          <div className="flex items-center gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+            {/* Date: hidden on very small screens */}
+            <div className="hidden sm:flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md border border-border">
               <CalendarIcon className="h-3 w-3 text-sky-400" />
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-tight whitespace-nowrap">
                 {formattedDate}
               </span>
             </div>
             <div className="flex items-center gap-1.5 bg-sky-500/10 px-2 py-0.5 rounded-md border border-sky-500/20">
               <div className="h-1 w-1 rounded-full bg-sky-400 animate-pulse" />
-              <span className="text-[10px] font-mono font-bold text-sky-600 dark:text-sky-300 tracking-wider tabular-nums">
+              <span className="text-[10px] font-mono font-bold text-sky-600 dark:text-sky-300 tracking-wider tabular-nums whitespace-nowrap">
                 {formattedTime}
               </span>
             </div>
@@ -154,20 +156,20 @@ export default function Topbar() {
       </div>
 
       {/* --- MIDDLE SECTION --- */}
-      <div className="flex items-center justify-center">
+      <div className="flex shrink-0 items-center justify-center">
         {session?.user?.role === "super_admin" ? (
           <div className="flex items-center gap-3 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1.5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 animate-in fade-in zoom-in duration-500">
             <button
-              onClick={() =>
-                 window.location.replace(mainUrl("/superadmin"))
-              }
+              onClick={() => window.location.replace(mainUrl("/superadmin"))}
+              title="Back to Super Admin"
               className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-100 hover:text-indigo-600 transition-colors group cursor-pointer"
             >
               <ArrowLeft
                 size={12}
                 className="group-hover:-translate-x-0.5 transition-transform"
               />
-              Back to Super Admin
+              {/* Mobile: arrow only */}
+              <span className="hidden sm:inline whitespace-nowrap">Back to Super Admin</span>
             </button>
           </div>
         ) : (
@@ -181,19 +183,20 @@ export default function Topbar() {
       </div>
 
       {/* --- RIGHT SECTION --- */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <div className="flex items-center gap-0.5 sm:gap-1">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSearchOpen(true)}
             title="Search (Ctrl + K)"
-            className="text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 rounded-full h-9 w-9 cursor-pointer"
+            className="text-muted-foreground hover:text-sky-400 hover:bg-sky-500/10 rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer"
           >
             <Search className="h-4 w-4" />
           </Button>
           <ThemeToggle />
-          <div className="relative">
+          {/* Bell: hidden on very small screens */}
+          <div className="relative hidden sm:block">
             <Button
               variant="ghost"
               size="icon"
@@ -208,9 +211,9 @@ export default function Topbar() {
         {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-3 pl-1 pr-3 py-1 cursor-pointer bg-muted/50 hover:bg-muted transition-all rounded-md border border-border group shadow-inner">
+            <div className="flex items-center gap-2 sm:gap-3 p-0.5 sm:pl-1 sm:pr-3 sm:py-1 cursor-pointer bg-muted/50 hover:bg-muted transition-all rounded-md border border-border group shadow-inner">
               <div className="relative">
-                <div className="h-10 w-10 rounded-md bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-md bg-card border border-border flex items-center justify-center overflow-hidden group-hover:border-sky-500/50 transition-all">
                   {session?.user?.image ? (
                     <img
                       src={session.user.image}
@@ -223,8 +226,8 @@ export default function Topbar() {
                 </div>
                 <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-background"></div>
               </div>
-              <div className="text-left hidden sm:block">
-                <p className="text-[11px] font-bold text-foreground leading-none tracking-wide">
+              <div className="text-left hidden md:block">
+                <p className="text-[11px] font-bold text-foreground leading-none tracking-wide max-w-[120px] truncate">
                   {session?.user?.name || "User Name"}
                 </p>
                 <p className="text-[9px] text-sky-500 dark:text-sky-400/80 font-bold mt-1 uppercase tracking-tighter">
@@ -235,15 +238,15 @@ export default function Topbar() {
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            className="w-50 mt-1 bg-popover border-border shadow-2xl rounded-md text-popover-foreground"
+            className="w-56 max-w-[calc(100vw-1.5rem)] mt-1 bg-popover border-border shadow-2xl rounded-md text-popover-foreground"
             align="end"
           >
             <DropdownMenuLabel className="font-normal p-4 bg-muted/30">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-bold text-foreground uppercase">
+              <div className="flex flex-col space-y-1 min-w-0">
+                <p className="text-sm font-bold text-foreground uppercase truncate">
                   {session?.user?.name || "Admin User"}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground truncate">
                   {session?.user?.email || "email@school.com"}
                 </p>
               </div>
@@ -268,7 +271,12 @@ export default function Topbar() {
             <DropdownMenuSeparator className="bg-border" />
 
             <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => {
+                try {
+                  sessionStorage.clear();
+                } catch {}
+                signOut({ callbackUrl: "/login" });
+              }}
               className="flex items-center gap-3 p-3 m-1 rounded-lg cursor-pointer text-rose-400 hover:bg-rose-500/10 focus:bg-rose-500/20 focus:text-rose-400 font-bold transition-colors"
             >
               <LogOut className="h-4 w-4" />

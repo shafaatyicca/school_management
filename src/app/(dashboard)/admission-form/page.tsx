@@ -81,10 +81,7 @@ function AdmissionFormPage() {
       <PageHeader title="Admission Form" icon={<FileText className="w-4 h-4" />} />
 
       {/* Toolbar */}
-      <div
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
-      >
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div>
           <p className="text-sm font-bold text-foreground">Blank Admission Form</p>
           <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -94,10 +91,9 @@ function AdmissionFormPage() {
         <div className="flex items-center gap-2">
           {/* Edit Undertaking → "Settings → Edit" */}
           {canEditSettings && (
-            <Link
+             <Link
               href="/settings"
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 h-9 text-xs font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
-              style={{ borderColor: "var(--border)" }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 h-9 text-xs font-semibold text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-500/40 dark:hover:bg-sky-500/10 dark:hover:text-sky-300"
             >
               <Settings2 className="w-3.5 h-3.5" /> Edit Undertaking
             </Link>
@@ -108,7 +104,7 @@ function AdmissionFormPage() {
             <Button
               onClick={() => printAdmissionForm(formData)}
               disabled={loading}
-              className="h-9 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+               className="h-9 border border-sky-300 bg-sky-100 px-4 text-xs font-semibold text-sky-700 shadow-none hover:bg-sky-200 cursor-pointer dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
             >
               <Printer className="w-3.5 h-3.5 mr-1" />
               Print Admission Form
@@ -124,8 +120,8 @@ function AdmissionFormPage() {
 
       {/* Live preview (exactly what will be printed) */}
       <div
-        className="rounded-xl border p-4 flex justify-center"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--muted)" }}
+        className="flex justify-center rounded-xl border border-slate-200 p-4 shadow-sm dark:border-slate-800"
+        style={{ backgroundColor: "var(--muted)" }}
       >
         {loading ? (
           <p className="py-20 text-sm" style={{ color: "var(--muted-foreground)" }}>

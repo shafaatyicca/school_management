@@ -6,13 +6,12 @@ import StudentModel from "@/models/Student";
 import "@/models/Class";
 import { getAccess, requirePermission, schoolIdFor, logActivity, diffChanges } from "@/lib/access";
 
-// Fields shown in the activity log (all fields of models/Parent.ts; password is never logged)
 const LOG_FIELDS = ["fullName", "cnic", "phone", "address", "occupation", "gender", "email"];
-
-// Fields the client may never set (p_id and email are made by the model)
 const BLOCKED = ["_id", "id", "schoolId", "p_id", "email", "createdAt", "updatedAt", "__v"];
 
 const isOid = (v: any) => !!v && v !== "undefined" && mongoose.Types.ObjectId.isValid(String(v));
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const looseDigits = (q: string) => q.split("").map(escapeRegex).join("[-\\s]?");
 
 function cleanBody(input: any) {
   const out: any = {};
@@ -79,9 +78,46 @@ export async function GET(req: Request) {
       return NextResponse.json(list.map((p: any) => ({ ...p, students: [] })));
     }
 
-    // 1. All parents of this school
+        // Filters (all optional — without them the full list comes, as before)
+    const sp = new URL(req.url).searchParams;
+    const q = (sp.get("q") || "").trim();
+    const classId = sp.get("classId");
+    const section = (sp.get("section") || "").trim();
+    const orphan = sp.get("orphan") === "1";
+
+    const filter: any = { schoolId };
+
+    if (classId) {
+      // Parents with at least one child in this class (+ section)
+      if (!isOid(classId)) return NextResponse.json({ message: "Invalid class" }, { status: 400 });
+      const sf: any = { schoolId, classId };
+      if (section) sf.section = section;
+      const ids: any[] = await (StudentModel as any).distinct("parentId", sf);
+      filter._id = { $in: ids.filter(Boolean) };
+    } else if (orphan) {
+      // Parents without any child
+      const ids: any[] = await (StudentModel as any).distinct("parentId", { schoolId });
+      filter._id = { $nin: ids.filter(Boolean) };
+    }
+
+    if (q) {
+      // Name, CNIC, phone or P-ID
+      const isDigits = /^[\d-\s]+$/.test(q);
+      const digits = q.replace(/\D/g, "");
+      const rx = { $regex: escapeRegex(q), $options: "i" };
+      const loose = { $regex: looseDigits(digits), $options: "i" };
+      const pid = Number(q);
+      filter.$or = [
+        { fullName: rx },
+        { cnic: isDigits && digits ? loose : rx },
+        { phone: isDigits && digits ? loose : rx },
+        ...(Number.isInteger(pid) && pid > 0 ? [{ p_id: pid }] : []),
+      ];
+    }
+
+    // 1. Parents of this school (filtered)
     const hide = access.can("parents", "edit") ? "" : "-password";
-    const parents: any[] = await (ParentModel as any).find({ schoolId }).select(hide).sort({ fullName: 1 }).lean();
+    const parents: any[] = await (ParentModel as any).find(filter).select(hide).sort({ fullName: 1 }).lean();
 
     // 2. All their students in ONE query (student password never sent)
     const parentIds = parents.map((p) => p._id);
@@ -227,6 +263,7 @@ export async function DELETE(req: Request) {
         { status: 409 },
       );
     }
+
 
     await (ParentModel as any).deleteOne({ _id: id, schoolId });
 

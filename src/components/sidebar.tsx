@@ -15,6 +15,7 @@ const HOVER =
 
 const ACTIVE = "bg-gradient-to-r from-sky-500/60 to-transparent text-white";
 
+
 export default function Sidebar() {
   const { data: session } = useSession();
   const params = useParams();
@@ -26,14 +27,20 @@ export default function Sidebar() {
   const [isHovered, setIsHovered] = useState(false); // Expand on hover while collapsed
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   // Each dropdown remembers its own open/closed state
-  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+ const [menuState, setMenuState] = useState<{ path: string; open: Record<string, boolean> }>({
+    path: "",
+    open: {},
+  });
+  const openMenus = menuState.path === pathname ? menuState.open : {};
+  const toggleMenu = (name: string, next: boolean) =>
+    setMenuState({ path: pathname, open: { ...openMenus, [name]: next } });
 
   // When collapsed and hovered, show the full width
   const isFullyExpanded = !isCollapsed || isHovered;
   const sidebarWidth = isFullyExpanded ? "lg:w-[220px]" : "lg:w-[70px]";
 
   // Menu comes from components/menuConfig.ts (shared with the global search)
-    const { can } = usePermissions();
+  const { can } = usePermissions();
   const isAdmin = isSuperAdmin || session?.user?.role === "school_admin";
   const menu = getSidebarMenu(isSuperAdmin, isAdmin, can);
   return (
@@ -101,13 +108,18 @@ export default function Sidebar() {
               const isOpen = openMenus[item.name] ?? isAnySubItemActive;
 
               return (
-                <div key={item.name} className="w-full space-y-0.5">
+                <div
+                  key={item.name}
+                  className={cn(
+                    "w-full rounded-sm transition-colors duration-300",
+                    // Open group → soft background + thin border
+                    isOpen && isFullyExpanded && "bg-white/[0.1] ring-1 ring-white/[0.06]",
+                  )}
+                >
                   {/* Parent button */}
                   <button
                     type="button"
-                    onClick={() =>
-                      setOpenMenus((prev) => ({ ...prev, [item.name]: !isOpen }))
-                    }
+                   onClick={() => toggleMenu(item.name, !isOpen)}
                     className={cn(
                       "flex items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium transition-all duration-300 group relative w-full text-left cursor-pointer",
                       isAnySubItemActive ? "text-sky-400" : "text-slate-100",
@@ -143,9 +155,9 @@ export default function Sidebar() {
                     )}
                   </button>
 
-                  {/* Submenu links */}
+                  {/* Submenu links — guide line on the left (under the parent icon) */}
                   {isOpen && isFullyExpanded && (
-                    <div className="pl-3 space-y-0.5 transition-all duration-300">
+                    <div className="ml-[15px] mb-1 border-l border-slate-600/70 pl-1 space-y-0.5 transition-all duration-300">
                       {item.subItems!.map((sub) => {
                         const isSubActive = pathname === sub.href;
                         const SubIcon = sub.icon;
@@ -156,7 +168,7 @@ export default function Sidebar() {
                             href={sub.href!}
                             onClick={() => setIsMobileOpen(false)}
                             className={cn(
-                              "flex items-center gap-3 rounded-md px-3 py-2 text-[12px] font-medium transition-all duration-300 group relative w-full",
+                              "flex items-center gap-2 rounded-md pl-2 pr-1 py-2 text-[11px] font-medium transition-all duration-300 group relative w-full",
                               isSubActive ? ACTIVE : cn("text-slate-300", HOVER),
                             )}
                           >
@@ -172,8 +184,9 @@ export default function Sidebar() {
                             )}
                             <span className="truncate tracking-wide z-10">{sub.name}</span>
 
+                            {/* Active page → blue mark on the guide line */}
                             {isSubActive && (
-                              <div className="absolute left-0 bg-sky-500 rounded-r-full w-[3px] h-8 shadow-[0_0_12px_rgba(14,165,233,1)]" />
+                              <div className="absolute -left-[5px] top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-full bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,1)]" />
                             )}
                           </Link>
                         );

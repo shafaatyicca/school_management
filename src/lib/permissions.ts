@@ -20,8 +20,10 @@ export type ModuleGroup = (typeof MODULE_GROUPS)[number]["key"];
 // (Dashboard has no row: it opens for everyone, its widgets have their own ticks.)
 export const MODULES = [
   { key: "classes", label: "Classes", group: "students", actions: ["view", "edit", "export"] },
+  { key: "classSummary", label: "Class Summary", group: "students", actions: ["view", "export"] },
   { key: "students", label: "Add Student (Students)", group: "students", actions: ["view", "create", "edit", "delete", "export"] },
   { key: "studentInfo", label: "Student Information", group: "students", actions: ["view", "export"] },
+  { key: "bulkInfo", label: "Students Bulk Info Change", group: "students", actions: ["view", "edit"] },
   { key: "bioData", label: "Bulk Student Bio Data", group: "students", actions: ["view", "export"] },
   { key: "admissionForm", label: "Print Admission Form", group: "students", actions: ["view", "export"] },
   { key: "parents", label: "Parents", group: "people", actions: ["view", "create", "edit", "delete", "export"] },
@@ -36,13 +38,6 @@ export const MODULES = [
   { key: "settings", label: "Settings", group: "system", actions: ["view", "edit"] },
 ] as const;
 export type ModuleKey = (typeof MODULES)[number]["key"];
-
-// ─────────────────────────────────────────────────────────────
-// Dashboard widgets (rows in User Access → "Dashboard Widgets" tab)
-// One tick per widget (show / hide). Separate from page permissions.
-// Always shown to everyone (no tick): Welcome, My Activity.
-// Only School Admin / Super Admin (no tick): Tasks, Login Activity.
-// ─────────────────────────────────────────────────────────────
 
 export const WIDGET_GROUPS = [
   { key: "school", label: "School" },
@@ -98,6 +93,7 @@ export const DEFAULT_ROLES: { key: string; name: string; permissions: Permission
     permissions: {
       modules: {
         classes: { view: true },
+        classSummary: { view: true, export: true },
         students: { view: true, export: true },
         studentInfo: { view: true, export: true },
         bioData: { view: true, export: true },

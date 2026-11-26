@@ -45,7 +45,7 @@ function StudentFeeLedgerPage() {
   const [editInvoice, setEditInvoice] = useState<any>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<any>(null);
-    const urlStudentLoaded = useRef<string | null>(null);
+  const urlStudentLoaded = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -125,11 +125,10 @@ function StudentFeeLedgerPage() {
     if (!effectiveSchoolId) return;
 
     const id = new URLSearchParams(window.location.search).get("student");
-   if (id && urlStudentLoaded.current !== id) {
+    if (id && urlStudentLoaded.current !== id) {
       urlStudentLoaded.current = id;
       loadStudent(id);
     }
-
 
     const onOpen = (e: Event) => loadStudent((e as CustomEvent).detail);
     window.addEventListener("ledger:open-student", onOpen);
@@ -137,7 +136,7 @@ function StudentFeeLedgerPage() {
   }, [effectiveSchoolId]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header Row */}
       <PageHeader
         title="Student Fee Ledger"
@@ -153,13 +152,13 @@ function StudentFeeLedgerPage() {
 
       {/* Content Area */}
       {studentInfo ? (
-        <div className="rounded-md mt-2 bg-card shadow-sm">
+        <div className="mt-2">
           <div className="flex flex-col lg:flex-row w-full items-start gap-4">
             {/* Info Table */}
-            <div className="flex items-center gap-4 w-full">
-              <div className="w-full overflow-hidden rounded border border-slate-200">
+            <div className="flex flex-col lg:flex-row items-center gap-4 w-full">
+              <div className="w-full overflow-hidden rounded border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 {/* Header Row */}
-                <div className="flex items-center justify-between border-b bg-slate-50 dark:bg-slate-800 p-1">
+                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 p-1">
                   <div className="text-md text-red-500">Student Info :</div>
 
                   <div className="flex flex-wrap gap-2">
@@ -167,7 +166,7 @@ function StudentFeeLedgerPage() {
                     {canCreateInvoice && (
                       <button
                         onClick={() => setIsInvoiceModalOpen(true)}
-                        className="rounded bg-green-600 px-3 py-1 text-xs text-white cursor-pointer hover:bg-green-700"
+                        className="rounded border border-emerald-300 bg-emerald-100 px-3 py-1 text-xs text-emerald-700 cursor-pointer hover:bg-emerald-200 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300 dark:hover:bg-emerald-500/30"
                       >
                         Generate Invoice
                       </button>
@@ -175,7 +174,7 @@ function StudentFeeLedgerPage() {
 
                     {/* Final Reminder Letter → "Student Fee Ledger → Export / Print" */}
                     {canExport && (
-                      <button className="rounded bg-amber-600 px-3 py-1 text-xs text-white hover:bg-indigo-800">
+                      <button className="rounded border border-amber-300 bg-amber-100 px-3 py-1 text-xs text-amber-700 cursor-pointer hover:bg-amber-200 dark:border-amber-500/40 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30">
                         Final Reminder Letter
                       </button>
                     )}
@@ -183,7 +182,7 @@ function StudentFeeLedgerPage() {
                     {/* Recent Payments → viewing only (reverse is checked inside) */}
                     <button
                       onClick={() => setIsRecentOpen(true)}
-                      className="rounded bg-sky-500 px-3 py-1 text-xs text-white cursor-pointer hover:bg-sky-600"
+                      className="rounded border border-sky-300 bg-sky-100 px-3 py-1 text-xs text-sky-700 cursor-pointer hover:bg-sky-200 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
                     >
                       Recent Payments
                     </button>
@@ -210,10 +209,10 @@ function StudentFeeLedgerPage() {
                   </div>
 
                   {/* Table */}
-                  <div className="w-full min-w-0 overflow-hidden rounded border border-slate-200 dark:border-slate-700">
+                  <div className="w-full min-w-0 overflow-hidden border-l border-slate-200 dark:border-slate-700">
                     <table className="w-full table-fixed border-collapse text-xs">
                       <tbody>
-                        <tr className="border-b bg-slate-50 dark:bg-slate-800">
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
                           <td className="p-1">GR Number</td>
                           <td className="p-1">{studentInfo.grNumber}</td>
 
@@ -230,7 +229,7 @@ function StudentFeeLedgerPage() {
                           </td>
                         </tr>
 
-                        <tr className="border-b">
+                        <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                           <td className="p-1">Name</td>
                           <td className="p-1 text-sky-600">
                             {studentInfo.fullName}
@@ -242,7 +241,7 @@ function StudentFeeLedgerPage() {
                           </td>
                         </tr>
 
-                        <tr className="border-b bg-slate-50 dark:bg-slate-800">
+                        <tr className="border-b border-slate-200 dark:border-slate-700">
                           <td className="p-1">Parent Name</td>
                           <td className="p-1 text-sky-600">
                             {studentInfo.parentName || "---"}
@@ -254,7 +253,7 @@ function StudentFeeLedgerPage() {
                           </td>
                         </tr>
 
-                        <tr className="border-b">
+                        <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                           <td className="p-1">Mother Name</td>
                           <td className="p-1">
                             {studentInfo.motherName || "---"}
@@ -266,7 +265,7 @@ function StudentFeeLedgerPage() {
                           </td>
                         </tr>
 
-                        <tr className="bg-slate-50 dark:bg-slate-800">
+                        <tr>
                           <td className="p-1">Guardian Name</td>
                           <td className="p-1">
                             {studentInfo.guardianName || "---"}
@@ -283,8 +282,8 @@ function StudentFeeLedgerPage() {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 w-80 overflow-hidden rounded border border-slate-200 ">
-                <div className="flex items-center justify-between border-b bg-slate-50 dark:bg-slate-800 p-1">
+              <div className="flex-shrink-0 w-full lg:w-80 overflow-hidden rounded border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-1">
                   <h4 className=" text-red-500">Discounts</h4>
                   <div className="flex gap-2">
                     {/* Add → "Fee Discounts → Create" */}
@@ -294,7 +293,7 @@ function StudentFeeLedgerPage() {
                           setEditDiscount(null);
                           setIsModalOpen(true);
                         }}
-                        className="rounded bg-green-600 px-2 py-1 text-xs text-white cursor-pointer"
+                        className="rounded border border-emerald-300 bg-emerald-100 px-2 py-1 text-xs text-emerald-700 cursor-pointer hover:bg-emerald-200 dark:border-emerald-500/40 dark:bg-emerald-500/20 dark:text-emerald-300 dark:hover:bg-emerald-500/30"
                       >
                         Add
                       </button>
@@ -303,7 +302,7 @@ function StudentFeeLedgerPage() {
                     {/* View Discounts → "Fee Discounts → View" */}
                     {canViewDiscounts && (
                       <button
-                        className="rounded bg-blue-600/20 dark:text-white px-2 py-1 text-xs text-black cursor-pointer"
+                        className="rounded border border-blue-300 bg-blue-100 px-2 py-1 text-xs text-blue-700 cursor-pointer hover:bg-blue-200 dark:border-blue-500/40 dark:bg-blue-500/20 dark:text-blue-300 dark:hover:bg-blue-500/30"
                         onClick={() => setIsViewDiscountOpen(true)}
                       >
                         View Discounts
@@ -315,7 +314,7 @@ function StudentFeeLedgerPage() {
                 <table className="w-full text-xs">
                   <tbody>
                     {discounts.map((item: any) => (
-                      <tr key={item._id} className="border-t">
+                      <tr key={item._id} className="border-t border-slate-200 dark:border-slate-700 ">
                         <td className="p-1 flex items-center  gap-1">
                           <span>{item.feeCategoryId?.name}</span>
                         </td>
@@ -335,7 +334,7 @@ function StudentFeeLedgerPage() {
                     {Array.from({
                       length: Math.max(0, 4 - discounts.length),
                     }).map((_, index) => (
-                      <tr key={`empty-${index}`} className="border-t">
+                      <tr key={`empty-${index}`} className="border-t border-slate-200 dark:border-slate-700">
                         <td className="p-1">-</td>
                         <td className="p-1 text-center text-blue-600">-</td>
                         <td className="p-1 text-center text-pink-600">-</td>
@@ -344,7 +343,7 @@ function StudentFeeLedgerPage() {
                     ))}
 
                     {/* TOTAL Row */}
-                    <tr className="border-t bg-slate-50 dark:bg-slate-800 text-xs">
+                    <tr className="border-t border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800 text-xs">
                       <td className="p-1 font-bold">Total</td>
 
                       {/* Base Fee Total */}

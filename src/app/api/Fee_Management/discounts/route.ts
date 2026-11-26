@@ -22,6 +22,7 @@ const BLOCKED = ["_id", "id", "schoolId", "studentId", "feeCategoryId", "created
 const isOid = (v: any) => !!v && v !== "undefined" && mongoose.Types.ObjectId.isValid(String(v));
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 
+
 // Super Admin may work without a schoolId; everyone else is locked to their school
 const scopeOf = (schoolId: string | null) => (schoolId ? { schoolId } : {});
 

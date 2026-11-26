@@ -44,7 +44,7 @@ parentSchema.pre<IParent>("save", async function () {
       const Parent = models.Parent || model<IParent>("Parent", parentSchema);
 
       // 2. ID Generation (Per School)
-      const lastParent = await Parent.findOne({ schoolId: doc.schoolId })
+      const lastParent = await (Parent as any).findOne({ schoolId: doc.schoolId })
         .sort({ p_id: -1 })
         .select("p_id")
         .lean();

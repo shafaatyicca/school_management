@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { useTheme, lighten } from "@mui/material/styles";
 import {
   BookUser,
   Printer,
@@ -11,8 +12,10 @@ import {
   Users,
   Filter,
   Lock,
+  School,
+  Building2,
+  type LucideIcon,
 } from "lucide-react";
-import { TextField } from "@mui/material";
 import PageHeader from "@/components/PageHeader";
 import PageGuard from "@/components/PageGuard";
 import { usePermissions } from "@/components/PermissionsProvider";
@@ -27,12 +30,50 @@ const SEARCH_MODE = "__search__";
 const ALL = "all";
 type StatusFilter = "active" | "inactive" | "all";
 
+// Tabs: Class / All classes / Search
+type Tab = "class" | "all" | "search";
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: "class", label: "Select One Class", icon: School },
+  { key: "all", label: "Select All classes", icon: Building2 },
+  { key: "search", label: "Search From All School", icon: Search },
+];
+
+// Filter styles (same light look as the Bulk Info page)
+const TAB = "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors cursor-pointer";
+const TAB_OFF = "text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100";
+const TAB_ON =
+  "bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:ring-sky-500/40";
+const CHIP =
+  "inline-flex h-8 items-center rounded-full border px-3.5 text-xs font-medium transition-colors cursor-pointer";
+const CHIP_OFF =
+  "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-500/40 dark:hover:bg-sky-500/10";
+const CHIP_ON =
+  "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300";
+const SEC = "inline-flex h-6 items-center rounded-full px-3 text-[11px] font-medium transition-colors cursor-pointer";
+const SEC_OFF =
+  "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+const SEC_ON = "bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:ring-sky-500/40";
+
+// Makes the StudentSearchBox input match the other boxes
+const SEARCH_LOOK = [
+  "[&_input]:!h-9 [&_input]:!rounded-lg [&_input]:!border [&_input]:!text-sm",
+  "[&_input]:!bg-white [&_input]:!text-slate-700 [&_input]:!border-slate-200",
+  "dark:[&_input]:!bg-slate-900 dark:[&_input]:!text-slate-200 dark:[&_input]:!border-slate-700",
+  "[&_input]:focus:!border-sky-500 [&_input]:focus:!ring-2 [&_input]:focus:!ring-sky-100 dark:[&_input]:focus:!ring-sky-500/20",
+].join(" ");
+
 function StudentBioDataPage() {
   const { data: session } = useSession();
   const isSuperAdmin = session?.user?.role === "super_admin";
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const schoolId = isSuperAdmin ? viewSchoolId : session?.user?.schoolId;
 
+  // Same background as the MRT tables (Classes, Students…): MUI theme colour
+  const muiTheme = useTheme();
+  const tableBg =
+    muiTheme.palette.mode === "dark"
+      ? lighten(muiTheme.palette.background.default, 0.05)
+      : muiTheme.palette.background.default;
 
   // Print → "Student Bio Data → Export/Print"
   const { can } = usePermissions();
@@ -43,7 +84,8 @@ function StudentBioDataPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [classesLoading, setClassesLoading] = useState(true);
 
-  // "" = nothing, SEARCH_MODE = search, "all" = all classes, otherwise classId
+  // Tab + mode ("" = nothing, SEARCH_MODE = search, "all" = all classes, otherwise classId)
+  const [tab, setTab] = useState<Tab>("class");
   const [mode, setMode] = useState("");
   const [section, setSection] = useState(ALL);
   const [status, setStatus] = useState<StatusFilter>("active");
@@ -73,7 +115,7 @@ function StudentBioDataPage() {
     }
   }, [isSuperAdmin]);
 
-  // Classes — loaded on their own so the dropdown is ready quickly
+  // Classes — loaded on their own so the chips are ready quickly
   useEffect(() => {
     if (!schoolId) return;
     setClassesLoading(true);
@@ -154,6 +196,16 @@ function StudentBioDataPage() {
     setPicked([]);
   };
 
+  // Tab: Class → wait for a class chip, All classes → load all, Search → search box
+  const changeTab = (t: Tab) => {
+    if (t === tab) return;
+    setTab(t);
+    changeMode(t === "search" ? SEARCH_MODE : t === "all" ? ALL : "");
+  };
+
+  // Class chip: choose, or click again to clear
+  const pickClass = (id: string) => changeMode(mode === id ? "" : id);
+
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -210,14 +262,26 @@ function StudentBioDataPage() {
   };
 
   const STATUS_BUTTONS: { key: StatusFilter; label: string; count: number; active: string }[] = [
-    { key: "active", label: "Active", count: counts.active, active: "bg-emerald-600 border-emerald-600 text-white" },
-    { key: "inactive", label: "Inactive", count: counts.inactive, active: "bg-rose-600 border-rose-600 text-white" },
+    {
+      key: "active",
+      label: "Active",
+      count: counts.active,
+      active:
+        "bg-emerald-50 border-emerald-300 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-300",
+    },
+    {
+      key: "inactive",
+      label: "Inactive",
+      count: counts.inactive,
+      active:
+        "bg-rose-50 border-rose-300 text-rose-700 dark:bg-rose-500/15 dark:border-rose-500/40 dark:text-rose-300",
+    },
     {
       key: "all",
       label: "All",
       count: counts.all,
       active:
-        "bg-slate-800 border-slate-800 text-white dark:bg-slate-200 dark:border-slate-200 dark:text-slate-900",
+        "bg-slate-100 border-slate-300 text-slate-700 dark:bg-slate-500/20 dark:border-slate-500/40 dark:text-slate-200",
     },
   ];
 
@@ -226,133 +290,155 @@ function StudentBioDataPage() {
       <PageHeader title="Student Bio Data" icon={<BookUser className="w-4 h-4" />} />
 
       {/* ── Filters ── */}
-      <div
-        className="rounded-xl border p-4 space-y-3"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
-      >
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {/* Row 1: tabs + search box (Search tab) + form style */}
         <div className="flex flex-wrap items-center gap-3">
-          <TextField
-            select
-            label="Select By"
-            size="small"
-            value={mode}
-            onChange={(e) => changeMode(e.target.value)}
-            disabled={classesLoading}
-            SelectProps={{ native: true }}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 230 }}
-          >
-            <option value="">
-              {classesLoading ? "Loading classes..." : "Choose a class or search"}
-            </option>
-            <option value={SEARCH_MODE}>Search Students</option>
-            <option value={ALL}>All Classes</option>
-            <optgroup label="Classes">
-              {classes.map((c) => (
-                <option key={c._id} value={String(c._id)}>
-                  {c.name}
-                </option>
-              ))}
-            </optgroup>
-          </TextField>
-
-          {selectedClass && (
-            <TextField
-              select
-              label="Section"
-              size="small"
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              SelectProps={{ native: true }}
-              InputLabelProps={{ shrink: true }}
-              sx={{ minWidth: 170 }}
-            >
-              <option value={ALL}>All Sections</option>
-              {sections.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </TextField>
-          )}
+          <div className="inline-flex flex-wrap gap-0.5 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => changeTab(t.key)}
+                  className={`${TAB} ${tab === t.key ? TAB_ON : TAB_OFF}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
 
           {isSearchMode && (
-            <div className="flex-1 min-w-[260px]">
+            <div className={`w-full sm:w-80 ${SEARCH_LOOK}`}>
               <StudentSearchBox
                 schoolId={schoolId}
                 onSelect={addPicked}
                 clearOnSelect
                 showSearchButton={false}
                 variant="page"
-                placeholder="Type a student name or GR # and pick a student"
+                placeholder="Name or GR #"
               />
             </div>
           )}
 
-          <TextField
-            select
-            label="Form"
-            size="small"
-            value={formStyle}
-            onChange={(e) => setFormStyle(e.target.value as "style1" | "style2")}
-            SelectProps={{ native: true }}
-            InputLabelProps={{ shrink: true }}
-            sx={{ minWidth: 120, ml: { sm: "auto" } }}
-          >
-            <option value="style1">Form Style Classic</option>
-            <option value="style2">Form Style Modern</option>
-          </TextField>
+          {/* Form style */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">Select Form Design:</span>
+            <div className="inline-flex gap-0.5 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+              {(
+                [
+                  { key: "style1", label: "Classic" },
+                  { key: "style2", label: "Modern" },
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFormStyle(f.key)}
+                  className={`${TAB} h-7 ${formStyle === f.key ? TAB_ON : TAB_OFF}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Status buttons (class / all classes) */}
-        {mode && !isSearchMode && (
-          <div className="flex flex-wrap items-center gap-2">
-            {STATUS_BUTTONS.map((b) => {
-              const on = status === b.key;
-              return (
-                <button
-                  key={b.key}
-                  type="button"
-                  onClick={() => setStatus(b.key)}
-                  className={`inline-flex items-center gap-2 rounded-lg border px-3 h-8 text-xs font-semibold transition-colors cursor-pointer ${
-                    on ? b.active : "text-foreground hover:bg-[color:var(--muted)]"
-                  }`}
-                  style={on ? undefined : { borderColor: "var(--border)" }}
-                >
-                  {b.label}
-                  <span
-                    className={`rounded-full px-1.5 text-[10px] font-bold ${on ? "bg-white/25" : ""}`}
-                    style={on ? undefined : { backgroundColor: "var(--muted)" }}
+        {/* Row 2: class chips (Class tab) */}
+        {tab === "class" && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {classesLoading ? (
+              <span className="py-1.5 text-xs text-slate-400 dark:text-slate-500">Loading classes…</span>
+            ) : classes.length === 0 ? (
+              <span className="py-1.5 text-xs text-slate-400 dark:text-slate-500">No classes found</span>
+            ) : (
+              classes.map((c) => {
+                const id = String(c._id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => pickClass(id)}
+                    className={`${CHIP} ${mode === id ? CHIP_ON : CHIP_OFF}`}
                   >
-                    {b.count}
-                  </span>
+                    {c.name}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Row 3: section chips + status (class / all classes) */}
+        {mode && !isSearchMode && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-dashed border-slate-200 pt-3 dark:border-slate-700">
+            {selectedClass && (
+              <>
+                <span className="mr-1 text-[11px] text-slate-400 dark:text-slate-500">Section:</span>
+                <button
+                  type="button"
+                  onClick={() => setSection(ALL)}
+                  className={`${SEC} ${section === ALL ? SEC_ON : SEC_OFF}`}
+                >
+                  All
                 </button>
-              );
-            })}
+                {sections.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSection(s)}
+                    className={`${SEC} ${section === s ? SEC_ON : SEC_OFF}`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </>
+            )}
+
+            <div className="ml-auto flex items-center gap-2">
+              {STATUS_BUTTONS.map((b) => {
+                const on = status === b.key;
+                return (
+                  <button
+                    key={b.key}
+                    type="button"
+                    onClick={() => setStatus(b.key)}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 h-8 text-xs font-semibold transition-colors cursor-pointer ${
+                      on ? b.active : "text-foreground hover:bg-[color:var(--muted)]"
+                    }`}
+                    style={on ? undefined : { borderColor: "var(--border)" }}
+                  >
+                    {b.label}
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] font-bold ${on ? "bg-black/10 dark:bg-white/15" : ""}`}
+                      style={on ? undefined : { backgroundColor: "var(--muted)" }}
+                    >
+                      {b.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
 
       {/* ── Students ── */}
       {!mode ? (
-        <div
-          className="flex h-56 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm"
-          style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}
-        >
+        <div className="flex h-56 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 text-sm text-slate-400 dark:border-slate-700 dark:text-slate-500">
           <Filter className="h-8 w-8" />
-          Choose a class or &quot;Search Students&quot; to begin
+          Choose a class or search to begin
         </div>
       ) : (
         <div
-          className="rounded-xl border"
-          style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
+          className="rounded-xl border border-slate-200 shadow-sm dark:border-slate-800"
+          style={{ backgroundColor: tableBg }}
         >
           {/* Toolbar */}
-          <div
-            className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-700">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
               <Users className="w-3.5 h-3.5" /> {targetCount} student(s) selected
             </span>
             <div className="flex items-center gap-1">
@@ -404,16 +490,13 @@ function StudentBioDataPage() {
                 <Button
                   onClick={handlePrint}
                   disabled={targetCount === 0 || printing || !school}
-                  className="h-8 ml-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+                  className="h-8 ml-2 border border-sky-300 bg-sky-100 px-4 text-xs font-semibold text-sky-700 shadow-none hover:bg-sky-200 cursor-pointer dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
                 >
                   <Printer className="w-3.5 h-3.5 mr-1" />
                   {printing ? "Preparing..." : `Print Bio Data (${targetCount})`}
                 </Button>
               ) : (
-                <span
-                  className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
+                <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
                   <Lock className="w-3.5 h-3.5" /> No print permission
                 </span>
               )}
@@ -424,10 +507,7 @@ function StudentBioDataPage() {
           <div className="max-h-80 overflow-y-auto p-4">
             {isSearchMode ? (
               picked.length === 0 ? (
-                <p
-                  className="flex items-center justify-center gap-1.5 py-8 text-xs"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
+                <p className="flex items-center justify-center gap-1.5 py-8 text-xs text-slate-400 dark:text-slate-500">
                   <Search className="w-3.5 h-3.5" /> Search and pick students from any class.
                 </p>
               ) : (
@@ -435,18 +515,20 @@ function StudentBioDataPage() {
                   {picked.map((s) => (
                     <span
                       key={s._id}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-sky-600 bg-sky-600 px-2 py-1 text-[11px] font-medium text-white"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-sky-100 px-2 py-1 text-[11px] font-medium text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300"
                     >
                       {s.fullName}
-                      <span className="text-sky-100">
+                      <span className="text-sky-500 dark:text-sky-400/80">
                         ({s.className}
                         {s.section ? `-${s.section}` : ""})
                       </span>
-                      <span className="rounded bg-sky-700 px-1 font-mono text-[10px]">{s.grNumber}</span>
+                      <span className="rounded bg-sky-200 px-1 font-mono text-[10px] text-sky-800 dark:bg-sky-500/30 dark:text-sky-200">
+                        {s.grNumber}
+                      </span>
                       <button
                         type="button"
                         onClick={() => setPicked((prev) => prev.filter((p) => p._id !== s._id))}
-                        className="rounded hover:bg-sky-700 cursor-pointer"
+                        className="rounded hover:bg-sky-200 cursor-pointer dark:hover:bg-sky-500/30"
                         aria-label={`Remove ${s.fullName}`}
                       >
                         <X className="w-3 h-3" />
@@ -456,11 +538,9 @@ function StudentBioDataPage() {
                 </div>
               )
             ) : loading ? (
-              <p className="py-8 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
-                Loading students...
-              </p>
+              <p className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">Loading students...</p>
             ) : visibleStudents.length === 0 ? (
-              <p className="py-8 text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">
                 No {status !== "all" ? status : ""} students found.
               </p>
             ) : (
@@ -475,27 +555,26 @@ function StudentBioDataPage() {
                       onClick={() => toggle(id)}
                       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
                         on
-                          ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
-                          : "text-foreground hover:border-sky-400"
+                          ? "border-sky-300 bg-sky-100 text-sky-700 hover:bg-sky-200 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-500/40"
                       }`}
-                      style={on ? undefined : { borderColor: "var(--border)", backgroundColor: "var(--card)" }}
                     >
                       {s.fullName}
-                      <span
-                        className={on ? "text-sky-100" : ""}
-                        style={on ? undefined : { color: "var(--muted-foreground)" }}
-                      >
+                      <span className={on ? "text-sky-500 dark:text-sky-400/80" : "text-slate-400 dark:text-slate-500"}>
                         ({s.classId?.name}
                         {s.section ? `-${s.section}` : ""})
                       </span>
                       <span
-                        className={`rounded px-1 font-mono text-[10px] ${on ? "bg-sky-700 text-white" : ""}`}
-                        style={on ? undefined : { backgroundColor: "var(--muted)" }}
+                        className={`rounded px-1 font-mono text-[10px] ${
+                          on
+                            ? "bg-sky-200 text-sky-800 dark:bg-sky-500/30 dark:text-sky-200"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        }`}
                       >
                         {s.grNumber}
                       </span>
                       {s.status === "inactive" && (
-                        <span className="rounded bg-rose-500 px-1 text-[9px] font-bold text-white">
+                        <span className="rounded bg-rose-100 px-1 text-[9px] font-bold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
                           INACTIVE
                         </span>
                       )}

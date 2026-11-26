@@ -340,9 +340,9 @@ export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, o
     muiTablePaperProps: {
       elevation: 0,
       sx: {
-        borderRadius: "0px",
-        border: "1px solid var(--border)",
-        backgroundColor: "var(--background)",
+        borderRadius: 0,
+        border: "none",
+        backgroundColor: "transparent",
         padding: "0px 6px",
       },
     },
@@ -366,14 +366,13 @@ export default function StudentInvoiceTable({ studentId, schoolId, onPayClick, o
         padding: "4px 6px",
         fontWeight: "700",
         backgroundColor: "var(--muted)",
-        borderTop: "1px solid var(--border)",
       },
     },
   });
 
   return (
     <>
-      <div className="rounded-md border bg-background shadow-sm overflow-hidden mt-2">
+      <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden mt-2 dark:border-slate-800 dark:bg-slate-900">
         <MaterialReactTable table={table} />
       </div>
 

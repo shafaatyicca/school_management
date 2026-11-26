@@ -350,8 +350,9 @@ function ClassPage() {
     muiTablePaperProps: {
       elevation: 0,
       sx: {
-        borderRadius: "16px",
-        border: "1px solid var(--border)",
+        borderRadius: 0,
+        border: "none",
+        backgroundColor: "transparent",
         padding: "0px 10px",
       },
     },
@@ -380,7 +381,7 @@ function ClassPage() {
         }
         icon={<BookOpen className="w-4 h-4" />}
       />
-      <div className="rounded-xl border bg-background shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-800 dark:bg-slate-900">
         <MaterialReactTable table={table} />
       </div>
       <ClassFormModal

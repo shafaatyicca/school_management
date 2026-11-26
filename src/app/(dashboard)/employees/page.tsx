@@ -449,10 +449,10 @@ function EmployeesPage() {
     muiTablePaperProps: {
       elevation: 0,
       sx: {
-        borderRadius: "16px",
-        border: "1px solid var(--border)",
-        backgroundColor: "var(--background)",
-        padding: " 0px 10px",
+        borderRadius: 0,
+        border: "none",
+        backgroundColor: "transparent",
+        padding: "0px 10px",
       },
     },
     muiTableHeadCellProps: {
@@ -487,7 +487,7 @@ function EmployeesPage() {
         }
         icon={<Users className="w-3.5 h-3.5" />}
       />
-      <div className="w-full border border-border rounded-xl shadow-sm bg-background overflow-hidden">
+      <div className="w-full rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-800 dark:bg-slate-900">
         <MaterialReactTable table={table} />
       </div>
       <EmployeeFormModal

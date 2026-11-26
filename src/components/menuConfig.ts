@@ -9,14 +9,19 @@ import {
   FileUp,
   BriefcaseBusiness,
   UsersRound,
+  Users,
   WalletCards,
   ReceiptText,
   Ticket,
   Settings,
   History,
   ShieldCheck,
+  BookPlus,
+  ClipboardList,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
+
 
 export type MenuItem = {
   name: string;
@@ -31,6 +36,7 @@ export type MenuItem = {
   subItems?: MenuItem[];
 };
 
+
 // Permission check passed in from usePermissions().can
 export type CanFn = (module: string, action: string) => boolean;
 
@@ -39,7 +45,15 @@ export const MENU: MenuItem[] = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard, keywords: ["home", "stats", "tasks"] },
     { name: "Activity Logs", href: "/activity-logs", icon: History, keywords: ["logs", "history", "audit", "who changed", "login history", "my activity"] },
   { name: "User Access", href: "/user-access", icon: ShieldCheck, keywords: ["roles", "permissions", "access", "staff login"], superAdminOnly: true },
-  { name: "Classes", href: "/classes", icon: BookOpen, module: "classes", keywords: ["class", "section", "class fee", "order"] },
+    {
+    name: "Class Management",
+    icon: BookOpen,
+    isDropdown: true,
+    subItems: [
+      { name: "Add Classes", href: "/classes", icon: BookPlus, module: "classes", keywords: ["class", "section", "class fee", "order"] },
+      { name: "Classes Summary", href: "/class-summary", icon: ClipboardList, module: "classSummary", keywords: ["strength", "boys", "girls", "gender", "students count", "section wise"] },
+    ],
+  },
   {
     name: "Students Management",
     icon: GraduationCap,
@@ -47,13 +61,21 @@ export const MENU: MenuItem[] = [
     subItems: [
       { name: "Add Student", href: "/students", icon: UserPlus, module: "students", keywords: ["students", "new student", "admission", "list"] },
       { name: "Student Information", href: "/student-information", icon: Contact, module: "studentInfo", keywords: ["active", "inactive", "class list", "report"] },
-      { name: "Student Bio Data", href: "/student-bio-data", icon: BookUser, module: "bioData", keywords: ["bio", "print", "profile print"] },
-      { name: "Admission Form", href: "/admission-form", icon: FileText, module: "admissionForm", keywords: ["blank form", "form", "admission"] },
+      { name: "Student Bulk Info Change", href: "/student-bulk-info", icon: UserCog, module: "bulkInfo", keywords: ["bulk", "change", "date of birth", "dob", "admission date", "section change", "class change", "promote"] },
+      { name: "Print Student Bio Data", href: "/student-bio-data", icon: BookUser, module: "bioData", keywords: ["bio", "print", "profile print"] },
+      { name: "Print Admission Form", href: "/admission-form", icon: FileText, module: "admissionForm", keywords: ["blank form", "form", "admission"] },
       { name: "Import Students", href: "/student-import", icon: FileUp, keywords: ["excel", "upload", "bulk"], superAdminOnly: true },
     ],
   },
+  {
+    name: "Parent Management",
+    icon: Users,
+    isDropdown: true,
+    subItems: [
+      { name: "Parent Information", href: "/parents", icon: UsersRound, module: "parents", keywords: ["parents", "father", "guardian", "family", "cnic", "orphan"] },
+    ],
+  },
   { name: "Employees", href: "/employees", icon: BriefcaseBusiness, module: "employees", keywords: ["staff", "teachers", "salary"] },
-  { name: "Parents", href: "/parents", icon: UsersRound, module: "parents", keywords: ["father", "guardian", "family"] },
   {
     name: "Fee Management",
     icon: WalletCards,

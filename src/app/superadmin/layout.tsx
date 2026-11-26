@@ -205,7 +205,12 @@ export default function SuperAdminLayout({
               <UserCircle size={32} className="text-slate-300" />
             </div>
             <button
-              onClick={() => signOut()}
+               onClick={() => {
+                try {
+                  sessionStorage.clear();
+                } catch {}
+                signOut();
+              }}
               className="p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white rounded-md transition-all shadow-sm cursor-pointer"
             >
               <LogOut size={20} />

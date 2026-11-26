@@ -13,7 +13,6 @@ function adjustToBase(record: any, newBase: number) {
     discountValue: newBase - net,
   };
 }
-
 export async function ensureTuitionLock(studentId: string) {
   const student: any = await (Student as any).findById(studentId)
     .select("schoolId classId")

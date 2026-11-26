@@ -31,7 +31,7 @@ export async function proxy(req: NextRequest) {
     host === `www.${mainDomain}` ||
     host === "localhost:3000" ||
     host === "lvh.me:3000" ||
-    host.endsWith(".vercel.app"); // Vercel's own link → main (Super Admin)
+    host.endsWith(".vercel.app");
 
   // School slug from the subdomain ("" on the main domain)
   let currentHost = "";

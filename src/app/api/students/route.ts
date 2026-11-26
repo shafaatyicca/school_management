@@ -31,6 +31,11 @@ export async function GET(req: Request) {
     const classId = searchParams.get("classId");
     const section = searchParams.get("section");
     const ids = searchParams.get("ids");
+        // Students page (admissions): all optional — other pages don't send these
+    const from = searchParams.get("from"); // YYYY-MM-DD (admission date)
+    const to = searchParams.get("to"); // YYYY-MM-DD
+    const status = searchParams.get("status"); // "active" | "inactive"
+    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "", 10) || 0, 0), 500);
 
     // Pages that list students + parent profile (only its own children)
     const canStudents =
@@ -54,17 +59,30 @@ export async function GET(req: Request) {
     if (classId) filter.classId = classId; // Student Information page
     if (section) filter.section = section;
     if (ids) filter._id = { $in: ids.split(",").filter(Boolean) };
+        // Admission date range (Pakistan time, whole days)
+    const YMD = /^\d{4}-\d{2}-\d{2}$/;
+    const okFrom = !!from && YMD.test(from);
+    const okTo = !!to && YMD.test(to);
+    if (okFrom || okTo) {
+      filter.enrollmentDate = {};
+      if (okFrom) filter.enrollmentDate.$gte = new Date(`${from}T00:00:00+05:00`);
+      if (okTo) filter.enrollmentDate.$lte = new Date(`${to}T23:59:59.999+05:00`);
+    }
+    if (status === "active" || status === "inactive") filter.status = status;
+    const byAdmission = okFrom || okTo || limit > 0; // newest admissions first
 
     // Student password only for users who can edit students; parent password never
     const hide = access.can("students", "edit") ? "" : "-password";
 
-    const students = await (Student as any)
+    let query = (Student as any)
       .find(filter)
       .select(hide)
       .populate("classId", "name")
       .populate("parentId", "-password")
-      .sort(parentId ? { fullName: 1 } : { grNumber: -1 })
-      .lean();
+      .sort(parentId ? { fullName: 1 } : byAdmission ? { enrollmentDate: -1, grNumber: -1 } : { grNumber: -1 });
+    if (limit > 0) query = query.limit(limit);
+
+    const students = await query.lean();
 
     return NextResponse.json(students);
   } catch (error: any) {
@@ -249,9 +267,6 @@ export async function PUT(req: Request) {
 }
 
 // --- DELETE: Delete Student (Add Student → Delete) ---
-//     { id, schoolId, preview?: true }
-//     preview → only says what will be deleted (nothing is removed)
-//     Student with fee payments → not allowed (mark Inactive instead)
 export async function DELETE(req: Request) {
   try {
     const { access, error } = await requirePermission("students", "delete");

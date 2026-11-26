@@ -17,8 +17,10 @@ import {
   CircleAlert,
   Settings2,
   Search,
+  School,
+  type LucideIcon,
 } from "lucide-react";
-import { TextField } from "@mui/material";
+import { useTheme, lighten } from "@mui/material/styles";
 import dayjs from "dayjs";
 import PageHeader from "@/components/PageHeader";
 import PageGuard from "@/components/PageGuard";
@@ -72,6 +74,41 @@ const byGr = (a: any, b: any) => {
     : x - y;
 };
 
+// Tabs: Class / Search
+type Tab = "class" | "search";
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: "class", label: "Select One Class", icon: School },
+  { key: "search", label: "Search From All School", icon: Search },
+];
+
+// Filter styles (same light look as Bio Data / Bulk Info pages)
+const TAB = "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors cursor-pointer";
+const TAB_OFF = "text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100";
+const TAB_ON =
+  "bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:ring-sky-500/40";
+const CHIP =
+  "inline-flex h-8 items-center rounded-full border px-3.5 text-xs font-medium transition-colors cursor-pointer";
+const CHIP_OFF =
+  "border-slate-200 bg-white text-slate-600 hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-500/40 dark:hover:bg-sky-500/10";
+const CHIP_ON =
+  "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300";
+const SEC = "inline-flex h-6 items-center rounded-full px-3 text-[11px] font-medium transition-colors cursor-pointer";
+const SEC_OFF =
+  "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700";
+const SEC_ON = "bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-500/20 dark:text-sky-300 dark:ring-sky-500/40";
+
+// Light buttons
+const BTN_SKY =
+  "h-9 border border-sky-300 bg-sky-100 px-4 text-xs font-semibold text-sky-700 shadow-none hover:bg-sky-200 cursor-pointer dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30";
+
+// Makes the StudentSearchBox input match the other boxes
+const SEARCH_LOOK = [
+  "[&_input]:!h-9 [&_input]:!rounded-lg [&_input]:!border [&_input]:!text-sm",
+  "[&_input]:!bg-white [&_input]:!text-slate-700 [&_input]:!border-slate-200",
+  "dark:[&_input]:!bg-slate-900 dark:[&_input]:!text-slate-200 dark:[&_input]:!border-slate-700",
+  "[&_input]:focus:!border-sky-500 [&_input]:focus:!ring-2 [&_input]:focus:!ring-sky-100 dark:[&_input]:focus:!ring-sky-500/20",
+].join(" ");
+
 // ─────────────────────────────────────────────────────────────
 // UI pieces
 // ─────────────────────────────────────────────────────────────
@@ -81,28 +118,24 @@ function Card({
   subtitle,
   right,
   children,
+  bg,
 }: {
   title: string;
   subtitle?: string;
   right?: React.ReactNode;
   children: React.ReactNode;
+  bg?: string; // optional background (e.g. same colour as the tables)
 }) {
   return (
     <div
-      className="rounded-xl border overflow-hidden"
-      style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      style={bg ? { backgroundColor: bg } : undefined}
     >
-      <div
-        className="flex flex-wrap items-center justify-between gap-3 px-5 py-1 border-b"
-        style={{ borderColor: "var(--border)" }}
-      >
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-1 dark:border-slate-700">
         <div>
           <h2 className="text-sm font-bold text-foreground">{title}</h2>
           {subtitle && (
-            <p
-              className="text-xs mt-0.5"
-              style={{ color: "var(--muted-foreground)" }}
-            >
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               {subtitle}
             </p>
           )}
@@ -127,31 +160,19 @@ function InfoTile({
   hint?: string;
 }) {
   return (
-    <div
-      className="flex items-center gap-3 rounded-lg border px-3 py-1"
-      style={{ borderColor: "var(--border)", backgroundColor: "var(--muted)" }}
-    >
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
-      >
+    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 dark:border-slate-700 dark:bg-slate-800/60">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
         {icon}
       </span>
       <span className="min-w-0">
-        <span
-          className="block text-[10px] font-bold uppercase tracking-wider"
-          style={{ color: "var(--muted-foreground)" }}
-        >
+        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           {label}
         </span>
-        <span className="block text-sm font-semibold text-foreground truncate">
+        <span className="block truncate text-sm font-semibold text-foreground">
           {value}
         </span>
         {hint && (
-          <span
-            className="block text-[10px]"
-            style={{ color: "var(--muted-foreground)" }}
-          >
+          <span className="block text-[10px] text-slate-500 dark:text-slate-400">
             {hint}
           </span>
         )}
@@ -172,18 +193,12 @@ function IssueDateTile({
 }) {
   return (
     <div className="group relative">
-      <div
-        className="pointer-events-none flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-shadow group-hover:shadow-sm group-focus-within:ring-2 group-focus-within:ring-sky-500/40"
-        style={{ borderColor: "var(--border)", backgroundColor: "var(--card)" }}
-      >
+      <div className="pointer-events-none flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-shadow group-hover:shadow-sm group-focus-within:ring-2 group-focus-within:ring-sky-500/40 dark:border-slate-700 dark:bg-slate-900">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-sky-200 bg-sky-50 dark:border-sky-500/30 dark:bg-sky-500/10">
           <CalendarDays className="w-4 h-4 text-sky-600 dark:text-sky-300" />
         </span>
         <span>
-          <span
-            className="block text-[10px] font-bold uppercase tracking-wider"
-            style={{ color: "var(--muted-foreground)" }}
-          >
+          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Issue Date
           </span>
           <span className="block text-sm font-semibold text-foreground">
@@ -225,11 +240,20 @@ function FeeVoucherPage() {
   const canPrint = can("vouchers", "export");
   const canOpenSettings = can("settings", "view");
 
+  // Same background as the MRT tables (Classes, Students…): MUI theme colour
+  const muiTheme = useTheme();
+  const tableBg =
+    muiTheme.palette.mode === "dark"
+      ? lighten(muiTheme.palette.background.default, 0.05)
+      : muiTheme.palette.background.default;
+
   const [issueDate, setIssueDate] = useState(toYMD());
   const [settings, setSettings] = useState<any>(null);
   const [classes, setClasses] = useState<any[]>([]);
+  const [classesLoading, setClassesLoading] = useState(true);
 
-  // "" = nothing selected, SEARCH_MODE = search, otherwise a classId
+  // Tab + mode ("" = nothing selected, SEARCH_MODE = search, otherwise a classId)
+  const [tab, setTab] = useState<Tab>("class");
   const [mode, setMode] = useState("");
   const [section, setSection] = useState("all");
 
@@ -253,7 +277,7 @@ function FeeVoucherPage() {
   // Super admin: resolve school from subdomain
   useEffect(() => {
     if (!isSuperAdmin) return;
-        const slug = getSubdomain(window.location.hostname);
+    const slug = getSubdomain(window.location.hostname);
     if (slug) {
       fetch(`/api/superadmin/schools?slug=${slug}&fields=basic`)
         .then((r) => r.json())
@@ -264,6 +288,7 @@ function FeeVoucherPage() {
   // Load settings + classes
   useEffect(() => {
     if (!schoolId) return;
+    setClassesLoading(true);
     Promise.all([
       fetch(`/api/settings?schoolId=${schoolId}`).then((r) => r.json()),
       fetch(`/api/classes?schoolId=${schoolId}`).then((r) => r.json()),
@@ -272,7 +297,8 @@ function FeeVoucherPage() {
         setSettings(s);
         setClasses(Array.isArray(cls) ? cls : []);
       })
-      .catch(() => notify.error("Failed to load settings or classes"));
+      .catch(() => notify.error("Failed to load settings or classes"))
+      .finally(() => setClassesLoading(false));
   }, [schoolId]);
 
   // Class mode: load students of the selected class + section
@@ -340,6 +366,16 @@ function FeeVoucherPage() {
     setPicked([]);
     setResult(null);
   };
+
+  // Tab: Class → wait for a class chip, Search → search box
+  const changeTab = (t: Tab) => {
+    if (t === tab) return;
+    setTab(t);
+    changeMode(t === "search" ? SEARCH_MODE : "");
+  };
+
+  // Class chip: choose, or click again to clear
+  const pickClass = (id: string) => changeMode(mode === id ? "" : id);
 
   const toggleStudent = (id: string) =>
     setSelected((prev) => {
@@ -410,8 +446,7 @@ function FeeVoucherPage() {
           canOpenSettings ? (
             <Link
               href="/settings"
-              className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
-              style={{ borderColor: "var(--border)" }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-sky-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700 hover:bg-sky-200 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
             >
               <Settings2 className="w-3.5 h-3.5" /> Open Settings
             </Link>
@@ -469,77 +504,97 @@ function FeeVoucherPage() {
           )
         }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <TextField
-            select
-            label="Select By"
-            size="small"
-            value={mode}
-            onChange={(e) => changeMode(e.target.value)}
-            SelectProps={{ native: true }}
-            InputLabelProps={{ shrink: true }}
-          >
-            <option value="">Choose a class or search</option>
-            <option value={SEARCH_MODE}>Search Students</option>
-            <optgroup label="Classes">
-              {classes.map((c) => (
-                <option key={c._id} value={String(c._id)}>
-                  {c.name}
-                </option>
-              ))}
-            </optgroup>
-          </TextField>
-
-          {/* Class mode → section; Search mode → search box */}
-          {selectedClass && (
-            <TextField
-              select
-              label="Section"
-              size="small"
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              SelectProps={{ native: true }}
-              InputLabelProps={{ shrink: true }}
-            >
-              <option value="all">All Sections</option>
-              {sectionNames(selectedClass).map((sec) => (
-                <option key={sec} value={sec}>
-                  {sec}
-                </option>
-              ))}
-            </TextField>
-          )}
+        {/* Row 1: tabs + search box (Search tab) */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex flex-wrap gap-0.5 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => changeTab(t.key)}
+                  className={`${TAB} ${tab === t.key ? TAB_ON : TAB_OFF}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
 
           {isSearchMode && (
-            <StudentSearchBox
-              schoolId={schoolId}
-              onSelect={addPicked}
-              clearOnSelect
-              showSearchButton={false}
-              variant="page"
-              placeholder="Type a student name or GR # and pick a student"
-            />
+            <div className={`w-full sm:w-80 ${SEARCH_LOOK}`}>
+              <StudentSearchBox
+                schoolId={schoolId}
+                onSelect={addPicked}
+                clearOnSelect
+                showSearchButton={false}
+                variant="page"
+                placeholder="Name or GR #"
+              />
+            </div>
           )}
         </div>
 
+        {/* Row 2: class chips (Class tab) */}
+        {tab === "class" && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {classesLoading ? (
+              <span className="py-1.5 text-xs text-slate-400 dark:text-slate-500">Loading classes…</span>
+            ) : classes.length === 0 ? (
+              <span className="py-1.5 text-xs text-slate-400 dark:text-slate-500">No classes found</span>
+            ) : (
+              classes.map((c) => {
+                const id = String(c._id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => pickClass(id)}
+                    className={`${CHIP} ${mode === id ? CHIP_ON : CHIP_OFF}`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Row 3: section chips (after a class is chosen) */}
+        {selectedClass && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-dashed border-slate-200 pt-3 dark:border-slate-700">
+            <span className="mr-1 text-[11px] text-slate-400 dark:text-slate-500">Section:</span>
+            <button
+              type="button"
+              onClick={() => setSection("all")}
+              className={`${SEC} ${section === "all" ? SEC_ON : SEC_OFF}`}
+            >
+              All
+            </button>
+            {sectionNames(selectedClass).map((sec) => (
+              <button
+                key={sec}
+                type="button"
+                onClick={() => setSection(sec)}
+                className={`${SEC} ${section === sec ? SEC_ON : SEC_OFF}`}
+              >
+                {sec}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Students area */}
         <div
-          className="mt-4 rounded-lg border"
-          style={{
-            borderColor: "var(--border)",
-            backgroundColor: "var(--muted)",
-          }}
+          className="mt-4 rounded-lg border border-slate-200 dark:border-slate-800"
+          style={{ backgroundColor: tableBg }}
         >
           {/* Toolbar (class mode only) */}
           {selectedClass && classStudents.length > 0 && (
-            <div
-              className="flex items-center justify-between gap-2 px-3 py-2 border-b"
-              style={{ borderColor: "var(--border)" }}
-            >
-              <span
-                className="text-[11px]"
-                style={{ color: "var(--muted-foreground)" }}
-              >
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 Click a name to include or exclude
               </span>
               <div className="flex items-center gap-1">
@@ -570,14 +625,8 @@ function FeeVoucherPage() {
 
           {/* Toolbar (search mode) */}
           {isSearchMode && picked.length > 0 && (
-            <div
-              className="flex items-center justify-between gap-2 px-3 py-2 border-b"
-              style={{ borderColor: "var(--border)" }}
-            >
-              <span
-                className="text-[11px]"
-                style={{ color: "var(--muted-foreground)" }}
-              >
+            <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 {picked.length} student(s) added — sorted by GR # when printed
               </span>
               <Button
@@ -594,18 +643,12 @@ function FeeVoucherPage() {
 
           <div className="max-h-72 overflow-y-auto p-3">
             {!mode ? (
-              <p
-                className="py-6 text-center text-xs"
-                style={{ color: "var(--muted-foreground)" }}
-              >
-                Choose a class or &quot;Search Student&quot; to begin.
+              <p className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
+                Choose a class or search to begin.
               </p>
             ) : isSearchMode ? (
               picked.length === 0 ? (
-                <p
-                  className="flex items-center justify-center gap-1.5 py-6 text-center text-xs"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
+                <p className="flex items-center justify-center gap-1.5 py-6 text-center text-xs text-slate-400 dark:text-slate-500">
                   <Search className="w-3.5 h-3.5" /> Search and pick students
                   from any class.
                 </p>
@@ -614,14 +657,14 @@ function FeeVoucherPage() {
                   {picked.map((s) => (
                     <span
                       key={s._id}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-sky-600 bg-sky-600 px-2 py-1 text-[11px] font-medium text-white"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-sky-300 bg-sky-100 px-2 py-1 text-[11px] font-medium text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300"
                     >
                       <span>{s.fullName}</span>
-                      <span className="text-sky-100">
+                      <span className="text-sky-500 dark:text-sky-400/80">
                         ({s.className}
                         {s.section ? `-${s.section}` : ""})
                       </span>
-                      <span className="rounded bg-sky-700 px-1 font-mono text-[10px]">
+                      <span className="rounded bg-sky-200 px-1 font-mono text-[10px] text-sky-800 dark:bg-sky-500/30 dark:text-sky-200">
                         {s.grNumber}
                       </span>
                       <button
@@ -631,7 +674,7 @@ function FeeVoucherPage() {
                             prev.filter((p) => p._id !== s._id),
                           )
                         }
-                        className="ml-0.5 rounded hover:bg-sky-700 cursor-pointer"
+                        className="ml-0.5 rounded hover:bg-sky-200 cursor-pointer dark:hover:bg-sky-500/30"
                         aria-label={`Remove ${s.fullName}`}
                       >
                         <X className="w-3 h-3" />
@@ -641,17 +684,11 @@ function FeeVoucherPage() {
                 </div>
               )
             ) : loadingStudents ? (
-              <p
-                className="py-6 text-center text-xs"
-                style={{ color: "var(--muted-foreground)" }}
-              >
+              <p className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
                 Loading students...
               </p>
             ) : classStudents.length === 0 ? (
-              <p
-                className="py-6 text-center text-xs"
-                style={{ color: "var(--muted-foreground)" }}
-              >
+              <p className="py-6 text-center text-xs text-slate-400 dark:text-slate-500">
                 No students found in this class / section.
               </p>
             ) : (
@@ -665,36 +702,22 @@ function FeeVoucherPage() {
                       onClick={() => toggleStudent(s._id)}
                       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
                         on
-                          ? "border-sky-600 bg-sky-600 text-white hover:bg-sky-700"
-                          : "text-foreground hover:border-sky-400"
+                          ? "border-sky-300 bg-sky-100 text-sky-700 hover:bg-sky-200 dark:border-sky-500/40 dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-500/30"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-sky-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-sky-500/40"
                       }`}
-                      style={
-                        on
-                          ? undefined
-                          : {
-                              borderColor: "var(--border)",
-                              backgroundColor: "var(--card)",
-                            }
-                      }
                     >
                       <span>{s.fullName}</span>
                       {s.section && (
-                        <span
-                          className={on ? "text-sky-100" : ""}
-                          style={
-                            on
-                              ? undefined
-                              : { color: "var(--muted-foreground)" }
-                          }
-                        >
+                        <span className={on ? "text-sky-500 dark:text-sky-400/80" : "text-slate-400 dark:text-slate-500"}>
                           ({s.section})
                         </span>
                       )}
                       <span
-                        className={`rounded px-1 font-mono text-[10px] ${on ? "bg-sky-700 text-white" : ""}`}
-                        style={
-                          on ? undefined : { backgroundColor: "var(--muted)" }
-                        }
+                        className={`rounded px-1 font-mono text-[10px] ${
+                          on
+                            ? "bg-sky-200 text-sky-800 dark:bg-sky-500/30 dark:text-sky-200"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                        }`}
                       >
                         {s.grNumber}
                       </span>
@@ -708,10 +731,7 @@ function FeeVoucherPage() {
 
         {/* Generate */}
         <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-          <span
-            className="text-[11px] mr-auto"
-            style={{ color: "var(--muted-foreground)" }}
-          >
+          <span className="mr-auto text-[11px] text-slate-500 dark:text-slate-400">
             Only pending and partially paid invoices are included ·{" "}
             {perPageText}
           </span>
@@ -719,7 +739,7 @@ function FeeVoucherPage() {
             <Button
               onClick={handleGenerate}
               disabled={generating || targetStudents.length === 0}
-              className="h-9 bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 dark:text-slate-900 text-white text-xs font-semibold px-4 cursor-pointer"
+              className={BTN_SKY}
             >
               <Zap className="w-3.5 h-3.5 mr-1" />
               {generating ? "Generating..." : "Generate Fee Vouchers"}
@@ -736,6 +756,7 @@ function FeeVoucherPage() {
       {/* ── Result ── */}
       {result && (
         <Card
+        bg={tableBg}
           title="Vouchers Ready"
           subtitle={`${result.vouchers.length} voucher(s) generated${
             result.skipped
@@ -746,7 +767,7 @@ function FeeVoucherPage() {
             result.vouchers.length > 0 && (
               <Button
                 onClick={() => printVouchers(result.vouchers)}
-                className="h-9 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 cursor-pointer"
+                className={BTN_SKY}
               >
                 <Printer className="w-3.5 h-3.5 mr-1" />
                 Print Fee Vouchers
@@ -760,13 +781,10 @@ function FeeVoucherPage() {
               None of the selected students have pending invoices.
             </div>
           ) : (
-            <div
-              className="rounded-md border overflow-hidden"
-              style={{ borderColor: "var(--border)" }}
-            >
+            <div className="overflow-hidden rounded-md border border-slate-200 dark:border-slate-800">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr style={{ backgroundColor: "var(--muted)" }}>
+                  <tr>
                     {[
                       "S#",
                       "GR #",
@@ -779,12 +797,11 @@ function FeeVoucherPage() {
                     ].map((h) => (
                       <th
                         key={h}
-                        className={`p-2 font-bold ${
+                        className={`p-2 font-bold text-slate-500 dark:text-slate-400 ${
                           ["Lines", "Within Due", "After Due"].includes(h)
                             ? "text-right"
                             : "text-left"
                         }`}
-                        style={{ color: "var(--muted-foreground)" }}
                       >
                         {h}
                       </th>
@@ -795,12 +812,7 @@ function FeeVoucherPage() {
                   {result.vouchers.map((v, i) => (
                     <tr
                       key={v.studentId}
-                      className="border-t"
-                      style={{
-                        borderColor: "var(--border)",
-                        backgroundColor:
-                          i % 2 === 0 ? "var(--card)" : "var(--muted)",
-                      }}
+                      className="border-t border-slate-200 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800/60"
                     >
                       <td className="p-2 text-foreground">{i + 1}</td>
                       <td className="p-2 font-mono text-sky-700 dark:text-sky-300">
@@ -809,13 +821,10 @@ function FeeVoucherPage() {
                       <td className="p-2 font-medium text-foreground">
                         {v.student.name}
                       </td>
-                      <td className="p-2" style={{ color: "var(--muted-foreground)" }}>
+                      <td className="p-2 text-slate-500 dark:text-slate-400">
                         {v.student.parentName || "---"}
-                        </td>
-                      <td
-                        className="p-2"
-                        style={{ color: "var(--muted-foreground)" }}
-                      >
+                      </td>
+                      <td className="p-2 text-slate-500 dark:text-slate-400">
                         {v.student.className}
                         {v.student.section ? ` (${v.student.section})` : ""}
                       </td>
@@ -832,18 +841,8 @@ function FeeVoucherPage() {
                       </td>
                     </tr>
                   ))}
-                  <tr
-                    className="border-t font-bold"
-                    style={{
-                      borderColor: "var(--border)",
-                      backgroundColor: "var(--muted)",
-                    }}
-                  >
-                    <td
-                      colSpan={6}
-                      className="p-2"
-                      style={{ color: "var(--muted-foreground)" }}
-                    >
+                  <tr className="border-t border-slate-200 font-bold dark:border-slate-700">
+                    <td colSpan={6} className="p-2 text-slate-500 dark:text-slate-400">
                       Total
                     </td>
                     <td className="p-2 text-right text-foreground">

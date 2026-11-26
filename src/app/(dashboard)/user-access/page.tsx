@@ -73,6 +73,7 @@ export default function UserAccessPage() {
     }
   }, [isSuperAdmin]);
 
+  
   // ── Users + roles of this school
   const loadAll = useCallback(async () => {
     if (!schoolId) return;

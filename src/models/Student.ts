@@ -71,6 +71,7 @@ const StudentSchema = new Schema<IStudent>(
 );
 StudentSchema.index({ schoolId: 1, grNumber: 1 }, { unique: true });
 
+
 StudentSchema.pre<IStudent>("save", async function () {
   const doc = this;
   if (!doc.isNew) return;
@@ -81,7 +82,7 @@ StudentSchema.pre<IStudent>("save", async function () {
   // 1. GR Number: keep the given one (e.g. from an import sheet), otherwise next number
   let grNumber = Number(doc.grNumber) || 0;
   if (!grNumber) {
-    const lastStudent = await StudentModel.findOne({ schoolId: doc.schoolId })
+    const lastStudent = await (StudentModel as any).findOne({ schoolId: doc.schoolId })
       .sort({ grNumber: -1 })
       .select("grNumber")
       .lean();
@@ -92,7 +93,6 @@ StudentSchema.pre<IStudent>("save", async function () {
   }
   doc.grNumber = grNumber;
 
-  
   // 2. Prefix (first 3 letters of the school id)
   const shortPrefix = String(doc.schoolId)
     .replace(/[^a-zA-Z]/g, "")
